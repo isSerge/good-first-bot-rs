@@ -1,7 +1,7 @@
-use teloxide::prelude::*;
-use teloxide::utils::command::BotCommands;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use teloxide::prelude::*;
+use teloxide::utils::command::BotCommands;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -18,21 +18,47 @@ enum Command {
 
 type Storage = Arc<Mutex<HashMap<ChatId, Vec<String>>>>;
 
-async fn handle_commands(bot: Bot, msg: Message, cmd: Command, storage: Storage) -> ResponseResult<()> {
+async fn handle_commands(
+    bot: Bot,
+    msg: Message,
+    cmd: Command,
+    storage: Storage,
+) -> ResponseResult<()> {
     match cmd {
         Command::Help => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
                 .await?;
         }
         Command::Add(repo) => {
-            {
-                let mut storage = storage.lock().unwrap();
-                storage.entry(msg.chat.id)
-                    .or_insert_with(Vec::new)
-                    .push(repo.clone());
+            // check if repo is not empty
+            if repo.trim().is_empty() {
+                bot.send_message(msg.chat.id, "Repository name cannot be empty. Please use format: owner/repo")
+                    .await?;
+                return Ok(());
             }
-            bot.send_message(msg.chat.id, format!("Added repo: {}", repo))
-                .await?;
+
+            // check if repo is already in the list
+            let already_exists = {
+                let storage = storage.lock().unwrap();
+                storage.get(&msg.chat.id)
+                    .map(|repos| repos.contains(&repo))
+                    .unwrap_or(false)
+            };
+
+            if already_exists {
+                bot.send_message(msg.chat.id, format!("Repository {} is already in your list", repo))
+                    .await?;
+            } else {
+                {
+                    let mut storage = storage.lock().unwrap();
+                    storage
+                        .entry(msg.chat.id)
+                        .or_insert_with(Vec::new)
+                        .push(repo.clone());
+                }
+                bot.send_message(msg.chat.id, format!("Added repo: {}", repo))
+                    .await?;
+            }
         }
         Command::Remove(repo) => {
             let removed = {
@@ -44,22 +70,28 @@ async fn handle_commands(bot: Bot, msg: Message, cmd: Command, storage: Storage)
                     false
                 }
             };
-            
+
             if removed {
-                bot.send_message(msg.chat.id, format!("Removed repo: {}", repo)).await?;
+                bot.send_message(msg.chat.id, format!("Removed repo: {}", repo))
+                    .await?;
             } else {
-                bot.send_message(msg.chat.id, "You don't have any repositories tracked.").await?;
+                bot.send_message(msg.chat.id, "You don't have any repositories tracked.")
+                    .await?;
             }
         }
         Command::List => {
             let repos = {
                 let storage = storage.lock().unwrap();
-                storage.get(&msg.chat.id)
+                storage
+                    .get(&msg.chat.id)
                     .map(|repos| repos.join("\n"))
                     .unwrap_or_else(|| "No repositories tracked.".to_string())
             };
-            bot.send_message(msg.chat.id, format!("Your tracked repositories:\n{}", repos))
-                .await?;
+            bot.send_message(
+                msg.chat.id,
+                format!("Your tracked repositories:\n{}", repos),
+            )
+            .await?;
         }
     }
     Ok(())
@@ -73,12 +105,15 @@ async fn main() {
     let storage: Storage = Arc::new(Mutex::new(HashMap::new()));
     let bot = Bot::from_env();
 
-    let handler = dptree::entry()
-        .branch(Update::filter_message()
+    let handler = dptree::entry().branch(
+        Update::filter_message()
             .filter_command::<Command>()
-            .endpoint(|bot: Bot, msg: Message, cmd: Command, storage: Storage| async move {
-                handle_commands(bot, msg, cmd, storage).await
-            }));
+            .endpoint(
+                |bot: Bot, msg: Message, cmd: Command, storage: Storage| async move {
+                    handle_commands(bot, msg, cmd, storage).await
+                },
+            ),
+    );
 
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![storage])
