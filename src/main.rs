@@ -75,7 +75,7 @@ async fn handle_commands(
                 bot.send_message(msg.chat.id, format!("Removed repo: {}", repo))
                     .await?;
             } else {
-                bot.send_message(msg.chat.id, "You don't have any repositories tracked.")
+                bot.send_message(msg.chat.id, format!("You are not tracking repo: {}", repo))
                     .await?;
             }
         }
