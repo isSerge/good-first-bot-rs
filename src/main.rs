@@ -8,13 +8,14 @@ mod bot_handler;
 mod github;
 mod storage;
 
-use crate::bot_handler::{BotHandler, Command};
+use crate::bot_handler::{BotHandler, Command, CommandState};
 use crate::storage::Storage;
 use anyhow::Context;
 use log::debug;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
+use teloxide::dispatching::dialogue::{Dialogue, InMemStorage};
 use teloxide::prelude::*;
 use tokio::sync::Mutex;
 
@@ -37,22 +38,39 @@ async fn run() -> anyhow::Result<()> {
     debug!("GitHub token retrieved successfully.");
 
     let github_client =
-        github::GithubClient::new(github_token).context("Failed to create GitHub client")?;
+        github::GithubClient::new(github_token, None).context("Failed to create GitHub client")?;
     debug!("GitHub client created successfully.");
 
-    let handler = BotHandler::new(github_client, storage, bot.clone());
+    // Dialogue storage for conversation state.
+    let dialogue_storage = InMemStorage::<CommandState>::new();
+
+    let handler = Arc::new(BotHandler::new(github_client, storage, bot.clone()));
+    let handler_clone = handler.clone();
 
     Dispatcher::builder(
         bot,
-        dptree::entry().branch(
-            Update::filter_message()
-                .filter_command::<Command>()
-                .endpoint(move |msg: Message, cmd: Command| {
-                    let handler = handler.clone();
-                    async move { handler.handle_commands(msg, cmd).await }
-                }),
-        ),
+        dptree::entry()
+            .branch(
+                Update::filter_message()
+                    .enter_dialogue::<Message, InMemStorage<CommandState>, CommandState>()
+                    .branch(
+                        Update::filter_message()
+                            .filter_command::<Command>()
+                            .endpoint(move |msg: Message, cmd: Command, dialogue: Dialogue<CommandState, InMemStorage<CommandState>>| {
+                                let handler = handler.clone();
+                                async move { handler.handle_commands(msg, cmd, dialogue).await }
+                            })
+                    )
+                    .branch(
+                        Update::filter_message()
+                            .endpoint(move |msg: Message, dialogue: Dialogue<CommandState, InMemStorage<CommandState>>| {
+                                let handler = handler_clone.clone();
+                                async move { handler.handle_reply(msg, dialogue).await }
+                            })
+                    ),
+            ),
     )
+    .dependencies(dptree::deps![dialogue_storage])
     .enable_ctrlc_handler()
     .build()
     .dispatch()
