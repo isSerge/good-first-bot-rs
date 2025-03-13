@@ -1,0 +1,8 @@
+type Query {
+  repository(owner: String!, name: String!): Repository
+}
+
+type Repository {
+  id: ID!
+  nameWithOwner: String!
+}
