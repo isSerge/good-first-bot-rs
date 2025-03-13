@@ -5,4 +5,5 @@ type Query {
 type Repository {
   id: ID!
   nameWithOwner: String!
+  url: String!
 }

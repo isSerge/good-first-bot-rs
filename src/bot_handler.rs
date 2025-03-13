@@ -1,5 +1,5 @@
 use crate::github;
-use crate::storage::Storage;
+use crate::storage::{Repository, Storage};
 use teloxide::utils::command::BotCommands;
 use teloxide::{prelude::*, types::Message};
 
@@ -53,6 +53,8 @@ impl BotHandler {
         }
 
         if let Some((owner, repo_name)) = parse_repo_name(&repo) {
+            let repo_url = format!("https://github.com/{}/{}", owner, repo_name);
+            let repo = Repository::new(format!("{}/{}", owner, repo_name), repo_url.clone());
             match self.github_client.repo_exists(owner, repo_name).await {
                 Ok(true) => {
                     let mut storage_lock = self.storage.lock().await;
@@ -60,13 +62,19 @@ impl BotHandler {
                     if repos.contains(&repo) {
                         self.send_response(
                             msg.chat.id,
-                            format!("Repository {} is already in your list", repo),
+                            format!(
+                                "Repository {} is already in your list",
+                                repo.name_with_owner
+                            ),
                         )
                         .await?;
                     } else {
-                        repos.push(repo.clone());
-                        self.send_response(msg.chat.id, format!("Added repo: {}", repo))
-                            .await?;
+                        repos.push(repo);
+                        self.send_response(
+                            msg.chat.id,
+                            format!("Added repo: {} ({})", repo_name, repo_url),
+                        )
+                        .await?;
                     }
                 }
                 Ok(false) => {
@@ -90,8 +98,16 @@ impl BotHandler {
         let storage_lock = self.storage.lock().await;
         let repos_msg = storage_lock
             .get(&msg.chat.id)
-            .map(|repos| repos.join("\n"))
+            .filter(|repos| !repos.is_empty())
+            .map(|repos| {
+                repos
+                    .iter()
+                    .map(|r| format!("{} ({})", r.name_with_owner, r.url))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
             .unwrap_or_else(|| "No repositories tracked.".to_string());
+
         self.send_response(
             msg.chat.id,
             format!("Your tracked repositories:\n{}", repos_msg),
@@ -104,7 +120,7 @@ impl BotHandler {
         let mut storage_lock = self.storage.lock().await;
         if let Some(repos) = storage_lock.get_mut(&msg.chat.id) {
             let initial_len = repos.len();
-            repos.retain(|r| r != &repo);
+            repos.retain(|r| r.name_with_owner != repo);
             if repos.len() != initial_len {
                 self.send_response(msg.chat.id, format!("Removed repo: {}", repo))
                     .await?;
