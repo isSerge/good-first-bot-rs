@@ -36,10 +36,7 @@ async fn send_response(bot: &Bot, chat_id: ChatId, text: impl ToString) -> Respo
 }
 
 fn parse_repo_name(repo_name_with_owner: &str) -> Option<(&str, &str)> {
-  match repo_name_with_owner.split('/').collect::<Vec<_>>().as_slice() {
-      [owner, repo_name] => Some((*owner, *repo_name)),
-      _ => None,
-  }
+  repo_name_with_owner.split_once('/')
 }
 
 async fn handle_add_command(
@@ -47,34 +44,29 @@ async fn handle_add_command(
   msg: &Message,
   repo: String,
   storage: &Storage,
-  github_client: &Arc<github::GithubClient>,
+  github_client: &github::GithubClient,
 ) -> ResponseResult<()> {
   if repo.trim().is_empty() {
       return send_response(bot, msg.chat.id, "Repository name cannot be empty. Please use format: owner/repo").await;
   }
-  if let Some((owner, repo_name)) = parse_repo_name(&repo) {
-      match github_client.repo_exists(owner, repo_name).await {
+
+  match parse_repo_name(&repo) {
+      Some((owner, repo_name)) => match github_client.repo_exists(owner, repo_name).await {
           Ok(true) => {
               let mut storage_lock = storage.lock().await;
-              let repos = storage_lock.entry(msg.chat.id).or_insert_with(Vec::new);
+              let repos = storage_lock.entry(msg.chat.id).or_default();
               if repos.contains(&repo) {
-                  send_response(bot, msg.chat.id, format!("Repository {} is already in your list", repo)).await?;
+                  send_response(bot, msg.chat.id, format!("Repository {} is already in your list", repo)).await
               } else {
                   repos.push(repo.clone());
-                  send_response(bot, msg.chat.id, format!("Added repo: {}", repo)).await?;
+                  send_response(bot, msg.chat.id, format!("Added repo: {}", repo)).await
               }
           }
-          Ok(false) => {
-              send_response(bot, msg.chat.id, "Repository does not exist on GitHub.").await?;
-          }
-          Err(e) => {
-              send_response(bot, msg.chat.id, format!("Error checking repository: {}", e)).await?;
-          }
-      }
-  } else {
-      send_response(bot, msg.chat.id, "Invalid repository format. Use owner/repo.").await?;
+          Ok(false) => send_response(bot, msg.chat.id, "Repository does not exist on GitHub.").await,
+          Err(e) => send_response(bot, msg.chat.id, format!("Error checking repository: {}", e)).await,
+      },
+      None => send_response(bot, msg.chat.id, "Invalid repository format. Use owner/repo.").await,
   }
-  Ok(())
 }
 
 async fn handle_commands(
