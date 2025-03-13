@@ -5,14 +5,14 @@
 //! It provides a simple interface to add, remove, and list tracked repositories.
 
 mod bot_handler;
+mod config;
 mod github;
 mod storage;
 
 use crate::bot_handler::{BotHandler, Command, CommandState};
+use crate::config::Config;
 use crate::storage::Storage;
-use anyhow::Context;
 use log::debug;
-use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::{Dialogue, InMemStorage};
 use teloxide::prelude::*;
@@ -29,15 +29,10 @@ async fn main() {
 }
 
 async fn run() -> anyhow::Result<()> {
+    let config = Config::from_env()?;
     let storage = Storage::new();
-    let bot = Bot::from_env();
-    let github_token =
-        env::var("GITHUB_TOKEN").context("GITHUB_TOKEN environment variable is required")?;
-    debug!("GitHub token retrieved successfully.");
-
-    let github_client =
-        github::GithubClient::new(github_token, None).context("Failed to create GitHub client")?;
-    debug!("GitHub client created successfully.");
+    let bot = Bot::new(config.telegram_bot_token.clone());
+    let github_client = github::GithubClient::new(config.github_token, config.github_graphql_url)?;
 
     // Dialogue storage for conversation state.
     let dialogue_storage = InMemStorage::<CommandState>::new();
