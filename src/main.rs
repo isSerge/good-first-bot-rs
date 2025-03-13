@@ -45,7 +45,7 @@ async fn run() -> anyhow::Result<()> {
     let dialogue_storage = InMemStorage::<CommandState>::new();
 
     let handler = Arc::new(BotHandler::new(github_client, storage, bot.clone()));
-    let handler_clone = handler.clone();
+    let handler_clone = Arc::clone(&handler);
 
     Dispatcher::builder(
         bot,
