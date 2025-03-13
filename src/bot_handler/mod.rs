@@ -1,3 +1,5 @@
+mod utils;
+
 use crate::github;
 use crate::storage::{Repository, Storage};
 use teloxide::utils::command::BotCommands;
@@ -52,7 +54,7 @@ impl BotHandler {
                 .await;
         }
 
-        if let Some((owner, repo_name)) = parse_repo_name(&repo) {
+        if let Some((owner, repo_name)) = utils::parse_repo_name(&repo) {
             let repo_url = format!("https://github.com/{}/{}", owner, repo_name);
             let repo = Repository::new(format!("{}/{}", owner, repo_name), repo_url.clone());
             match self.github_client.repo_exists(owner, repo_name).await {
@@ -96,17 +98,14 @@ impl BotHandler {
     /// Handles the List command.
     async fn handle_list_command(&self, msg: &Message) -> ResponseResult<()> {
         let storage_lock = self.storage.lock().await;
-        let repos_msg = storage_lock
-            .get(&msg.chat.id)
-            .filter(|repos| !repos.is_empty())
-            .map(|repos| {
-                repos
-                    .iter()
-                    .map(|r| format!("{} ({})", r.name_with_owner, r.url))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            })
-            .unwrap_or_else(|| "No repositories tracked.".to_string());
+        let user_repos = storage_lock
+            .get(&msg.chat.id);
+
+        if user_repos.is_none() {
+            return self.send_response(msg.chat.id, "No repositories tracked.").await;
+        }
+
+        let repos_msg = utils::format_tracked_repos(user_repos.unwrap());
 
         self.send_response(
             msg.chat.id,
@@ -154,9 +153,4 @@ impl BotHandler {
         }
         Ok(())
     }
-}
-
-/// Parses a repository string in "owner/repo" format.
-fn parse_repo_name(repo_name_with_owner: &str) -> Option<(&str, &str)> {
-    repo_name_with_owner.split_once('/')
 }
