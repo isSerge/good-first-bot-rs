@@ -16,17 +16,17 @@ pub struct Repository;
 #[derive(Clone)]
 pub struct GithubClient {
     client: Client,
+    graphql_url: String,
 }
 
 impl GithubClient {
-    pub fn new(github_token: String) -> Result<Self> {
+    pub fn new(github_token: String, graphql_url: Option<String>) -> Result<Self> {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
 
         headers.insert(
             AUTHORIZATION,
-            HeaderValue::from_str(&format!("Bearer {}", github_token))
-                .context("Failed to build authorization header")?,
+            HeaderValue::from_str(&format!("Bearer {}", github_token))?,
         );
         headers.insert(USER_AGENT, HeaderValue::from_static("github-activity-rs"));
 
@@ -36,7 +36,10 @@ impl GithubClient {
             .context("Failed to build HTTP client")?;
         debug!("HTTP client built successfully.");
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            graphql_url: graphql_url.unwrap_or_else(|| "https://api.github.com/graphql".into()),
+        })
     }
 
     /// Check if a repository exists.
@@ -49,12 +52,9 @@ impl GithubClient {
         let request = Repository::build_query(variables);
         debug!("GraphQL request: {:?}", request);
 
-        let graphql_url = std::env::var("GITHUB_GRAPHQL_URL")
-            .unwrap_or_else(|_| "https://api.github.com/graphql".into());
-
         let res = self
             .client
-            .post(&graphql_url)
+            .post(&self.graphql_url)
             .json(&request)
             .send()
             .await
