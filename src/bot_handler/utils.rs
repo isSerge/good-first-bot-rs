@@ -11,5 +11,5 @@ pub fn format_tracked_repos(repos: &[Repository]) -> String {
 
 /// Parses a repository string in "owner/repo" format.
 pub fn parse_repo_name(repo_name_with_owner: &str) -> Option<(&str, &str)> {
-  repo_name_with_owner.split_once('/')
+    repo_name_with_owner.split_once('/')
 }
