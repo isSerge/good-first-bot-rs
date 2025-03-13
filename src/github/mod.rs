@@ -60,15 +60,15 @@ impl GithubClient {
             .await
             .context("Failed to send request")?;
 
-        let response_body: Response<repository::ResponseData> =
-            res.json().await.context("Failed to parse response")?;
-        debug!("GraphQL response: {:?}", response_body);
+        let response_body: Response<repository::ResponseData> = res
+            .json()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
 
-        let repo_exists = if let Some(data) = response_body.data {
-            data.repository.is_some()
-        } else {
-            return Err(anyhow::anyhow!("No data in GraphQL response"));
-        };
+        let repo_exists = response_body
+            .data
+            .and_then(|data| data.repository)
+            .is_some();
 
         Ok(repo_exists)
     }
