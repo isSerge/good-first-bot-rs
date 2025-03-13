@@ -1,8 +1,14 @@
+#![warn(missing_docs)]
+//! A Telegram bot for tracking beginner-friendly GitHub issues.
+//!
+//! This bot allows users to track repositories and receive notifications for new issues labeled as "good first issue".
+//! It provides a simple interface to add, remove, and list tracked repositories.
+
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use teloxide::prelude::*;
 use teloxide::utils::command::BotCommands;
+use tokio::sync::Mutex;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -62,18 +68,12 @@ async fn handle_commands(
                     bot.send_message(msg.chat.id, format!("Removed repo: {}", repo))
                         .await?;
                 } else {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("You are not tracking repo: {}", repo),
-                    )
-                    .await?;
+                    bot.send_message(msg.chat.id, format!("You are not tracking repo: {}", repo))
+                        .await?;
                 }
             } else {
-                bot.send_message(
-                    msg.chat.id,
-                    format!("You are not tracking repo: {}", repo),
-                )
-                .await?;
+                bot.send_message(msg.chat.id, format!("You are not tracking repo: {}", repo))
+                    .await?;
             }
         }
         Command::List => {
@@ -95,6 +95,7 @@ async fn handle_commands(
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
+    env_logger::init();
 
     let storage: Storage = Arc::new(Mutex::new(HashMap::new()));
     let bot = Bot::from_env();
