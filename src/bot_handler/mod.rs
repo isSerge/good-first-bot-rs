@@ -65,36 +65,34 @@ impl BotHandler {
 
     /// Dispatches the incoming command to the appropriate handler.
     pub async fn handle_commands(
-        &self,
-        msg: Message,
-        cmd: Command,
-        dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
-    ) -> Result<()> {
-        // Create a handler instance for the command.
-        let handler_instance: Box<dyn CommandHandler + Send + Sync> = match cmd {
-            Command::Help => Box::new(HelpCommand),
-            Command::Add(_) => Box::new(AddCommand),
-            Command::Remove(_) => Box::new(RemoveCommand),
-            Command::List => Box::new(ListCommand),
-        };
-
-        // Extract command argument if applicable.
-        let args = match &cmd {
-            Command::Add(arg) | Command::Remove(arg) => Some(arg.clone()),
-            _ => None,
-        };
-
-        // Create a CommandContext.
-        let ctx = CommandContext {
-            handler: self,
-            message: &msg,
-            dialogue: &dialogue,
-            args,
-        };
-
-        handler_instance.handle(ctx).await?;
-        Ok(())
-    }
+      &self,
+      msg: Message,
+      cmd: Command,
+      dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+  ) -> anyhow::Result<()> {
+      // Extract command argument if applicable.
+      let args = match &cmd {
+          Command::Add(arg) | Command::Remove(arg) => Some(arg.clone()),
+          _ => None,
+      };
+  
+      // Create the command context. (Dialogue may still be passed if needed.)
+      let ctx = CommandContext {
+          handler: self,
+          message: &msg,
+          args,
+          dialogue: &dialogue,
+      };
+  
+      // Match on the command and call its handler directly.
+      match cmd {
+          Command::Help => HelpCommand.handle(ctx).await?,
+          Command::List => ListCommand.handle(ctx).await?,
+          Command::Add(_) => AddCommand.handle(ctx).await?,
+          Command::Remove(_) => RemoveCommand.handle(ctx).await?,
+      }
+      Ok(())
+  }
 
     /// Handle a reply message when we're waiting for repository input.
     pub async fn handle_reply(
