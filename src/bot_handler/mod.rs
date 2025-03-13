@@ -59,10 +59,12 @@ impl BotHandler {
     }
 
     /// Handles the Add command when the user provides a repository name.
-    async fn handle_add_command(&self, msg: &Message, repo_name_with_owner: String) -> ResponseResult<()> {
+    async fn handle_add_command(&self, msg: &Message, repo_name_with_owner: String) -> Result<()> {
         if let Some((owner, repo_name)) = utils::parse_repo_name(&repo_name_with_owner) {
-            let repo_url = format!("https://github.com/{}/{}", owner, repo_name);
-            let repo = Repository::new(format!("{}/{}", owner, repo_name), repo_url.clone());
+            let repo = Repository::from_full_name(&repo_name_with_owner)?;
+            let repo_url = repo.url.clone();
+
+            // Check if the repository exists on GitHub.
             match self.github_client.repo_exists(owner, repo_name).await {
                 Ok(true) => {
                     if self.storage.contains(&msg.chat.id, &repo).await {

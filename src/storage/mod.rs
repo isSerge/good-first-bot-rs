@@ -1,23 +1,11 @@
+mod repository;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use teloxide::types::ChatId;
 use tokio::sync::Mutex;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Repository {
-    pub url: String,
-    pub name_with_owner: String,
-}
-
-impl Repository {
-    pub fn new(name_with_owner: String, url: String) -> Self {
-        Self {
-            name_with_owner,
-            url,
-        }
-    }
-}
-
+pub use repository::Repository;
 pub struct Storage {
     data: Arc<Mutex<HashMap<ChatId, Vec<Repository>>>>,
 }
