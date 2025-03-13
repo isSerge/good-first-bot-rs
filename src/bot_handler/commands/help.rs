@@ -15,7 +15,6 @@ impl CommandHandler for HelpCommand {
         ctx.handler
             .send_response(ctx.message.chat.id, help_text)
             .await?;
-        ctx.dialogue.exit().await?;
         Ok(())
     }
 }

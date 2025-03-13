@@ -13,7 +13,6 @@ pub struct ListCommand;
 impl CommandHandler for ListCommand {
     async fn handle(&self, ctx: CommandContext<'_>) -> Result<()> {
         handle_list_command(ctx.handler, ctx.message).await?;
-        ctx.dialogue.exit().await?;
         Ok(())
     }
 }
