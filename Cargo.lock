@@ -97,6 +97,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.87"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d556ec1359574147ec0c4fc5eb525f3f23263a592b1a9c07e0a75b427de55c97"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -506,6 +517,7 @@ name = "good-first-bot-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "dotenv",
  "env_logger",
  "graphql_client",

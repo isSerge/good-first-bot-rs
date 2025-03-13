@@ -15,3 +15,4 @@ anyhow = "1.0.97"
 log = "0.4.26"
 env_logger = "0.11.7"
 tokio-util = { version = "0.6.10", features = ["codec"] }
+async-trait = "0.1.87"
