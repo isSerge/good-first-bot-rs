@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use teloxide::prelude::*;
 use teloxide::utils::command::BotCommands;
 
@@ -30,66 +31,60 @@ async fn handle_commands(
                 .await?;
         }
         Command::Add(repo) => {
-            // check if repo is not empty
             if repo.trim().is_empty() {
-                bot.send_message(msg.chat.id, "Repository name cannot be empty. Please use format: owner/repo")
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    "Repository name cannot be empty. Please use format: owner/repo",
+                )
+                .await?;
                 return Ok(());
             }
-
-            // check if repo is already in the list
-            let already_exists = {
-                let storage = storage.lock().unwrap();
-                storage.get(&msg.chat.id)
-                    .map(|repos| repos.contains(&repo))
-                    .unwrap_or(false)
-            };
-
-            if already_exists {
-                bot.send_message(msg.chat.id, format!("Repository {} is already in your list", repo))
-                    .await?;
+            let mut storage_lock = storage.lock().await;
+            let repos = storage_lock.entry(msg.chat.id).or_insert_with(Vec::new);
+            if repos.contains(&repo) {
+                bot.send_message(
+                    msg.chat.id,
+                    format!("Repository {} is already in your list", repo),
+                )
+                .await?;
             } else {
-                {
-                    let mut storage = storage.lock().unwrap();
-                    storage
-                        .entry(msg.chat.id)
-                        .or_insert_with(Vec::new)
-                        .push(repo.clone());
-                }
+                repos.push(repo.clone());
                 bot.send_message(msg.chat.id, format!("Added repo: {}", repo))
                     .await?;
             }
         }
         Command::Remove(repo) => {
-            let removed = {
-                let mut storage = storage.lock().unwrap();
-                if let Some(repos) = storage.get_mut(&msg.chat.id) {
-                    repos.retain(|r| r != &repo);
-                    true
+            let mut storage_lock = storage.lock().await;
+            if let Some(repos) = storage_lock.get_mut(&msg.chat.id) {
+                let initial_len = repos.len();
+                repos.retain(|r| r != &repo);
+                if repos.len() != initial_len {
+                    bot.send_message(msg.chat.id, format!("Removed repo: {}", repo))
+                        .await?;
                 } else {
-                    false
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("You are not tracking repo: {}", repo),
+                    )
+                    .await?;
                 }
-            };
-
-            if removed {
-                bot.send_message(msg.chat.id, format!("Removed repo: {}", repo))
-                    .await?;
             } else {
-                bot.send_message(msg.chat.id, format!("You are not tracking repo: {}", repo))
-                    .await?;
+                bot.send_message(
+                    msg.chat.id,
+                    format!("You are not tracking repo: {}", repo),
+                )
+                .await?;
             }
         }
         Command::List => {
-            let repos = {
-                let storage = storage.lock().unwrap();
-                storage
-                    .get(&msg.chat.id)
-                    .map(|repos| repos.join("\n"))
-                    .unwrap_or_else(|| "No repositories tracked.".to_string())
-            };
+            let storage_lock = storage.lock().await;
+            let repos_msg = storage_lock
+                .get(&msg.chat.id)
+                .map(|repos| repos.join("\n"))
+                .unwrap_or_else(|| "No repositories tracked.".to_string());
             bot.send_message(
                 msg.chat.id,
-                format!("Your tracked repositories:\n{}", repos),
+                format!("Your tracked repositories:\n{}", repos_msg),
             )
             .await?;
         }
@@ -101,7 +96,6 @@ async fn handle_commands(
 async fn main() {
     dotenv::dotenv().ok();
 
-    // store repo list for each user
     let storage: Storage = Arc::new(Mutex::new(HashMap::new()));
     let bot = Bot::from_env();
 
