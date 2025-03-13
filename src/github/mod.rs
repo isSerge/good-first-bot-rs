@@ -13,6 +13,7 @@ use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
 )]
 pub struct Repository;
 
+#[derive(Clone)]
 pub struct GithubClient {
     client: Client,
 }
