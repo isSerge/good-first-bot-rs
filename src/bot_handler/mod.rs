@@ -25,7 +25,6 @@ pub enum Command {
 }
 
 /// Encapsulates the bot, storage and GitHub client.
-#[derive(Clone)]
 pub struct BotHandler {
     github_client: github::GithubClient,
     storage: Storage,
@@ -60,28 +59,26 @@ impl BotHandler {
     }
 
     /// Handles the Add command when the user provides a repository name.
-    async fn handle_add_command(&self, msg: &Message, repo: String) -> ResponseResult<()> {
-        if let Some((owner, repo_name)) = utils::parse_repo_name(&repo) {
+    async fn handle_add_command(&self, msg: &Message, repo_name_with_owner: String) -> ResponseResult<()> {
+        if let Some((owner, repo_name)) = utils::parse_repo_name(&repo_name_with_owner) {
             let repo_url = format!("https://github.com/{}/{}", owner, repo_name);
             let repo = Repository::new(format!("{}/{}", owner, repo_name), repo_url.clone());
             match self.github_client.repo_exists(owner, repo_name).await {
                 Ok(true) => {
-                    let mut storage_lock = self.storage.lock().await;
-                    let repos = storage_lock.entry(msg.chat.id).or_default();
-                    if repos.contains(&repo) {
+                    if self.storage.contains(&msg.chat.id, &repo).await {
                         self.send_response(
                             msg.chat.id,
                             format!(
                                 "Repository {} is already in your list",
-                                repo.name_with_owner
+                                repo_name_with_owner
                             ),
                         )
                         .await?;
                     } else {
-                        repos.push(repo);
+                        self.storage.add_repository(msg.chat.id, repo).await;
                         self.send_response(
                             msg.chat.id,
-                            format!("Added repo: {} ({})", repo_name, repo_url),
+                            format!("Added repo: {} ({})", repo_name_with_owner, repo_url),
                         )
                         .await?;
                     }
@@ -104,16 +101,15 @@ impl BotHandler {
 
     /// Handles the List command.
     async fn handle_list_command(&self, msg: &Message) -> ResponseResult<()> {
-        let storage_lock = self.storage.lock().await;
-        let user_repos = storage_lock.get(&msg.chat.id);
+        let user_repos = self.storage.get_repositories(msg.chat.id).await;
 
-        if user_repos.is_none() || user_repos.unwrap().is_empty() {
+        if user_repos.is_empty() {
             return self
                 .send_response(msg.chat.id, "No repositories tracked.")
                 .await;
         }
 
-        let repos_msg = utils::format_tracked_repos(user_repos.unwrap());
+        let repos_msg = utils::format_tracked_repos(&user_repos);
 
         self.send_response(
             msg.chat.id,
@@ -124,17 +120,9 @@ impl BotHandler {
 
     /// Handles the Remove command when the user provides a repository name.
     async fn handle_remove_command(&self, msg: &Message, repo: String) -> ResponseResult<()> {
-        let mut storage_lock = self.storage.lock().await;
-        if let Some(repos) = storage_lock.get_mut(&msg.chat.id) {
-            let initial_len = repos.len();
-            repos.retain(|r| r.name_with_owner != repo);
-            if repos.len() != initial_len {
-                self.send_response(msg.chat.id, format!("Removed repo: {}", repo))
-                    .await?;
-            } else {
-                self.send_response(msg.chat.id, format!("You are not tracking repo: {}", repo))
-                    .await?;
-            }
+        if self.storage.remove_repository(msg.chat.id, &repo).await {
+            self.send_response(msg.chat.id, format!("Removed repo: {}", repo))
+                .await?;
         } else {
             self.send_response(msg.chat.id, format!("You are not tracking repo: {}", repo))
                 .await?;

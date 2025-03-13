@@ -12,12 +12,10 @@ use crate::bot_handler::{BotHandler, Command, CommandState};
 use crate::storage::Storage;
 use anyhow::Context;
 use log::debug;
-use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::dialogue::{Dialogue, InMemStorage};
 use teloxide::prelude::*;
-use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() {
@@ -31,7 +29,7 @@ async fn main() {
 }
 
 async fn run() -> anyhow::Result<()> {
-    let storage: Storage = Arc::new(Mutex::new(HashMap::new()));
+    let storage = Storage::new();
     let bot = Bot::from_env();
     let github_token =
         env::var("GITHUB_TOKEN").context("GITHUB_TOKEN environment variable is required")?;
