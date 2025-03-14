@@ -91,22 +91,22 @@ impl BotHandler {
         // Check if we're waiting for repository input.
         match dialogue.get().await? {
             Some(CommandState::WaitingForRepo { command }) if msg.text().is_some() => {
+                let repo_name = msg.text().unwrap();
                 match command.as_str() {
-                    "add" => add::handle(ctx, msg.text().unwrap()).await?,
-                    "remove" => remove::handle(ctx, msg.text().unwrap()).await?,
+                    "add" => add::handle(ctx, repo_name).await?,
+                    "remove" => remove::handle(ctx, repo_name).await?,
                     _ => self.send_response(msg.chat.id, "Unknown command").await?,
                 }
-                dialogue.exit().await?;
             }
             Some(_) => {
                 self.send_response(msg.chat.id, "No text found in your reply.")
                     .await?;
-                dialogue.exit().await?;
             }
             None => {
                 // Do nothing
             }
         }
+        dialogue.exit().await?;
         Ok(())
     }
 
