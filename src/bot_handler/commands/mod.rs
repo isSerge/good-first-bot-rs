@@ -28,8 +28,8 @@ impl CommandHandler for super::Command {
         match self {
             super::Command::Help => help::handle(ctx).await,
             super::Command::List => list::handle(ctx).await,
-            super::Command::Add(arg) => add::handle(ctx, arg).await,
-            super::Command::Remove(arg) => remove::handle(ctx, arg).await,
+            super::Command::Add(arg) => add::handle(ctx, &arg).await,
+            super::Command::Remove(arg) => remove::handle(ctx, &arg).await,
         }
     }
 }

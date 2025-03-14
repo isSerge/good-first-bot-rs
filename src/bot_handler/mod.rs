@@ -92,8 +92,8 @@ impl BotHandler {
         match dialogue.get().await? {
             Some(CommandState::WaitingForRepo { command }) if msg.text().is_some() => {
                 match command.as_str() {
-                    "add" => add::handle(ctx, msg.text().unwrap().to_string()).await?,
-                    "remove" => remove::handle(ctx, msg.text().unwrap().to_string()).await?,
+                    "add" => add::handle(ctx, msg.text().unwrap()).await?,
+                    "remove" => remove::handle(ctx, msg.text().unwrap()).await?,
                     _ => self.send_response(msg.chat.id, "Unknown command").await?,
                 }
                 dialogue.exit().await?;

@@ -3,7 +3,7 @@ use crate::storage::Repository;
 use anyhow::Result;
 use teloxide::types::Message;
 
-pub async fn handle(ctx: CommandContext<'_>, arg: String) -> Result<()> {
+pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     if arg.trim().is_empty() {
         ctx.handler.prompt_for_repo(ctx.message.chat.id).await?;
         ctx.dialogue
@@ -20,10 +20,10 @@ pub async fn handle(ctx: CommandContext<'_>, arg: String) -> Result<()> {
 async fn process_add(
     handler: &BotHandler,
     msg: &Message,
-    repo_name_with_owner: String,
+    repo_name_with_owner: &str,
 ) -> Result<()> {
-    if let Some((owner, repo_name)) = utils::parse_repo_name(&repo_name_with_owner) {
-        let repo = Repository::from_full_name(&repo_name_with_owner)?;
+    if let Some((owner, repo_name)) = utils::parse_repo_name(repo_name_with_owner) {
+        let repo = Repository::from_full_name(repo_name_with_owner)?;
         let repo_url = repo.url.clone();
 
         // Check if the repository exists on GitHub.
