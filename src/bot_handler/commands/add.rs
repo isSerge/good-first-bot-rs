@@ -19,46 +19,44 @@ async fn process_add(
     msg: &Message,
     repo_name_with_owner: &str,
 ) -> Result<()> {
-    match Repository::from_full_name(repo_name_with_owner) {
-        Ok(repo) => {
-            // Check if the repository exists on GitHub.
-            match handler
-                .github_client
-                .repo_exists(&repo.owner, &repo.name)
-                .await
-            {
-                Ok(true) => {
-                    if handler.storage.contains(msg.chat.id, &repo).await {
-                        handler
-                            .send_response(
-                                msg.chat.id,
-                                format!(
-                                    "Repository {} is already in your list",
-                                    repo_name_with_owner
-                                ),
-                            )
-                            .await?;
-                    } else {
-                        handler.storage.add_repository(msg.chat.id, repo.clone()).await;
-                        handler
-                            .send_response(msg.chat.id, format!("Added repo: {}", repo.to_string()))
-                            .await?;
-                    }
-                }
-                Ok(false) => {
-                    handler
-                        .send_response(msg.chat.id, "Repository does not exist on GitHub.")
-                        .await?;
-                }
-                Err(e) => {
-                    handler
-                        .send_response(msg.chat.id, format!("Error checking repository: {}", e))
-                        .await?;
-                }
+    let repo = repo_name_with_owner.parse::<Repository>()?;
+
+    // Check if the repository exists on GitHub.
+    match handler
+        .github_client
+        .repo_exists(&repo.owner, &repo.name)
+        .await
+    {
+        Ok(true) => {
+            if handler.storage.contains(msg.chat.id, &repo).await {
+                handler
+                    .send_response(
+                        msg.chat.id,
+                        format!(
+                            "Repository {} is already in your list",
+                            repo_name_with_owner
+                        ),
+                    )
+                    .await?;
+            } else {
+                handler
+                    .storage
+                    .add_repository(msg.chat.id, repo.clone())
+                    .await;
+                handler
+                    .send_response(msg.chat.id, format!("Added repo: {}", repo.to_string()))
+                    .await?;
             }
         }
+        Ok(false) => {
+            handler
+                .send_response(msg.chat.id, "Repository does not exist on GitHub.")
+                .await?;
+        }
         Err(e) => {
-            handler.send_response(msg.chat.id, e.to_string()).await?;
+            handler
+                .send_response(msg.chat.id, format!("Error checking repository: {}", e))
+                .await?;
         }
     }
     Ok(())
