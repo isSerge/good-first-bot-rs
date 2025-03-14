@@ -29,13 +29,18 @@ impl FromStr for Repository {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split('/').collect();
-        if parts.len() != 2 || parts[0].trim().is_empty() || parts[1].trim().is_empty() {
-            return Err(anyhow!("Invalid repository format. Use owner/repo."));
+        let error = anyhow!("Invalid repository format. Use owner/repo.");
+        if let Some((owner, name)) = s.split_once('/') {
+            if owner.trim().is_empty() || name.trim().is_empty() {
+                Err(error)
+            } else {
+                Ok(Self {
+                    owner: owner.trim().to_owned(),
+                    name: name.trim().to_owned(),
+                })
+            }
+        } else {
+            Err(error)
         }
-        Ok(Self {
-            owner: parts[0].trim().to_owned(),
-            name: parts[1].trim().to_owned(),
-        })
     }
 }
