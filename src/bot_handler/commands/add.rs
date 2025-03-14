@@ -29,7 +29,7 @@ async fn process_add(
         // Check if the repository exists on GitHub.
         match handler.github_client.repo_exists(owner, repo_name).await {
             Ok(true) => {
-                if handler.storage.contains(&msg.chat.id, &repo).await {
+                if handler.storage.contains(msg.chat.id, &repo).await {
                     handler
                         .send_response(
                             msg.chat.id,

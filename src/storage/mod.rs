@@ -44,9 +44,9 @@ impl Storage {
             .unwrap_or_default()
     }
 
-    pub async fn contains(&self, chat_id: &ChatId, repository: &Repository) -> bool {
+    pub async fn contains(&self, chat_id: ChatId, repository: &Repository) -> bool {
         let data = self.data.lock().await;
-        data.get(chat_id)
+        data.get(&chat_id)
             .map(|repos| repos.contains(repository))
             .unwrap_or(false)
     }
