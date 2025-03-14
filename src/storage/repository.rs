@@ -1,26 +1,38 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Repository {
-    pub url: String,
-    pub name_with_owner: String,
+    pub owner: String,
+    pub name: String,
 }
 
 impl Repository {
+    /// Creates a new repository from a full name in the format "owner/repo".
     pub fn from_full_name(full_name: &str) -> Result<Self> {
-        let (owner, name) = full_name.split_once('/').ok_or(anyhow::anyhow!(
-            "Invalid repository format. Use owner/repo."
-        ))?;
-
-        if owner.is_empty() || name.is_empty() {
-            return Err(anyhow::anyhow!(
-                "Invalid repository format. Use owner/repo."
-            ));
+        let parts: Vec<&str> = full_name.split('/').collect();
+        if parts.len() != 2 || parts[0].trim().is_empty() || parts[1].trim().is_empty() {
+            return Err(anyhow!("Invalid repository format. Use owner/repo."));
         }
-
         Ok(Self {
-            name_with_owner: format!("{}/{}", owner, name),
-            url: format!("https://github.com/{}/{}", owner, name),
+            owner: parts[0].trim().to_owned(),
+            name: parts[1].trim().to_owned(),
         })
     }
+
+    /// Returns the full repository name in "owner/repo" format.
+    pub fn full_name(&self) -> String {
+        format!("{}/{}", self.owner, self.name)
+    }
+
+    /// Returns the URL of the repository on GitHub.
+    pub fn url(&self) -> String {
+        format!("https://github.com/{}/{}", self.owner, self.name)
+    }
+}
+
+impl fmt::Display for Repository {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      write!(f, "{} ({})", self.full_name(), self.url())
+  }
 }
