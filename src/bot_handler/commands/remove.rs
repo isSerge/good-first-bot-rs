@@ -6,7 +6,7 @@ use teloxide::types::Message;
 pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     if arg.trim().is_empty() {
         ctx.handler
-            .prompt_and_wait_for_reply(ctx.message.chat.id, &ctx.dialogue, "remove")
+            .prompt_and_wait_for_reply(ctx.message.chat.id, ctx.dialogue, "remove")
             .await?;
     } else {
         process_remove(ctx.handler, ctx.message, arg).await?;

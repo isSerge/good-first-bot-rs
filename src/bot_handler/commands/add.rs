@@ -6,7 +6,7 @@ use teloxide::types::Message;
 pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     if arg.trim().is_empty() {
         ctx.handler
-            .prompt_and_wait_for_reply(ctx.message.chat.id, &ctx.dialogue, "add")
+            .prompt_and_wait_for_reply(ctx.message.chat.id, ctx.dialogue, "add")
             .await?;
     } else {
         process_add(ctx.handler, ctx.message, arg).await?;
@@ -54,7 +54,7 @@ async fn process_add(
                     .add_repository(msg.chat.id, repo.clone())
                     .await;
                 handler
-                    .send_response(msg.chat.id, format!("Added repo: {}", repo.to_string()))
+                    .send_response(msg.chat.id, format!("Added repo: {}", repo))
                     .await?;
             }
         }

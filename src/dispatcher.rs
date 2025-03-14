@@ -71,7 +71,7 @@ impl BotDispatcher {
                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
                  handler: Arc<BotHandler>| async move {
                     let maybe_tuple = query.message.as_ref()
-                        .and_then(|m| m.regular_message().map(|msg| msg.clone()))
+                        .and_then(|m| m.regular_message().cloned())
                         .and_then(|msg| {
                             query.data.as_deref()
                                 .and_then(|data| parse_callback_command(data).map(|cmd| (msg, cmd)))
