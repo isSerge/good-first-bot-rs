@@ -121,7 +121,7 @@ impl BotHandler {
     }
 
     /// Prompts the user for repository input and sets the state to waiting for repository input.
-    async fn prompt_and_set_state(
+    async fn prompt_and_wait_for_reply(
         &self,
         chat_id: ChatId,
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,

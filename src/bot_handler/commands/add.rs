@@ -6,7 +6,7 @@ use teloxide::types::Message;
 pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     if arg.trim().is_empty() {
         ctx.handler
-            .prompt_and_set_state(ctx.message.chat.id, &ctx.dialogue, "add")
+            .prompt_and_wait_for_reply(ctx.message.chat.id, &ctx.dialogue, "add")
             .await?;
     } else {
         process_add(ctx.handler, ctx.message, arg).await?;
