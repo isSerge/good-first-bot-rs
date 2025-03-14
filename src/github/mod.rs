@@ -44,6 +44,7 @@ impl GithubClient {
 
     /// Check if a repository exists.
     pub async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool> {
+        debug!("Checking if repository {}/{} exists", owner, name);
         let variables = repository::Variables {
             owner: owner.to_string(),
             name: name.to_string(),
