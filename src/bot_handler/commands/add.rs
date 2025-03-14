@@ -25,7 +25,6 @@ impl CommandHandler for AddCommand {
         } else if let Some(repo) = ctx.args {
             // Delegate the actual add logic
             process_add(ctx.handler, ctx.message, repo).await?;
-            ctx.dialogue.exit().await?;
         }
         Ok(())
     }

@@ -19,14 +19,13 @@ impl CommandHandler for RemoveCommand {
                 })
                 .await?;
         } else if let Some(repo) = ctx.args {
-            handle_remove_command(&ctx.handler, &ctx.message, repo).await?;
-            ctx.dialogue.exit().await?;
+            process_remove(&ctx.handler, &ctx.message, repo).await?;
         }
         Ok(())
     }
 }
 
-async fn handle_remove_command(handler: &BotHandler, msg: &Message, repo: String) -> Result<()> {
+async fn process_remove(handler: &BotHandler, msg: &Message, repo: String) -> Result<()> {
     if handler.storage.remove_repository(msg.chat.id, &repo).await {
         handler
             .send_response(msg.chat.id, format!("Removed repo: {}", repo))
