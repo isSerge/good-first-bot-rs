@@ -12,12 +12,14 @@ mod storage;
 use crate::bot_handler::{BotHandler, Command, CommandState};
 use crate::config::Config;
 use crate::storage::Storage;
-use anyhow::Ok;
+use anyhow::{Error, Ok, Result};
 use log::debug;
 use std::sync::Arc;
+use teloxide::dispatching::DpHandlerDescription;
 use teloxide::dispatching::dialogue::{Dialogue, InMemStorage};
 use teloxide::dptree::filter_map;
 use teloxide::prelude::*;
+use teloxide::types::Update;
 
 #[tokio::main]
 async fn main() {
@@ -38,7 +40,31 @@ async fn run() -> anyhow::Result<()> {
     let dialogue_storage = InMemStorage::<CommandState>::new();
     let handler = Arc::new(BotHandler::new(github_client, storage, bot.clone()));
 
-    let commands_branch = Update::filter_message()
+    let commands_branch = build_commands_branch();
+    let callback_queries_branch = build_callback_queries_branch();
+    let force_reply_branch = build_force_reply_branch();
+
+    Dispatcher::builder(
+        bot,
+        dptree::entry()
+            .branch(commands_branch)
+            .branch(callback_queries_branch)
+            // Branch for handling only force-reply texts.
+            .branch(force_reply_branch),
+    )
+    .dependencies(dptree::deps![dialogue_storage, handler])
+    .enable_ctrlc_handler()
+    .build()
+    .dispatch()
+    .await;
+    debug!("Dispatcher built successfully.");
+
+    Ok(())
+}
+
+fn build_commands_branch()
+-> Handler<'static, DependencyMap, Result<(), Error>, DpHandlerDescription> {
+    Update::filter_message()
         .filter_command::<Command>()
         .chain(filter_map(
             |update: Update, storage: Arc<InMemStorage<CommandState>>| {
@@ -55,9 +81,12 @@ async fn run() -> anyhow::Result<()> {
                     Ok(())
                 }
             },
-        );
+        )
+}
 
-    let callback_queries_branch = Update::filter_callback_query()
+fn build_callback_queries_branch()
+-> Handler<'static, DependencyMap, Result<(), Error>, DpHandlerDescription> {
+    Update::filter_callback_query()
         // Insert the dialogue extractor for callback queries.
         .chain(filter_map(
             |update: Update, storage: Arc<InMemStorage<CommandState>>| {
@@ -88,9 +117,12 @@ async fn run() -> anyhow::Result<()> {
                     Ok(())
                 }
             },
-        );
+        )
+}
 
-    let force_reply_branch = Update::filter_message()
+fn build_force_reply_branch()
+-> Handler<'static, DependencyMap, Result<(), Error>, DpHandlerDescription> {
+    Update::filter_message()
         .filter(|msg: Message| msg.reply_to_message().is_some())
         // Insert the dialogue extractor
         .chain(filter_map(
@@ -104,22 +136,5 @@ async fn run() -> anyhow::Result<()> {
                   handler: Arc<BotHandler>| {
                 async move { handler.handle_reply(msg, dialogue).await }
             },
-        );
-
-    Dispatcher::builder(
-        bot,
-        dptree::entry()
-            .branch(commands_branch)
-            .branch(callback_queries_branch)
-            // Branch for handling only force-reply texts.
-            .branch(force_reply_branch),
-    )
-    .dependencies(dptree::deps![dialogue_storage, handler])
-    .enable_ctrlc_handler()
-    .build()
-    .dispatch()
-    .await;
-    debug!("Dispatcher built successfully.");
-
-    Ok(())
+        )
 }
