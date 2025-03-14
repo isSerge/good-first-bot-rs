@@ -1,7 +1,8 @@
+pub mod add;
 mod help;
 mod list;
-pub mod add;
 pub mod remove;
+mod start;
 
 use crate::bot_handler::{BotHandler, CommandState};
 use anyhow::Result;
@@ -30,6 +31,7 @@ impl CommandHandler for super::Command {
             super::Command::List => list::handle(ctx).await,
             super::Command::Add(arg) => add::handle(ctx, &arg).await,
             super::Command::Remove(arg) => remove::handle(ctx, &arg).await,
+            super::Command::Start => start::handle(ctx).await,
         }
     }
 }
