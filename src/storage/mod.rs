@@ -1,13 +1,16 @@
 mod repository;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use teloxide::types::ChatId;
 use tokio::sync::Mutex;
 
 pub use repository::Repository;
+
+/// Represents a storage system for tracking repositories per chat.
+/// Uses an in-memory HashMap wrapped in an async Mutex for thread-safe access.
 pub struct Storage {
-    data: Arc<Mutex<HashMap<ChatId, Vec<Repository>>>>,
+    data: Arc<Mutex<HashMap<ChatId, HashSet<Repository>>>>,
 }
 
 impl Storage {
@@ -20,8 +23,8 @@ impl Storage {
     pub async fn add_repository(&self, chat_id: ChatId, repository: Repository) {
         let mut data = self.data.lock().await;
         data.entry(chat_id)
-            .or_insert_with(Vec::new)
-            .push(repository);
+            .or_insert_with(HashSet::new)
+            .insert(repository);
     }
 
     pub async fn remove_repository(&self, chat_id: ChatId, repo_name: &str) -> bool {
@@ -35,7 +38,7 @@ impl Storage {
         }
     }
 
-    pub async fn get_repositories(&self, chat_id: ChatId) -> Vec<Repository> {
+    pub async fn get_repositories(&self, chat_id: ChatId) -> HashSet<Repository> {
         self.data
             .lock()
             .await
