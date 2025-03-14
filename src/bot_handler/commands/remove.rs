@@ -32,7 +32,7 @@ async fn process_remove(
     };
     if handler
         .storage
-        .remove_repository(msg.chat.id, &repo.name)
+        .remove_repository(msg.chat.id, &repo.full_name())
         .await
     {
         handler

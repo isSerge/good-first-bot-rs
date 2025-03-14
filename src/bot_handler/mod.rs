@@ -22,9 +22,9 @@ pub enum Command {
     Start,
     #[command(description = "Show this help text.")]
     Help,
-    #[command(description = "Add a repository (e.g., owner/repo).")]
+    #[command(description = "Add a repository by replying with the repository url.")]
     Add(String),
-    #[command(description = "Remove a repository.")]
+    #[command(description = "Remove a repository by replying with the repository url.")]
     Remove(String),
     #[command(description = "List tracked repositories.")]
     List,
@@ -133,7 +133,7 @@ impl BotHandler {
 
     /// Prompts the user for repository input if there was no repository provided initially.
     async fn prompt_for_repo(&self, chat_id: ChatId) -> Result<()> {
-        let prompt = "Please reply with the repository in the format owner/repo.";
+        let prompt = "Please reply with the repository url.";
         self.bot
             .send_message(chat_id, prompt)
             .reply_markup(ForceReply::new())

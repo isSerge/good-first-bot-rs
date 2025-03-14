@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow};
 use std::{fmt, str::FromStr};
+use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Repository {
@@ -29,18 +30,24 @@ impl FromStr for Repository {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let error = anyhow!("Invalid repository format. Use owner/repo.");
-        if let Some((owner, name)) = s.split_once('/') {
-            if owner.trim().is_empty() || name.trim().is_empty() {
-                Err(error)
-            } else {
-                Ok(Self {
-                    owner: owner.trim().to_owned(),
-                    name: name.trim().to_owned(),
-                })
-            }
-        } else {
-            Err(error)
+        let url = Url::parse(s).map_err(|e| anyhow!("Invalid URL: {}", e))?;
+        if url.domain() != Some("github.com") {
+            return Err(anyhow!("URL must be from github.com"));
         }
+        let segments: Vec<_> = url
+            .path_segments()
+            .map(|c| c.collect::<Vec<_>>())
+            .unwrap_or_default();
+        if segments.len() < 2 {
+            return Err(anyhow!(
+                "URL must be in the format https://github.com/owner/repo"
+            ));
+        }
+        let owner = segments[0].to_string();
+        let name = segments[1].to_string();
+        if owner.is_empty() || name.is_empty() {
+            return Err(anyhow!("Owner or repository name cannot be empty"));
+        }
+        Ok(Self { owner, name })
     }
 }
