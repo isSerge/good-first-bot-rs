@@ -19,7 +19,23 @@ async fn process_add(
     msg: &Message,
     repo_name_with_owner: &str,
 ) -> Result<()> {
-    let repo = repo_name_with_owner.parse::<Repository>()?;
+    // Try to parse the repository.
+    let repo = match repo_name_with_owner.parse::<Repository>() {
+        Ok(repo) => repo,
+        Err(e) => {
+            // Send a message to the chat if parsing fails.
+            handler
+                .send_response(
+                    msg.chat.id,
+                    format!(
+                        "Failed to parse repository: {}",
+                        e
+                    ),
+                )
+                .await?;
+            return Ok(());
+        }
+    };
 
     // Check if the repository exists on GitHub.
     match handler
