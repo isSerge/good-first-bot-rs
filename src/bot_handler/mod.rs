@@ -119,4 +119,20 @@ impl BotHandler {
             .await
             .map(|_| ())
     }
+
+    /// Prompts the user for repository input and sets the state to waiting for repository input.
+    async fn prompt_and_set_state(
+        &self,
+        chat_id: ChatId,
+        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
+        command: &str,
+    ) -> Result<()> {
+        self.prompt_for_repo(chat_id).await?;
+        dialogue
+            .update(CommandState::WaitingForRepo {
+                command: command.into(),
+            })
+            .await?;
+        Ok(())
+    }
 }

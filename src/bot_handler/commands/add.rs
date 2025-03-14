@@ -1,16 +1,11 @@
-use crate::bot_handler::{BotHandler, CommandState, commands::CommandContext, utils};
+use crate::bot_handler::{BotHandler, commands::CommandContext, utils};
 use crate::storage::Repository;
 use anyhow::Result;
 use teloxide::types::Message;
 
 pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     if arg.trim().is_empty() {
-        ctx.handler.prompt_for_repo(ctx.message.chat.id).await?;
-        ctx.dialogue
-            .update(CommandState::WaitingForRepo {
-                command: "add".into(),
-            })
-            .await?;
+        ctx.handler.prompt_and_set_state(ctx.message.chat.id, &ctx.dialogue, "add").await?;
     } else {
         process_add(ctx.handler, ctx.message, arg).await?;
     }

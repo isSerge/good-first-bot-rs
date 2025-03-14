@@ -1,14 +1,11 @@
-use crate::bot_handler::{BotHandler, CommandState, commands::CommandContext};
+use crate::bot_handler::{BotHandler, commands::CommandContext};
 use anyhow::Result;
 use teloxide::types::Message;
 
 pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     if arg.trim().is_empty() {
-        ctx.handler.prompt_for_repo(ctx.message.chat.id).await?;
-        ctx.dialogue
-            .update(CommandState::WaitingForRepo {
-                command: "remove".into(),
-            })
+        ctx.handler
+            .prompt_and_set_state(ctx.message.chat.id, &ctx.dialogue, "remove")
             .await?;
     } else {
         process_remove(ctx.handler, ctx.message, arg).await?;
