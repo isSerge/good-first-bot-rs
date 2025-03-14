@@ -1,5 +1,5 @@
 use crate::bot_handler::{BotHandler, Command, CommandState};
-use anyhow::{Error, Ok};
+use anyhow::Result;
 use std::sync::Arc;
 use teloxide::{
     dispatching::{
@@ -12,14 +12,16 @@ use teloxide::{
 };
 
 /// Type alias to simplify handler type signatures.
-type BotResultHandler = Handler<'static, DependencyMap, Result<(), Error>, DpHandlerDescription>;
+type BotResultHandler = Handler<'static, DependencyMap, Result<()>, DpHandlerDescription>;
 
+/// Encapsulates the dispatcher logic for the bot.
 pub struct BotDispatcher {
     handler: Arc<BotHandler>,
     dialogue_storage: Arc<InMemStorage<CommandState>>,
 }
 
 impl BotDispatcher {
+    /// Creates a new `BotDispatcher`.
     pub fn new(
         handler: Arc<BotHandler>,
         dialogue_storage: Arc<InMemStorage<CommandState>>,
@@ -30,7 +32,8 @@ impl BotDispatcher {
         }
     }
 
-    pub fn build(&self, bot: Bot) -> Dispatcher<Bot, Error, DefaultKey> {
+    /// Builds the dispatcher using the provided `bot` instance.
+    pub fn build(&self, bot: Bot) -> Dispatcher<Bot, anyhow::Error, DefaultKey> {
         Dispatcher::builder(
             bot,
             dptree::entry()
@@ -59,7 +62,7 @@ impl BotDispatcher {
             )
     }
 
-    /// Builds the branch for handling callback queries.
+    /// Builds the branch for handling callback queries using combinators to reduce nesting.
     fn build_callback_queries_branch(&self) -> BotResultHandler {
         Update::filter_callback_query()
             .chain(filter_map(extract_dialogue))
@@ -67,14 +70,15 @@ impl BotDispatcher {
                 |query: CallbackQuery,
                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
                  handler: Arc<BotHandler>| async move {
-                    if let Some(msg) = query.message.as_ref().and_then(|m| m.regular_message()) {
-                        if let Some(data) = query.data.as_deref() {
-                            if let Some(command) = parse_callback_command(data) {
-                                handler
-                                    .handle_commands(msg.clone(), command, dialogue)
-                                    .await?;
-                            }
-                        }
+                    let maybe_tuple = query.message.as_ref()
+                        .and_then(|m| m.regular_message().map(|msg| msg.clone()))
+                        .and_then(|msg| {
+                            query.data.as_deref()
+                                .and_then(|data| parse_callback_command(data).map(|cmd| (msg, cmd)))
+                        });
+
+                    if let Some((msg, command)) = maybe_tuple {
+                        handler.handle_commands(msg, command, dialogue).await?;
                     }
                     Ok(())
                 },
@@ -96,7 +100,7 @@ impl BotDispatcher {
     }
 }
 
-/// Helper that extracts a dialogue from an update using the provided dialogue storage.
+/// Extracts a dialogue from an update using the provided dialogue storage.
 fn extract_dialogue(
     update: Update,
     storage: Arc<InMemStorage<CommandState>>,
@@ -104,7 +108,7 @@ fn extract_dialogue(
     update.chat().map(|chat| Dialogue::new(storage, chat.id))
 }
 
-/// Helper that converts callback data into a corresponding command.
+/// Converts callback data into a corresponding command.
 fn parse_callback_command(data: &str) -> Option<Command> {
     match data {
         "help" => Some(Command::Help),
