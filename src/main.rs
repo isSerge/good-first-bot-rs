@@ -38,85 +38,81 @@ async fn run() -> anyhow::Result<()> {
     let dialogue_storage = InMemStorage::<CommandState>::new();
     let handler = Arc::new(BotHandler::new(github_client, storage, bot.clone()));
 
+    let commands_branch = Update::filter_message()
+        .filter_command::<Command>()
+        .chain(filter_map(
+            |update: Update, storage: Arc<InMemStorage<CommandState>>| {
+                update.chat().map(|chat| Dialogue::new(storage, chat.id))
+            },
+        ))
+        .endpoint(
+            move |msg: Message,
+                  cmd: Command,
+                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+                  handler: Arc<BotHandler>| {
+                async move {
+                    handler.handle_commands(msg, cmd, dialogue).await?;
+                    Ok(())
+                }
+            },
+        );
+
+    let callback_queries_branch = Update::filter_callback_query()
+        // Insert the dialogue extractor for callback queries.
+        .chain(filter_map(
+            |update: Update, storage: Arc<InMemStorage<CommandState>>| {
+                update.chat().map(|chat| Dialogue::new(storage, chat.id))
+            },
+        ))
+        .endpoint(
+            move |query: CallbackQuery,
+                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+                  handler: Arc<BotHandler>| {
+                async move {
+                    if let Some(msg) = query.message.as_ref().and_then(|m| m.regular_message()) {
+                        if let Some(data) = query.data {
+                            // Map the callback data to the appropriate command.
+                            let command = match data.as_str() {
+                                "help" => Command::Help,
+                                "list" => Command::List,
+                                "add" => Command::Add(String::new()),
+                                "remove" => Command::Remove(String::new()),
+                                _ => return Ok(()),
+                            };
+                            // Pass the accessible message (cloned) to the command handler.
+                            handler
+                                .handle_commands(msg.clone(), command, dialogue)
+                                .await?;
+                        }
+                    }
+                    Ok(())
+                }
+            },
+        );
+
+    let force_reply_branch = Update::filter_message()
+        .filter(|msg: Message| msg.reply_to_message().is_some())
+        // Insert the dialogue extractor
+        .chain(filter_map(
+            |update: Update, storage: Arc<InMemStorage<CommandState>>| {
+                update.chat().map(|chat| Dialogue::new(storage, chat.id))
+            },
+        ))
+        .endpoint(
+            move |msg: Message,
+                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+                  handler: Arc<BotHandler>| {
+                async move { handler.handle_reply(msg, dialogue).await }
+            },
+        );
+
     Dispatcher::builder(
         bot,
         dptree::entry()
-            // Branch for handling /start command
-            .branch(
-                Update::filter_message()
-                    .filter_command::<Command>()
-                    .chain(filter_map(
-                        |update: Update, storage: Arc<InMemStorage<CommandState>>| {
-                            update.chat().map(|chat| Dialogue::new(storage, chat.id))
-                        },
-                    ))
-                    .endpoint(
-                        move |msg: Message,
-                              cmd: Command,
-                              dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
-                              handler: Arc<BotHandler>| {
-                            async move {
-                                handler.handle_commands(msg, cmd, dialogue).await?;
-                                Ok(())
-                            }
-                        },
-                    ),
-            )
-            // Branch for handling callback queries (inline keyboards)
-            .branch(
-                Update::filter_callback_query()
-                    // Insert the dialogue extractor for callback queries.
-                    .chain(filter_map(
-                        |update: Update, storage: Arc<InMemStorage<CommandState>>| {
-                            update.chat().map(|chat| Dialogue::new(storage, chat.id))
-                        },
-                    ))
-                    .endpoint(
-                        move |query: CallbackQuery,
-                              dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
-                              handler: Arc<BotHandler>| {
-                            async move {
-                                if let Some(msg) =
-                                    query.message.as_ref().and_then(|m| m.regular_message())
-                                {
-                                    if let Some(data) = query.data {
-                                        // Map the callback data to the appropriate command.
-                                        let command = match data.as_str() {
-                                            "help" => Command::Help,
-                                            "list" => Command::List,
-                                            "add" => Command::Add(String::new()),
-                                            "remove" => Command::Remove(String::new()),
-                                            _ => return Ok(()),
-                                        };
-                                        // Pass the accessible message (cloned) to the command handler.
-                                        handler
-                                            .handle_commands(msg.clone(), command, dialogue)
-                                            .await?;
-                                    }
-                                }
-                                Ok(())
-                            }
-                        },
-                    ),
-            )
+            .branch(commands_branch)
+            .branch(callback_queries_branch)
             // Branch for handling only force-reply texts.
-            .branch(
-                Update::filter_message()
-                    .filter(|msg: Message| msg.reply_to_message().is_some())
-                    // Insert the dialogue extractor
-                    .chain(filter_map(
-                        |update: Update, storage: Arc<InMemStorage<CommandState>>| {
-                            update.chat().map(|chat| Dialogue::new(storage, chat.id))
-                        },
-                    ))
-                    .endpoint(
-                        move |msg: Message,
-                              dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
-                              handler: Arc<BotHandler>| {
-                            async move { handler.handle_reply(msg, dialogue).await }
-                        },
-                    ),
-            ),
+            .branch(force_reply_branch),
     )
     .dependencies(dptree::deps![dialogue_storage, handler])
     .enable_ctrlc_handler()
