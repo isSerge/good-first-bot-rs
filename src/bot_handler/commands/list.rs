@@ -1,20 +1,10 @@
-use crate::bot_handler::{
-    BotHandler,
-    commands::{CommandContext, CommandHandler},
-    utils,
-};
+use crate::bot_handler::{BotHandler, commands::CommandContext, utils};
 use anyhow::Result;
-use async_trait::async_trait;
 use teloxide::{prelude::*, types::Message};
 
-pub struct ListCommand;
-
-#[async_trait]
-impl CommandHandler for ListCommand {
-    async fn handle(&self, ctx: CommandContext<'_>) -> Result<()> {
-        handle_list_command(ctx.handler, ctx.message).await?;
-        Ok(())
-    }
+pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
+    handle_list_command(ctx.handler, ctx.message).await?;
+    Ok(())
 }
 
 async fn handle_list_command(handler: &BotHandler, msg: &Message) -> ResponseResult<()> {

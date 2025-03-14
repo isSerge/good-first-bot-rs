@@ -1,33 +1,20 @@
-use crate::bot_handler::{
-    BotHandler, CommandState,
-    commands::{CommandContext, CommandHandler},
-    utils,
-};
+use crate::bot_handler::{BotHandler, CommandState, commands::CommandContext, utils};
 use crate::storage::Repository;
 use anyhow::Result;
-use async_trait::async_trait;
 use teloxide::types::Message;
 
-pub struct AddCommand;
-
-#[async_trait]
-impl CommandHandler for AddCommand {
-    async fn handle(&self, ctx: CommandContext<'_>) -> Result<()> {
-        if ctx.args.as_ref().map_or(true, |s| s.trim().is_empty()) {
-            ctx.handler.prompt_for_repo(ctx.message.chat.id).await?;
-
-            // Update the dialogue state to wait for the repository name.
-            ctx.dialogue
-                .update(CommandState::WaitingForRepo {
-                    command: "add".into(),
-                })
-                .await?;
-        } else if let Some(repo) = ctx.args {
-            // Delegate the actual add logic
-            process_add(ctx.handler, ctx.message, repo).await?;
-        }
-        Ok(())
+pub async fn handle(ctx: CommandContext<'_>, arg: String) -> Result<()> {
+    if arg.trim().is_empty() {
+        ctx.handler.prompt_for_repo(ctx.message.chat.id).await?;
+        ctx.dialogue
+            .update(CommandState::WaitingForRepo {
+                command: "add".into(),
+            })
+            .await?;
+    } else {
+        process_add(ctx.handler, ctx.message, arg).await?;
     }
+    Ok(())
 }
 
 async fn process_add(

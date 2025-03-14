@@ -1,28 +1,19 @@
-use crate::bot_handler::{
-    BotHandler, CommandState,
-    commands::{CommandContext, CommandHandler},
-};
+use crate::bot_handler::{BotHandler, CommandState, commands::CommandContext};
 use anyhow::Result;
-use async_trait::async_trait;
 use teloxide::types::Message;
 
-pub struct RemoveCommand;
-
-#[async_trait]
-impl CommandHandler for RemoveCommand {
-    async fn handle(&self, ctx: CommandContext<'_>) -> Result<()> {
-        if ctx.args.as_ref().map_or(true, |s| s.trim().is_empty()) {
-            ctx.handler.prompt_for_repo(ctx.message.chat.id).await?;
-            ctx.dialogue
-                .update(CommandState::WaitingForRepo {
-                    command: "remove".into(),
-                })
-                .await?;
-        } else if let Some(repo) = ctx.args {
-            process_remove(&ctx.handler, &ctx.message, repo).await?;
-        }
-        Ok(())
+pub async fn handle(ctx: CommandContext<'_>, arg: String) -> Result<()> {
+    if arg.trim().is_empty() {
+        ctx.handler.prompt_for_repo(ctx.message.chat.id).await?;
+        ctx.dialogue
+            .update(CommandState::WaitingForRepo {
+                command: "remove".into(),
+            })
+            .await?;
+    } else {
+        process_remove(ctx.handler, ctx.message, arg).await?;
     }
+    Ok(())
 }
 
 async fn process_remove(handler: &BotHandler, msg: &Message, repo: String) -> Result<()> {

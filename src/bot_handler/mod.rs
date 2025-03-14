@@ -1,10 +1,7 @@
 mod commands;
 mod utils;
 
-use crate::bot_handler::commands::{
-    CommandContext, CommandHandler, add::AddCommand, help::HelpCommand, list::ListCommand,
-    remove::RemoveCommand,
-};
+use crate::bot_handler::commands::{CommandContext, CommandHandler, add, remove};
 use crate::github;
 use crate::storage::Storage;
 use anyhow::Result;
@@ -65,34 +62,19 @@ impl BotHandler {
 
     /// Dispatches the incoming command to the appropriate handler.
     pub async fn handle_commands(
-      &self,
-      msg: Message,
-      cmd: Command,
-      dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
-  ) -> anyhow::Result<()> {
-      // Extract command argument if applicable.
-      let args = match &cmd {
-          Command::Add(arg) | Command::Remove(arg) => Some(arg.clone()),
-          _ => None,
-      };
-  
-      // Create the command context. (Dialogue may still be passed if needed.)
-      let ctx = CommandContext {
-          handler: self,
-          message: &msg,
-          args,
-          dialogue: &dialogue,
-      };
-  
-      // Match on the command and call its handler directly.
-      match cmd {
-          Command::Help => HelpCommand.handle(ctx).await?,
-          Command::List => ListCommand.handle(ctx).await?,
-          Command::Add(_) => AddCommand.handle(ctx).await?,
-          Command::Remove(_) => RemoveCommand.handle(ctx).await?,
-      }
-      Ok(())
-  }
+        &self,
+        msg: Message,
+        cmd: Command,
+        dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+    ) -> anyhow::Result<()> {
+        let ctx = CommandContext {
+            handler: self,
+            message: &msg,
+            dialogue: &dialogue,
+        };
+
+        cmd.handle(ctx).await
+    }
 
     /// Handle a reply message when we're waiting for repository input.
     pub async fn handle_reply(
@@ -100,20 +82,18 @@ impl BotHandler {
         msg: Message,
         dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
     ) -> Result<()> {
-        let args = msg.text().map(|s| s.to_string());
         // Create a common command context.
         let ctx = CommandContext {
             handler: self,
             message: &msg,
             dialogue: &dialogue,
-            args,
         };
         // Check if we're waiting for repository input.
         match dialogue.get().await? {
             Some(CommandState::WaitingForRepo { command }) if msg.text().is_some() => {
                 match command.as_str() {
-                    "add" => AddCommand.handle(ctx).await?,
-                    "remove" => RemoveCommand.handle(ctx).await?,
+                    "add" => add::handle(ctx, msg.text().unwrap().to_string()).await?,
+                    "remove" => remove::handle(ctx, msg.text().unwrap().to_string()).await?,
                     _ => self.send_response(msg.chat.id, "Unknown command").await?,
                 }
                 dialogue.exit().await?;
