@@ -5,6 +5,7 @@ use crate::bot_handler::commands::{CommandContext, CommandHandler, add, remove};
 use crate::github;
 use crate::storage::Storage;
 use anyhow::Result;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage},
@@ -58,7 +59,7 @@ impl BotHandler {
     async fn send_response(&self, chat_id: ChatId, text: impl ToString) -> Result<()> {
         self.bot
             .send_message(chat_id, text.to_string())
-            .reply_markup(Self::command_keyboard())
+            .reply_markup(COMMAND_KEYBOARD.clone())
             .await
             .map(|_| ())
             .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
@@ -140,20 +141,17 @@ impl BotHandler {
             .await?;
         Ok(())
     }
+}
 
-    // Add method to create the keyboard
-    fn command_keyboard() -> InlineKeyboardMarkup {
-        let buttons = vec![
-            vec![
-                InlineKeyboardButton::callback("Help", "help"),
-                InlineKeyboardButton::callback("List", "list"),
-            ],
-            vec![
-                InlineKeyboardButton::callback("Add", "add"),
-                InlineKeyboardButton::callback("Remove", "remove"),
-            ],
-        ];
-
-        InlineKeyboardMarkup::new(buttons)
-    }
+lazy_static! {
+    static ref COMMAND_KEYBOARD: InlineKeyboardMarkup = InlineKeyboardMarkup::new(vec![
+        vec![
+            InlineKeyboardButton::callback("Help", "help"),
+            InlineKeyboardButton::callback("List", "list"),
+        ],
+        vec![
+            InlineKeyboardButton::callback("Add", "add"),
+            InlineKeyboardButton::callback("Remove", "remove"),
+        ],
+    ]);
 }

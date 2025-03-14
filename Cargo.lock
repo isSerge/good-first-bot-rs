@@ -521,6 +521,7 @@ dependencies = [
  "dotenv",
  "env_logger",
  "graphql_client",
+ "lazy_static",
  "log",
  "reqwest",
  "serde",
