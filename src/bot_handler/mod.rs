@@ -9,13 +9,15 @@ use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage},
     prelude::*,
-    types::{ForceReply, Message},
+    types::{ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Message},
     utils::command::BotCommands,
 };
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
 pub enum Command {
+    #[command(description = "Start the bot and show welcome message.")]
+    Start,
     #[command(description = "Show this help text.")]
     Help,
     #[command(description = "Add a repository (e.g., owner/repo).")]
@@ -56,6 +58,7 @@ impl BotHandler {
     async fn send_response(&self, chat_id: ChatId, text: impl ToString) -> Result<()> {
         self.bot
             .send_message(chat_id, text.to_string())
+            .reply_markup(Self::command_keyboard())
             .await
             .map(|_| ())
             .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
@@ -136,5 +139,21 @@ impl BotHandler {
             })
             .await?;
         Ok(())
+    }
+
+    // Add method to create the keyboard
+    fn command_keyboard() -> InlineKeyboardMarkup {
+        let buttons = vec![
+            vec![
+                InlineKeyboardButton::callback("Help", "help"),
+                InlineKeyboardButton::callback("List", "list"),
+            ],
+            vec![
+                InlineKeyboardButton::callback("Add", "add"),
+                InlineKeyboardButton::callback("Remove", "remove"),
+            ],
+        ];
+
+        InlineKeyboardMarkup::new(buttons)
     }
 }
