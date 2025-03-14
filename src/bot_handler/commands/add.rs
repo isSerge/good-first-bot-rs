@@ -25,13 +25,7 @@ async fn process_add(
         Err(e) => {
             // Send a message to the chat if parsing fails.
             handler
-                .send_response(
-                    msg.chat.id,
-                    format!(
-                        "Failed to parse repository: {}",
-                        e
-                    ),
-                )
+                .send_response(msg.chat.id, format!("Failed to parse repository: {}", e))
                 .await?;
             return Ok(());
         }
