@@ -1,13 +1,13 @@
 use crate::bot_handler::{BotHandler, commands::CommandContext, utils};
 use anyhow::Result;
-use teloxide::{prelude::*, types::Message};
+use teloxide::types::Message;
 
 pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
-    handle_list_command(ctx.handler, ctx.message).await?;
+    process_list(ctx.handler, ctx.message).await?;
     Ok(())
 }
 
-async fn handle_list_command(handler: &BotHandler, msg: &Message) -> ResponseResult<()> {
+async fn process_list(handler: &BotHandler, msg: &Message) -> Result<()> {
     let user_repos = handler.storage.get_repositories(msg.chat.id).await;
 
     if user_repos.is_empty() {

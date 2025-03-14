@@ -53,11 +53,12 @@ impl BotHandler {
     }
 
     /// Sends a text message to the provided chat.
-    async fn send_response(&self, chat_id: ChatId, text: impl ToString) -> ResponseResult<()> {
+    async fn send_response(&self, chat_id: ChatId, text: impl ToString) -> Result<()> {
         self.bot
             .send_message(chat_id, text.to_string())
             .await
             .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
     }
 
     /// Dispatches the incoming command to the appropriate handler.
@@ -111,13 +112,14 @@ impl BotHandler {
     }
 
     /// Prompts the user for repository input if there was no repository provided initially.
-    async fn prompt_for_repo(&self, chat_id: ChatId) -> ResponseResult<()> {
+    async fn prompt_for_repo(&self, chat_id: ChatId) -> Result<()> {
         let prompt = "Please reply with the repository in the format owner/repo.";
         self.bot
             .send_message(chat_id, prompt)
             .reply_markup(ForceReply::new())
             .await
             .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
     }
 
     /// Prompts the user for repository input and sets the state to waiting for repository input.
