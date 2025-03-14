@@ -70,11 +70,15 @@ impl BotDispatcher {
                 |query: CallbackQuery,
                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
                  handler: Arc<BotHandler>| async move {
-                    let maybe_tuple = query.message.as_ref()
+                    let maybe_tuple = query
+                        .message
+                        .as_ref()
                         .and_then(|m| m.regular_message().cloned())
                         .and_then(|msg| {
-                            query.data.as_deref()
-                                .and_then(|data| parse_callback_command(data).map(|cmd| (msg, cmd)))
+                            query
+                                .data
+                                .as_deref()
+                                .and_then(|data| data.parse::<Command>().ok().map(|cmd| (msg, cmd)))
                         });
 
                     if let Some((msg, command)) = maybe_tuple {
@@ -106,15 +110,4 @@ fn extract_dialogue(
     storage: Arc<InMemStorage<CommandState>>,
 ) -> Option<Dialogue<CommandState, InMemStorage<CommandState>>> {
     update.chat().map(|chat| Dialogue::new(storage, chat.id))
-}
-
-/// Converts callback data into a corresponding command.
-fn parse_callback_command(data: &str) -> Option<Command> {
-    match data {
-        "help" => Some(Command::Help),
-        "list" => Some(Command::List),
-        "add" => Some(Command::Add(String::new())),
-        "remove" => Some(Command::Remove(String::new())),
-        _ => None,
-    }
 }

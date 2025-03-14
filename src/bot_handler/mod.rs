@@ -7,6 +7,7 @@ use crate::storage::Storage;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage},
     prelude::*,
@@ -27,6 +28,21 @@ pub enum Command {
     Remove(String),
     #[command(description = "List tracked repositories.")]
     List,
+}
+
+impl FromStr for Command {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "start" => Ok(Command::Start),
+            "help" => Ok(Command::Help),
+            "add" => Ok(Command::Add(String::new())),
+            "remove" => Ok(Command::Remove(String::new())),
+            "list" => Ok(Command::List),
+            _ => Err(format!("Unknown command: {}", s)),
+        }
+    }
 }
 
 /// Encapsulates the bot, storage and GitHub client.
