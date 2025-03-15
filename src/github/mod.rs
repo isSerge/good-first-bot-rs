@@ -119,12 +119,16 @@ impl GithubClient {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
 
+        debug!("Response body: {:?}", response_body);
+
         let issues = response_body
             .data
             .and_then(|data| data.repository)
             .and_then(|repo| repo.issues)
             .map(|issues| issues.nodes.unwrap_or_default())
             .unwrap_or_default();
+
+        debug!("Issues: {:?}", issues);
 
         Ok(issues)
     }

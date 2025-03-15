@@ -45,17 +45,20 @@ impl GithubPoller {
 
     /// Run the Poller.
     pub async fn run(&mut self) -> Result<()> {
+        debug!("Starting GitHub poller");
+
         let mut interval = tokio::time::interval(Duration::from_secs(self.poll_interval));
 
         loop {
             interval.tick().await;
-
-            debug!("Polling issues for repository...");
-
             let repos = self.storage.get_all_repos().await;
 
             for (chat_id, repos) in repos {
+                debug!("Polling issues for chat: {}", chat_id);
+
                 for repo in repos {
+                    debug!("Polling issues for repository: {}", repo.full_name);
+
                     let key = (chat_id, repo.full_name.clone());
                     let last_poll_time = self
                         .last_poll_times
@@ -90,6 +93,8 @@ impl GithubPoller {
                                 .collect();
 
                             if !issues_to_notify.is_empty() {
+                                debug!("Sending new issuesmessage to chat: {}", chat_id);
+
                                 let message = format!(
                                     "🚨 New issues in {}:\n\n{}",
                                     repo.full_name,

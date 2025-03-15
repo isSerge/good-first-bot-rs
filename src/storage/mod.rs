@@ -1,5 +1,6 @@
 mod repository;
 
+use log::debug;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use teloxide::types::ChatId;
@@ -23,6 +24,7 @@ impl Storage {
 
     /// Add a repository to the storage.
     pub async fn add_repository(&self, chat_id: ChatId, repository: Repository) {
+        debug!("Adding repository to storage: {:?}", repository);
         let mut data = self.data.lock().await;
         data.entry(chat_id)
             .or_insert_with(HashSet::new)
@@ -32,6 +34,7 @@ impl Storage {
     /// Remove a repository from the storage.
     #[must_use = "This function returns a Result that should not be ignored"]
     pub async fn remove_repository(&self, chat_id: ChatId, repo_name: &str) -> bool {
+        debug!("Removing repository from storage: {}", repo_name);
         let mut data = self.data.lock().await;
         if let Some(repos) = data.get_mut(&chat_id) {
             let initial_len = repos.len();
@@ -43,6 +46,7 @@ impl Storage {
     }
 
     pub async fn get_repos_per_user(&self, chat_id: ChatId) -> HashSet<Repository> {
+        debug!("Getting repositories for user: {}", chat_id);
         self.data
             .lock()
             .await
@@ -53,6 +57,7 @@ impl Storage {
 
     #[must_use = "This function returns a boolean that should not be ignored"]
     pub async fn contains(&self, chat_id: ChatId, repository: &Repository) -> bool {
+        debug!("Checking if repository is in storage: {:?}", repository);
         let data = self.data.lock().await;
         data.get(&chat_id)
             .map(|repos| repos.contains(repository))
@@ -60,6 +65,7 @@ impl Storage {
     }
 
     pub async fn get_all_repos(&self) -> HashMap<ChatId, HashSet<Repository>> {
+        debug!("Getting all repositories");
         self.data.lock().await.clone()
     }
 }

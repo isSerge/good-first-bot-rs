@@ -1,14 +1,17 @@
 use crate::bot_handler::{BotHandler, commands::CommandContext};
 use crate::storage::Repository;
 use anyhow::Result;
+use log::debug;
 use teloxide::types::Message;
 
 pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     if arg.trim().is_empty() {
+        debug!("Prompting for repository input");
         ctx.handler
             .prompt_and_wait_for_reply(ctx.message.chat.id, ctx.dialogue, "remove")
             .await?;
     } else {
+        debug!("Processing repository input: {}", arg);
         process_remove(ctx.handler, ctx.message, arg).await?;
     }
     Ok(())
