@@ -9,14 +9,9 @@ pub use repository::Repository;
 
 /// Represents a storage system for tracking repositories per chat.
 /// Uses an in-memory HashMap wrapped in an async Mutex for thread-safe access.
+#[derive(Default)]
 pub struct Storage {
     data: Arc<Mutex<HashMap<ChatId, HashSet<Repository>>>>,
-}
-
-impl Default for Storage {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Storage {
