@@ -87,7 +87,7 @@ impl GithubPoller {
 
                             if !issues_to_notify.is_empty() {
                                 let message = format!(
-                                    "🚨 New good first issues in {}:\n\n{}",
+                                    "🚨 New issues in {}:\n\n{}",
                                     repo.full_name(),
                                     issues_to_notify
                                         .iter()
