@@ -109,7 +109,7 @@ impl GithubPoller {
                             }
                         }
                         Result::Err(e) => {
-                            println!("Error polling issues: {:?}", e);
+                            log::error!("Error polling issues: {:?}", e);
                             // TODO: handle error
                         }
                     }

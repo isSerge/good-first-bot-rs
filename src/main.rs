@@ -26,7 +26,7 @@ async fn main() {
     env_logger::init();
 
     if let Err(err) = run().await {
-        eprintln!("Error: {}", err);
+        log::error!("Error: {}", err);
         std::process::exit(1);
     }
 }
