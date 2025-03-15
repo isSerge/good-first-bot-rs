@@ -90,12 +90,12 @@ impl GithubClient {
         &self,
         owner: &str,
         name: &str,
-        label: &str,
+        labels: Vec<String>,
     ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>> {
         let variables = issues::Variables {
             owner: owner.to_string(),
             name: name.to_string(),
-            label: label.to_string(),
+            labels: labels.into_iter().map(Into::into).collect(),
             first: Some(10),
         };
 

@@ -2,9 +2,10 @@ use crate::github;
 use crate::storage::Storage;
 use anyhow::Result;
 use chrono::DateTime;
+use lazy_static::lazy_static;
 use log::debug;
 use std::{collections::HashMap, sync::Arc, time::SystemTime};
-use teloxide::{Bot, types::ChatId};
+use teloxide::{Bot, prelude::*, types::ChatId};
 
 /// A poller for polling issues from GitHub and sending messages to Telegram.
 pub struct GithubPoller {
@@ -15,6 +16,14 @@ pub struct GithubPoller {
     poll_interval: u64,
     // This map tracks the last poll time per (chat, repository) pair.
     last_poll_times: HashMap<(ChatId, String), SystemTime>,
+}
+
+lazy_static! {
+    static ref GOOD_FIRST_ISSUE_LABELS: Vec<String> = vec![
+        "good first issue".to_string(),
+        "beginner-friendly".to_string(),
+        "help wanted".to_string(),
+    ];
 }
 
 impl GithubPoller {
@@ -50,7 +59,11 @@ impl GithubPoller {
                         .or_insert(SystemTime::UNIX_EPOCH);
                     let issues = self
                         .github_client
-                        .repo_issues_by_label(&repo.owner, &repo.name, "good first issue")
+                        .repo_issues_by_label(
+                            &repo.owner,
+                            &repo.name,
+                            GOOD_FIRST_ISSUE_LABELS.to_vec(),
+                        )
                         .await;
 
                     match issues {
@@ -74,14 +87,17 @@ impl GithubPoller {
 
                             if !issues_to_notify.is_empty() {
                                 let message = format!(
-                                    "New good first issues in {}: {}",
+                                    "🚨 New good first issues in {}:\n\n{}",
                                     repo.full_name(),
-                                    issues_to_notify.len()
+                                    issues_to_notify
+                                        .iter()
+                                        .map(|issue| format!("- {}: {}", issue.title, issue.url))
+                                        .collect::<Vec<_>>()
+                                        .join("\n")
                                 );
 
-                                debug!("Sending message to {}", chat_id);
-                                debug!("{}", message);
-                                // TODO: send message
+                                self.bot.send_message(chat_id, message).await?;
+
                                 // Update the last poll time for this chat/repo pair to now.
                                 self.last_poll_times.insert(key, SystemTime::now());
                             } else {
