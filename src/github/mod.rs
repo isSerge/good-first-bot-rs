@@ -97,7 +97,7 @@ impl GithubClient {
         let variables = issues::Variables {
             owner: owner.to_string(),
             name: name.to_string(),
-            labels: labels.into_iter().map(Into::into).collect(),
+            labels: Some(labels.into_iter().collect()),
             first: Some(10),
         };
 
