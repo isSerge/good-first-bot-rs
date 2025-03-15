@@ -26,6 +26,7 @@ impl Storage {
         }
     }
 
+    /// Add a repository to the storage.
     pub async fn add_repository(&self, chat_id: ChatId, repository: Repository) {
         let mut data = self.data.lock().await;
         data.entry(chat_id)
@@ -33,6 +34,8 @@ impl Storage {
             .insert(repository);
     }
 
+    /// Remove a repository from the storage.
+    #[must_use = "This function returns a Result that should not be ignored"]
     pub async fn remove_repository(&self, chat_id: ChatId, repo_name: &str) -> bool {
         let mut data = self.data.lock().await;
         if let Some(repos) = data.get_mut(&chat_id) {
@@ -53,6 +56,7 @@ impl Storage {
             .unwrap_or_default()
     }
 
+    #[must_use = "This function returns a boolean that should not be ignored"]
     pub async fn contains(&self, chat_id: ChatId, repository: &Repository) -> bool {
         let data = self.data.lock().await;
         data.get(&chat_id)

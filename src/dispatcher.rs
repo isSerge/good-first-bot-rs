@@ -33,6 +33,7 @@ impl BotDispatcher {
     }
 
     /// Builds the dispatcher using the provided `bot` instance.
+    #[must_use = "This function returns a Dispatcher that should not be ignored"]
     pub fn build(&self, bot: Bot) -> Dispatcher<Bot, anyhow::Error, DefaultKey> {
         Dispatcher::builder(
             bot,

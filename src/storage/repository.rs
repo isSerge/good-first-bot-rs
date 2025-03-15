@@ -25,6 +25,7 @@ impl fmt::Display for Repository {
 impl FromStr for Repository {
     type Err = anyhow::Error;
 
+    #[must_use = "This function returns a Result that should not be ignored"]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let url = Url::parse(s).map_err(|e| anyhow!("Invalid URL: {}", e))?;
         if url.domain() != Some("github.com") {

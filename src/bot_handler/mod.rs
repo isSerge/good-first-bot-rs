@@ -73,6 +73,7 @@ impl BotHandler {
     }
 
     /// Sends a text message to the provided chat.
+    #[must_use = "This function returns a Result that should not be ignored"]
     async fn send_response(&self, chat_id: ChatId, text: impl ToString) -> Result<()> {
         self.bot
             .send_message(chat_id, text.to_string())
@@ -133,6 +134,7 @@ impl BotHandler {
     }
 
     /// Prompts the user for repository input if there was no repository provided initially.
+    #[must_use = "This function returns a Result that should not be ignored"]
     async fn prompt_for_repo(&self, chat_id: ChatId) -> Result<()> {
         let prompt = "Please reply with the repository url.";
         self.bot

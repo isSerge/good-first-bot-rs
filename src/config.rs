@@ -10,6 +10,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[must_use = "This function returns a Result that should not be ignored"]
     pub fn from_env() -> Result<Self> {
         Ok(Self {
             github_token: env::var("GITHUB_TOKEN")
@@ -19,9 +20,10 @@ impl Config {
                 .unwrap_or_else(|| "https://api.github.com/graphql".to_string()),
             telegram_bot_token: env::var("TELOXIDE_TOKEN")
                 .context("TELOXIDE_TOKEN environment variable is required")?,
-            poll_interval: env::var("POLL_INTERVAL").ok()
+            poll_interval: env::var("POLL_INTERVAL")
+                .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(60)
+                .unwrap_or(60),
         })
     }
 }
