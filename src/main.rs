@@ -102,7 +102,7 @@ async fn run() -> Result<()> {
             }
 
             // Sleep for 60 seconds before polling again.
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(config.poll_interval)).await;
         }
     });
 

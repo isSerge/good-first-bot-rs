@@ -6,6 +6,7 @@ pub struct Config {
     pub github_token: String,
     pub github_graphql_url: String,
     pub telegram_bot_token: String,
+    pub poll_interval: u64,
 }
 
 impl Config {
@@ -17,6 +18,10 @@ impl Config {
                 .unwrap_or_else(|_| "https://api.github.com/graphql".into()),
             telegram_bot_token: env::var("TELOXIDE_TOKEN")
                 .context("TELOXIDE_TOKEN environment variable is required")?,
+            poll_interval: env::var("POLL_INTERVAL")
+                .unwrap_or_else(|_| "60".into())
+                .parse::<u64>()
+                .context("POLL_INTERVAL environment variable must be a valid integer")?,
         })
     }
 }
