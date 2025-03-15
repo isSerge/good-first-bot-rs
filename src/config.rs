@@ -15,13 +15,13 @@ impl Config {
             github_token: env::var("GITHUB_TOKEN")
                 .context("GITHUB_TOKEN environment variable is required")?,
             github_graphql_url: env::var("GITHUB_GRAPHQL_URL")
-                .unwrap_or_else(|_| "https://api.github.com/graphql".into()),
+                .ok()
+                .unwrap_or_else(|| "https://api.github.com/graphql".to_string()),
             telegram_bot_token: env::var("TELOXIDE_TOKEN")
                 .context("TELOXIDE_TOKEN environment variable is required")?,
-            poll_interval: env::var("POLL_INTERVAL")
-                .unwrap_or_else(|_| "60".into())
-                .parse::<u64>()
-                .context("POLL_INTERVAL environment variable must be a valid integer")?,
+            poll_interval: env::var("POLL_INTERVAL").ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(60)
         })
     }
 }
