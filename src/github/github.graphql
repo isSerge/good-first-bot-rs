@@ -8,7 +8,7 @@ query Repository($owner: String!, $name: String!) {
 
 query Issues($owner: String!, $name: String!, $labels: [String!], $first: Int = 10) {
   repository(owner: $owner, name: $name) {
-    issues(first: $first, states: OPEN, filterBy: {labels: [$labels]}) {
+    issues(first: $first, states: OPEN, filterBy: {labels: $labels}) {
       nodes {
         id
         title
