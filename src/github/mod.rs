@@ -32,7 +32,7 @@ pub struct GithubClient {
 }
 
 impl GithubClient {
-    pub fn new(github_token: String, graphql_url: String) -> Result<Self> {
+    pub fn new(github_token: &str, graphql_url: &str) -> Result<Self> {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
 
@@ -50,7 +50,7 @@ impl GithubClient {
 
         Ok(Self {
             client,
-            graphql_url,
+            graphql_url: graphql_url.to_string(),
         })
     }
 

@@ -35,7 +35,8 @@ async fn run() -> Result<()> {
     let config = Config::from_env()?;
     let storage = Arc::new(Storage::new());
     let bot = Bot::new(config.telegram_bot_token.clone());
-    let github_client = github::GithubClient::new(config.github_token, config.github_graphql_url)?;
+    let github_client =
+        github::GithubClient::new(&config.github_token, &config.github_graphql_url)?;
 
     // Spawn a polling task for issues.
     let mut github_poller = GithubPoller::new(
