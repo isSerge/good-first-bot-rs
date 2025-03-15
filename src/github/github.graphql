@@ -13,6 +13,7 @@ query Issues($owner: String!, $name: String!, $label: String!, $first: Int = 10)
         id
         title
         url
+        createdAt
       }
     }
   }

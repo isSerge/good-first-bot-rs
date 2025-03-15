@@ -4,6 +4,9 @@ use log::debug;
 use reqwest::Client;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
 
+// GraphQL DateTime scalar type.
+type DateTime = String;
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "src/github/schema.graphql",
