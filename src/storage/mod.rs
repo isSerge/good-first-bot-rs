@@ -38,7 +38,7 @@ impl Storage {
         }
     }
 
-    pub async fn get_repositories(&self, chat_id: ChatId) -> HashSet<Repository> {
+    pub async fn get_repos_per_user(&self, chat_id: ChatId) -> HashSet<Repository> {
         self.data
             .lock()
             .await
@@ -52,5 +52,9 @@ impl Storage {
         data.get(&chat_id)
             .map(|repos| repos.contains(repository))
             .unwrap_or(false)
+    }
+
+    pub async fn get_all_repos(&self) -> HashMap<ChatId, HashSet<Repository>> {
+        self.data.lock().await.clone()
     }
 }

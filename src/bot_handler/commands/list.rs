@@ -8,7 +8,7 @@ pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
 }
 
 async fn process_list(handler: &BotHandler, msg: &Message) -> Result<()> {
-    let user_repos = handler.storage.get_repositories(msg.chat.id).await;
+    let user_repos = handler.storage.get_repos_per_user(msg.chat.id).await;
 
     if user_repos.is_empty() {
         return handler
