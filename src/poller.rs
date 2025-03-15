@@ -4,7 +4,7 @@ use anyhow::Result;
 use chrono::DateTime;
 use lazy_static::lazy_static;
 use log::debug;
-use std::{collections::HashMap, sync::Arc, time::SystemTime};
+use std::{collections::HashMap, sync::Arc, time::Duration, time::SystemTime};
 use teloxide::{Bot, prelude::*, types::ChatId};
 
 /// A poller for polling issues from GitHub and sending messages to Telegram.
@@ -45,7 +45,11 @@ impl GithubPoller {
 
     /// Run the Poller.
     pub async fn run(&mut self) -> Result<()> {
+        let mut interval = tokio::time::interval(Duration::from_secs(self.poll_interval));
+
         loop {
+            interval.tick().await;
+
             debug!("Polling issues for repository...");
 
             let repos = self.storage.get_all_repos().await;
@@ -111,9 +115,6 @@ impl GithubPoller {
                     }
                 }
             }
-
-            // Sleep before polling again.
-            tokio::time::sleep(std::time::Duration::from_secs(self.poll_interval)).await;
         }
     }
 }
