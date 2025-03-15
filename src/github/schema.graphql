@@ -6,4 +6,31 @@ type Repository {
   id: ID!
   nameWithOwner: String!
   url: String!
+  issues(first: Int = 10, states: [IssueState!] = OPEN, filterBy: IssueFilter): IssueConnection
+}
+
+type IssueFilter {
+  labels: [String!]
+}
+
+type IssueConnection {
+  nodes: [Issue!]
+}
+
+type Issue {
+  id: ID!
+  title: String!
+  url: String!
+  state: IssueState!
+  labels: [Label!]
+}
+
+type Label {
+  id: ID!
+  name: String!
+}
+
+enum IssueState {
+  OPEN
+  CLOSED
 }

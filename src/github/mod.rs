@@ -13,6 +13,15 @@ use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
 )]
 pub struct Repository;
 
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "src/github/schema.graphql",
+    query_path = "src/github/github.graphql",
+    response_derives = "Debug, Default, serde::Serialize, Clone",
+    variables_derives = "Debug"
+)]
+pub struct Issues;
+
 #[derive(Clone)]
 pub struct GithubClient {
     client: Client,
@@ -72,5 +81,44 @@ impl GithubClient {
             .is_some();
 
         Ok(repo_exists)
+    }
+
+    pub async fn repo_issues_by_label(
+        &self,
+        owner: &str,
+        name: &str,
+        label: &str,
+    ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>> {
+        let variables = issues::Variables {
+            owner: owner.to_string(),
+            name: name.to_string(),
+            label: label.to_string(),
+            first: Some(10),
+        };
+
+        let request = Issues::build_query(variables);
+        debug!("GraphQL request: {:?}", request);
+
+        let res = self
+            .client
+            .post(&self.graphql_url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to send request")?;
+
+        let response_body: Response<issues::ResponseData> = res
+            .json()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
+
+        let issues = response_body
+            .data
+            .and_then(|data| data.repository)
+            .and_then(|repo| repo.issues)
+            .map(|issues| issues.nodes.unwrap_or_default())
+            .unwrap_or_default();
+
+        Ok(issues)
     }
 }

@@ -5,3 +5,15 @@ query Repository($owner: String!, $name: String!) {
     url
   }
 }
+
+query Issues($owner: String!, $name: String!, $label: String!, $first: Int = 10) {
+  repository(owner: $owner, name: $name) {
+    issues(first: $first, states: OPEN, filterBy: {labels: [$label]}) {
+      nodes {
+        id
+        title
+        url
+      }
+    }
+  }
+}
