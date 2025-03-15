@@ -79,6 +79,8 @@ impl GithubClient {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
 
+        debug!("Response body: {:?}", response_body);
+
         let repo_exists = response_body
             .data
             .and_then(|data| data.repository)
