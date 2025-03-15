@@ -37,7 +37,7 @@ impl Storage {
         let mut data = self.data.lock().await;
         if let Some(repos) = data.get_mut(&chat_id) {
             let initial_len = repos.len();
-            repos.retain(|r| r.full_name() != repo_name);
+            repos.retain(|r| r.full_name != repo_name);
             repos.len() != initial_len
         } else {
             false

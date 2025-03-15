@@ -6,14 +6,10 @@ use url::Url;
 pub struct Repository {
     pub owner: String,
     pub name: String,
+    pub full_name: String,
 }
 
 impl Repository {
-    /// Returns the full repository name in "owner/repo" format.
-    pub fn full_name(&self) -> String {
-        format!("{}/{}", self.owner, self.name)
-    }
-
     /// Returns the URL of the repository on GitHub.
     pub fn url(&self) -> String {
         format!("https://github.com/{}/{}", self.owner, self.name)
@@ -22,7 +18,7 @@ impl Repository {
 
 impl fmt::Display for Repository {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({})", self.full_name(), self.url())
+        write!(f, "{} ({})", self.full_name, self.url())
     }
 }
 
@@ -48,6 +44,13 @@ impl FromStr for Repository {
         if owner.is_empty() || name.is_empty() {
             return Err(anyhow!("Owner or repository name cannot be empty"));
         }
-        Ok(Self { owner, name })
+
+        let full_name = format!("{}/{}", owner, name);
+
+        Ok(Self {
+            owner,
+            name,
+            full_name,
+        })
     }
 }

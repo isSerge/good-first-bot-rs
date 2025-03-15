@@ -56,7 +56,7 @@ impl GithubPoller {
 
             for (chat_id, repos) in repos {
                 for repo in repos {
-                    let key = (chat_id, repo.full_name().clone());
+                    let key = (chat_id, repo.full_name.clone());
                     let last_poll_time = self
                         .last_poll_times
                         .entry(key.clone())
@@ -92,7 +92,7 @@ impl GithubPoller {
                             if !issues_to_notify.is_empty() {
                                 let message = format!(
                                     "🚨 New issues in {}:\n\n{}",
-                                    repo.full_name(),
+                                    repo.full_name,
                                     issues_to_notify
                                         .iter()
                                         .map(|issue| format!("- {}: {}", issue.title, issue.url))
@@ -105,7 +105,7 @@ impl GithubPoller {
                                 // Update the last poll time for this chat/repo pair to now.
                                 self.last_poll_times.insert(key, SystemTime::now());
                             } else {
-                                debug!("No new issues to notify for {}", repo.full_name());
+                                debug!("No new issues to notify for {}", repo.full_name);
                             }
                         }
                         Result::Err(e) => {
