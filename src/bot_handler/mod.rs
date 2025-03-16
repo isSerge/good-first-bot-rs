@@ -57,7 +57,7 @@ pub struct BotHandler {
 pub enum CommandState {
     #[default]
     None,
-    WaitingForRepo {
+    AwaitingRepositoryInput {
         command: String,
     },
 }
@@ -77,7 +77,6 @@ impl BotHandler {
     }
 
     /// Sends a text message to the provided chat.
-    #[must_use = "This function returns a Result that should not be ignored"]
     async fn send_response(&self, chat_id: ChatId, text: impl ToString) -> Result<()> {
         self.bot
             .send_message(chat_id, text.to_string())
@@ -117,7 +116,7 @@ impl BotHandler {
         };
         // Check if we're waiting for repository input.
         match dialogue.get().await? {
-            Some(CommandState::WaitingForRepo { command }) if msg.text().is_some() => {
+            Some(CommandState::AwaitingRepositoryInput { command }) if msg.text().is_some() => {
                 let repo_name = msg.text().unwrap();
                 match command.as_str() {
                     "add" => add::handle(ctx, repo_name).await?,
@@ -138,7 +137,6 @@ impl BotHandler {
     }
 
     /// Prompts the user for repository input if there was no repository provided initially.
-    #[must_use = "This function returns a Result that should not be ignored"]
     async fn prompt_for_repo(&self, chat_id: ChatId) -> Result<()> {
         let prompt = "Please reply with the repository url.";
         self.bot
@@ -158,7 +156,7 @@ impl BotHandler {
     ) -> Result<()> {
         self.prompt_for_repo(chat_id).await?;
         dialogue
-            .update(CommandState::WaitingForRepo {
+            .update(CommandState::AwaitingRepositoryInput {
                 command: command.into(),
             })
             .await?;
