@@ -118,7 +118,11 @@ impl RepoStorage for SqliteStorage {
         Ok(result)
     }
 
-    async fn get_last_poll_time(&self, chat_id: ChatId, repository: &Repository) -> Result<i64> {
+    async fn get_last_poll_time(
+        &self,
+        chat_id: ChatId,
+        repository: &Repository,
+    ) -> Result<Option<i64>> {
         debug!("Getting last poll time for repository: {:?}", repository);
         let chat_id = chat_id.0;
 
@@ -130,8 +134,8 @@ impl RepoStorage for SqliteStorage {
         .fetch_optional(&self.pool)
         .await?;
 
-        // If the repository is not found, return 0
-        Ok(result.map_or(0, |r| r.last_poll_time))
+        // If the repository is not found, return None
+        Ok(result.map(|r| r.last_poll_time))
     }
 
     async fn set_last_poll_time(&self, chat_id: ChatId, repository: &Repository) -> Result<()> {

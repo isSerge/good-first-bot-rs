@@ -12,6 +12,7 @@ use std::{
 };
 use teloxide::{Bot, prelude::*, types::ChatId};
 
+// TODO: consider replacing polling with webhooks
 /// A poller for polling issues from GitHub and sending messages to Telegram.
 pub struct GithubPoller {
     github_client: github::GithubClient,
@@ -46,7 +47,6 @@ impl GithubPoller {
     }
 
     /// Run the Poller.
-    // TODO: consider processing repos concurrently (if rate limit allows)
     pub async fn run(&mut self) -> Result<()> {
         debug!("Starting GitHub poller");
 
@@ -67,6 +67,7 @@ impl GithubPoller {
         for (chat_id, repos) in repos_by_chat_id {
             debug!("Polling issues for chat: {}", chat_id);
             for repo in repos {
+                // TODO: consider using tokio::spawn to poll repos concurrently
                 self.poll_user_repo(chat_id, repo).await?;
             }
         }
@@ -80,7 +81,9 @@ impl GithubPoller {
 
         // Get the last poll time for this repo
         let last_poll_time = self.storage.get_last_poll_time(chat_id, &repo).await?;
-        let last_poll_time = SystemTime::UNIX_EPOCH + Duration::from_secs(last_poll_time as u64);
+        let last_poll_time = last_poll_time
+            .map(|t| SystemTime::UNIX_EPOCH + Duration::from_secs(t as u64))
+            .unwrap_or(SystemTime::UNIX_EPOCH);
 
         let issues = self
             .github_client
