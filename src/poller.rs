@@ -1,6 +1,5 @@
 use crate::github;
-use crate::storage::Repository;
-use crate::storage::{RepoStorage, Storage};
+use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
 use chrono::DateTime;
 use lazy_static::lazy_static;
@@ -16,7 +15,7 @@ use teloxide::{Bot, prelude::*, types::ChatId};
 /// A poller for polling issues from GitHub and sending messages to Telegram.
 pub struct GithubPoller {
     github_client: github::GithubClient,
-    storage: Arc<Storage>,
+    storage: Arc<dyn RepoStorage>,
     bot: Bot,
     // The interval to poll GitHub for new issues.
     poll_interval: u64,
@@ -36,7 +35,7 @@ impl GithubPoller {
     /// Create a new GithubPoller.
     pub fn new(
         github_client: github::GithubClient,
-        storage: Arc<Storage>,
+        storage: Arc<dyn RepoStorage>,
         bot: Bot,
         poll_interval: u64,
     ) -> Self {

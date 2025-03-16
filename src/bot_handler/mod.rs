@@ -3,7 +3,7 @@ mod utils;
 
 use crate::bot_handler::commands::{CommandContext, CommandHandler, add, remove};
 use crate::github;
-use crate::storage::Storage;
+use crate::storage::RepoStorage;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ impl FromStr for Command {
 /// Encapsulates the bot, storage and GitHub client.
 pub struct BotHandler {
     github_client: github::GithubClient,
-    storage: Arc<Storage>,
+    storage: Arc<dyn RepoStorage>,
     bot: Bot,
 }
 
@@ -64,7 +64,11 @@ pub enum CommandState {
 
 impl BotHandler {
     /// Creates a new `BotHandler` instance.
-    pub fn new(github_client: github::GithubClient, storage: Arc<Storage>, bot: Bot) -> Self {
+    pub fn new(
+        github_client: github::GithubClient,
+        storage: Arc<dyn RepoStorage>,
+        bot: Bot,
+    ) -> Self {
         Self {
             github_client,
             storage,
