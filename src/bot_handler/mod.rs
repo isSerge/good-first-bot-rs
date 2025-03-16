@@ -130,16 +130,10 @@ impl BotHandler {
     }
 
     async fn process_add(&self, msg: &Message) -> Result<()> {
-        let repo_url = msg
-            .text()
-            .ok_or_else(|| anyhow::anyhow!("No repository url provided"))?;
-
-        // Try to parse the repository.
-        let repo = match Repository::from_url(repo_url) {
+        let repo = match self.parse_repo_from_msg(msg) {
             Ok(repo) => repo,
             Err(e) => {
-                // Send a message to the chat if parsing fails.
-                self.send_response(msg.chat.id, format!("Failed to parse repository: {}", e))
+                self.send_response(msg.chat.id, format!("Error parsing repository: {}", e))
                     .await?;
                 return Ok(());
             }
@@ -182,20 +176,15 @@ impl BotHandler {
     }
 
     async fn process_remove(&self, msg: &Message) -> Result<()> {
-        let repo_url = msg
-            .text()
-            .ok_or_else(|| anyhow::anyhow!("No repository url provided"))?;
-
-        // Try to parse the repository.
-        let repo = match Repository::from_url(repo_url) {
+        let repo = match self.parse_repo_from_msg(msg) {
             Ok(repo) => repo,
             Err(e) => {
-                // Send a message to the chat if parsing fails.
-                self.send_response(msg.chat.id, format!("Failed to parse repository: {}", e))
+                self.send_response(msg.chat.id, format!("Error parsing repository: {}", e))
                     .await?;
                 return Ok(());
             }
         };
+
         if self
             .storage
             .remove_repository(msg.chat.id, &repo.name_with_owner)
@@ -211,6 +200,15 @@ impl BotHandler {
             .await?;
         }
         Ok(())
+    }
+
+    fn parse_repo_from_msg(&self, msg: &Message) -> anyhow::Result<Repository> {
+        msg.text()
+            .ok_or_else(|| anyhow::anyhow!("No repository url provided"))
+            .and_then(|text| {
+                Repository::from_url(text)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse repository: {}", e))
+            })
     }
 }
 
