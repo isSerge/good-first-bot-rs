@@ -24,7 +24,7 @@ impl Config {
             poll_interval: env::var("POLL_INTERVAL")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(60),
+                .unwrap_or(10),
             database_url: env::var("DATABASE_URL")
                 .ok()
                 .unwrap_or_else(|| "sqlite://data/data.db".to_string()),
