@@ -1,13 +1,12 @@
 mod commands;
 mod utils;
 
-use crate::bot_handler::commands::{CommandContext, CommandHandler, add, remove};
+use crate::bot_handler::commands::{CommandContext, CommandHandler};
 use crate::github;
-use crate::storage::RepoStorage;
+use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use std::sync::Arc;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage},
@@ -24,26 +23,11 @@ pub enum Command {
     #[command(description = "Show this help text.")]
     Help,
     #[command(description = "Add a repository by replying with the repository url.")]
-    Add(String),
+    Add,
     #[command(description = "Remove a repository by replying with the repository url.")]
-    Remove(String),
+    Remove,
     #[command(description = "List tracked repositories.")]
     List,
-}
-
-impl FromStr for Command {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "start" => Ok(Command::Start),
-            "help" => Ok(Command::Help),
-            "add" => Ok(Command::Add(String::new())),
-            "remove" => Ok(Command::Remove(String::new())),
-            "list" => Ok(Command::List),
-            _ => Err(format!("Unknown command: {}", s)),
-        }
-    }
 }
 
 /// Encapsulates the bot, storage and GitHub client.
@@ -57,9 +41,8 @@ pub struct BotHandler {
 pub enum CommandState {
     #[default]
     None,
-    AwaitingRepositoryInput {
-        command: String,
-    },
+    AwaitingAddRepo,
+    AwaitingRemoveRepo,
 }
 
 impl BotHandler {
@@ -108,29 +91,11 @@ impl BotHandler {
         msg: Message,
         dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
     ) -> Result<()> {
-        // Create a common command context.
-        let ctx = CommandContext {
-            handler: self,
-            message: &msg,
-            dialogue: &dialogue,
-        };
         // Check if we're waiting for repository input.
         match dialogue.get().await? {
-            Some(CommandState::AwaitingRepositoryInput { command }) if msg.text().is_some() => {
-                let repo_name = msg.text().unwrap();
-                match command.as_str() {
-                    "add" => add::handle(ctx, repo_name).await?,
-                    "remove" => remove::handle(ctx, repo_name).await?,
-                    _ => self.send_response(msg.chat.id, "Unknown command").await?,
-                }
-            }
-            Some(_) => {
-                self.send_response(msg.chat.id, "No text found in your reply.")
-                    .await?;
-            }
-            None => {
-                // Do nothing
-            }
+            Some(CommandState::AwaitingAddRepo) => self.process_add(&msg).await?,
+            Some(CommandState::AwaitingRemoveRepo) => self.process_remove(&msg).await?,
+            _ => {}
         }
         dialogue.exit().await?;
         Ok(())
@@ -155,11 +120,92 @@ impl BotHandler {
         command: &str,
     ) -> Result<()> {
         self.prompt_for_repo(chat_id).await?;
-        dialogue
-            .update(CommandState::AwaitingRepositoryInput {
-                command: command.into(),
-            })
+        let state = match command {
+            "add" => CommandState::AwaitingAddRepo,
+            "remove" => CommandState::AwaitingRemoveRepo,
+            _ => unreachable!(),
+        };
+        dialogue.update(state).await?;
+        Ok(())
+    }
+
+    async fn process_add(&self, msg: &Message) -> Result<()> {
+        let repo_url = msg.text().unwrap();
+
+        // Try to parse the repository.
+        let repo = match Repository::from_url(repo_url) {
+            Ok(repo) => repo,
+            Err(e) => {
+                // Send a message to the chat if parsing fails.
+                self.send_response(msg.chat.id, format!("Failed to parse repository: {}", e))
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        // Check if the repository exists on GitHub.
+        match self
+            .github_client
+            .repo_exists(&repo.owner, &repo.name)
+            .await
+        {
+            Ok(true) => {
+                if self.storage.contains(msg.chat.id, &repo).await? {
+                    self.send_response(
+                        msg.chat.id,
+                        format!(
+                            "Repository {} is already in your list",
+                            repo.name_with_owner
+                        ),
+                    )
+                    .await?;
+                } else {
+                    self.storage
+                        .add_repository(msg.chat.id, repo.clone())
+                        .await?;
+                    self.send_response(msg.chat.id, format!("Added repo: {}", repo))
+                        .await?;
+                }
+            }
+            Ok(false) => {
+                self.send_response(msg.chat.id, "Repository does not exist on GitHub.")
+                    .await?;
+            }
+            Err(e) => {
+                self.send_response(msg.chat.id, format!("Error checking repository: {}", e))
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn process_remove(&self, msg: &Message) -> Result<()> {
+        let repo_url = msg.text().unwrap();
+
+        // Try to parse the repository.
+        let repo = match Repository::from_url(repo_url) {
+            Ok(repo) => repo,
+            Err(e) => {
+                // Send a message to the chat if parsing fails.
+                self.send_response(msg.chat.id, format!("Failed to parse repository: {}", e))
+                    .await?;
+                return Ok(());
+            }
+        };
+        if self
+            .storage
+            .remove_repository(msg.chat.id, &repo.name_with_owner)
+            .await?
+        {
+            self.send_response(msg.chat.id, format!("Removed repo: {}", repo.name))
+                .await?;
+        } else {
+            self.send_response(
+                msg.chat.id,
+                format!("You are not tracking repo: {}", repo.name),
+            )
             .await?;
+        }
         Ok(())
     }
 }

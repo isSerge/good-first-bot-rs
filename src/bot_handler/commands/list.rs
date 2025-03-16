@@ -1,26 +1,25 @@
-use crate::bot_handler::{BotHandler, commands::CommandContext, utils};
+use crate::bot_handler::{commands::CommandContext, utils};
 use anyhow::Result;
-use teloxide::types::Message;
 
 pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
-    process_list(ctx.handler, ctx.message).await?;
-    Ok(())
-}
-
-async fn process_list(handler: &BotHandler, msg: &Message) -> Result<()> {
-    let user_repos = handler.storage.get_repos_per_user(msg.chat.id).await?;
+    let user_repos = ctx
+        .handler
+        .storage
+        .get_repos_per_user(ctx.message.chat.id)
+        .await?;
 
     if user_repos.is_empty() {
-        return handler
-            .send_response(msg.chat.id, "No repositories tracked.")
+        return ctx
+            .handler
+            .send_response(ctx.message.chat.id, "No repositories tracked.")
             .await;
     }
 
     let repos_msg = utils::format_tracked_repos(&user_repos);
 
-    handler
+    ctx.handler
         .send_response(
-            msg.chat.id,
+            ctx.message.chat.id,
             format!("Your tracked repositories:\n{}", repos_msg),
         )
         .await

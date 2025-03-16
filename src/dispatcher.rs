@@ -9,6 +9,7 @@ use teloxide::{
     dptree::{deps, filter_map},
     prelude::*,
     types::Update,
+    utils::command::BotCommands,
 };
 
 /// Type alias to simplify handler type signatures.
@@ -76,10 +77,12 @@ impl BotDispatcher {
                         .as_ref()
                         .and_then(|m| m.regular_message().cloned())
                         .and_then(|msg| {
-                            query
-                                .data
-                                .as_deref()
-                                .and_then(|data| data.parse::<Command>().ok().map(|cmd| (msg, cmd)))
+                            query.data.as_deref().and_then(|data| {
+                                let cmd_str = format!("/{}", data);
+                                Command::parse(&cmd_str, "botname")
+                                    .ok()
+                                    .map(|cmd| (msg, cmd))
+                            })
                         });
 
                     if let Some((msg, command)) = maybe_tuple {

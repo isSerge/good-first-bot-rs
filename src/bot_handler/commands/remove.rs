@@ -1,49 +1,10 @@
-use crate::bot_handler::{BotHandler, commands::CommandContext};
-use crate::storage::Repository;
+use crate::bot_handler::commands::CommandContext;
 use anyhow::Result;
 use log::debug;
-use teloxide::types::Message;
 
-pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
-    if arg.trim().is_empty() {
-        debug!("Prompting for repository input");
-        ctx.handler
-            .prompt_and_wait_for_reply(ctx.message.chat.id, ctx.dialogue, "remove")
-            .await?;
-    } else {
-        debug!("Processing repository input: {}", arg);
-        process_remove(ctx.handler, ctx.message, arg).await?;
-    }
-    Ok(())
-}
-
-async fn process_remove(handler: &BotHandler, msg: &Message, repo_url: &str) -> Result<()> {
-    // Try to parse the repository.
-    let repo = match Repository::from_url(repo_url) {
-        Ok(repo) => repo,
-        Err(e) => {
-            // Send a message to the chat if parsing fails.
-            handler
-                .send_response(msg.chat.id, format!("Failed to parse repository: {}", e))
-                .await?;
-            return Ok(());
-        }
-    };
-    if handler
-        .storage
-        .remove_repository(msg.chat.id, &repo.name_with_owner)
-        .await?
-    {
-        handler
-            .send_response(msg.chat.id, format!("Removed repo: {}", repo.name))
-            .await?;
-    } else {
-        handler
-            .send_response(
-                msg.chat.id,
-                format!("You are not tracking repo: {}", repo.name),
-            )
-            .await?;
-    }
-    Ok(())
+pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
+    debug!("Prompting for repository input");
+    ctx.handler
+        .prompt_and_wait_for_reply(ctx.message.chat.id, ctx.dialogue, "remove")
+        .await
 }
