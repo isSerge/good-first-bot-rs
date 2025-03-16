@@ -14,7 +14,7 @@ mod storage;
 use crate::bot_handler::{BotHandler, CommandState};
 use crate::config::Config;
 use crate::poller::GithubPoller;
-use crate::storage::memory_storage::InMemoryStorage;
+use crate::storage::sqlite::SqliteStorage;
 use anyhow::Result;
 use log::debug;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ async fn main() {
 
 async fn run() -> Result<()> {
     let config = Config::from_env()?;
-    let storage = Arc::new(InMemoryStorage::default());
+    let storage = Arc::new(SqliteStorage::new(&config.database_url).await?);
     let bot = Bot::new(config.telegram_bot_token.clone());
     let github_client =
         github::GithubClient::new(&config.github_token, &config.github_graphql_url)?;

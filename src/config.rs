@@ -7,6 +7,7 @@ pub struct Config {
     pub github_graphql_url: String,
     pub telegram_bot_token: String,
     pub poll_interval: u64,
+    pub database_url: String,
 }
 
 impl Config {
@@ -24,6 +25,9 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(60),
+            database_url: env::var("DATABASE_URL")
+                .ok()
+                .unwrap_or_else(|| "sqlite://data/data.db".to_string()),
         })
     }
 }
