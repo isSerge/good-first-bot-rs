@@ -1,6 +1,6 @@
 use crate::github;
 use crate::storage::Repository;
-use crate::storage::Storage;
+use crate::storage::{RepoStorage, Storage};
 use anyhow::Result;
 use chrono::DateTime;
 use lazy_static::lazy_static;
@@ -58,7 +58,7 @@ impl GithubPoller {
 
         loop {
             interval.tick().await;
-            let repos_by_chat_id = self.storage.get_all_repos().await;
+            let repos_by_chat_id = self.storage.get_all_repos().await?;
             self.poll_all_repos(repos_by_chat_id).await?;
         }
     }

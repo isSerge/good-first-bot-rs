@@ -1,5 +1,5 @@
 use crate::bot_handler::{BotHandler, commands::CommandContext};
-use crate::storage::Repository;
+use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
 use log::debug;
 use teloxide::types::Message;
@@ -36,7 +36,7 @@ async fn process_remove(
     if handler
         .storage
         .remove_repository(msg.chat.id, &repo.full_name)
-        .await
+        .await?
     {
         handler
             .send_response(msg.chat.id, format!("Removed repo: {}", repo.name))

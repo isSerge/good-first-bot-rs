@@ -1,5 +1,5 @@
 use crate::bot_handler::{BotHandler, commands::CommandContext};
-use crate::storage::Repository;
+use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
 use log::debug;
 use teloxide::types::Message;
@@ -41,7 +41,7 @@ async fn process_add(
         .await
     {
         Ok(true) => {
-            if handler.storage.contains(msg.chat.id, &repo).await {
+            if handler.storage.contains(msg.chat.id, &repo).await? {
                 handler
                     .send_response(
                         msg.chat.id,
@@ -55,7 +55,7 @@ async fn process_add(
                 handler
                     .storage
                     .add_repository(msg.chat.id, repo.clone())
-                    .await;
+                    .await?;
                 handler
                     .send_response(msg.chat.id, format!("Added repo: {}", repo))
                     .await?;
