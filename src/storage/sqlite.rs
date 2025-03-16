@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use chrono::Utc;
 use log::debug;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate, query};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 use teloxide::types::ChatId;
 
 pub struct SqliteStorage {
@@ -71,12 +74,12 @@ impl RepoStorage for SqliteStorage {
 
         Ok(repos
             .into_iter()
-            .map(|r| Repository {
-                owner: r.owner,
-                name: r.name,
-                name_with_owner: r.name_with_owner,
+            .map(|r| {
+                Repository::from_str(&r.name_with_owner).map_err(|e| {
+                    anyhow::anyhow!("Failed to parse repository {}: {}", r.name_with_owner, e)
+                })
             })
-            .collect())
+            .collect::<Result<HashSet<_>>>()?)
     }
 
     async fn contains(&self, chat_id: ChatId, repository: &Repository) -> Result<bool> {

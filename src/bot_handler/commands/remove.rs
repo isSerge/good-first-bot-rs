@@ -17,13 +17,9 @@ pub async fn handle(ctx: CommandContext<'_>, arg: &str) -> Result<()> {
     Ok(())
 }
 
-async fn process_remove(
-    handler: &BotHandler,
-    msg: &Message,
-    repo_name_with_owner: &str,
-) -> Result<()> {
+async fn process_remove(handler: &BotHandler, msg: &Message, repo_url: &str) -> Result<()> {
     // Try to parse the repository.
-    let repo = match repo_name_with_owner.parse::<Repository>() {
+    let repo = match Repository::from_url(repo_url) {
         Ok(repo) => repo,
         Err(e) => {
             // Send a message to the chat if parsing fails.
