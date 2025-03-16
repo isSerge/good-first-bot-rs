@@ -1,5 +1,4 @@
 use crate::bot_handler::{BotHandler, commands::CommandContext, utils};
-use crate::storage::RepoStorage;
 use anyhow::Result;
 use teloxide::types::Message;
 
