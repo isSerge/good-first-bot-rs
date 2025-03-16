@@ -7,12 +7,14 @@ use teloxide::{
     types::{ForceReply, InlineKeyboardButton, InlineKeyboardMarkup},
 };
 
+/// Trait for sending messages to the user.
 #[async_trait]
 pub trait MessagingService: Send + Sync {
     async fn send_response_with_keyboard(&self, chat_id: ChatId, text: String) -> Result<()>;
     async fn prompt_for_repo_input(&self, chat_id: ChatId) -> Result<()>;
 }
 
+/// Telegram messaging service.
 pub struct TelegramMessagingService {
     bot: Bot,
 }
@@ -25,7 +27,7 @@ impl TelegramMessagingService {
 
 #[async_trait]
 impl MessagingService for TelegramMessagingService {
-    /// Sends a text message to the provided chat.
+    /// Sends a text message to the provided chat with a keyboard.
     async fn send_response_with_keyboard(&self, chat_id: ChatId, text: String) -> Result<()> {
         self.bot
             .send_message(chat_id, text)
@@ -35,7 +37,7 @@ impl MessagingService for TelegramMessagingService {
             .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
     }
 
-    /// Prompts the user for repository input if there was no repository provided initially.
+    /// Prompts the user for repository input.
     async fn prompt_for_repo_input(&self, chat_id: ChatId) -> Result<()> {
         let prompt = "Please reply with the repository url.";
         self.bot
