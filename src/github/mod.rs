@@ -55,7 +55,6 @@ impl GithubClient {
     }
 
     /// Check if a repository exists.
-    #[must_use = "This function returns a Result that should not be ignored"]
     pub async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool> {
         debug!("Checking if repository {}/{} exists", owner, name);
         let variables = repository::Variables {
@@ -89,7 +88,7 @@ impl GithubClient {
         Ok(repo_exists)
     }
 
-    #[must_use = "This function returns a Result that should not be ignored"]
+    /// Get issues by label.
     pub async fn repo_issues_by_label(
         &self,
         owner: &str,
