@@ -58,7 +58,7 @@ impl BotDispatcher {
                  cmd: Command,
                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
                  handler: Arc<BotHandler>| async move {
-                    handler.handle_commands(msg, cmd, dialogue).await?;
+                    handler.handle_commands(&msg, cmd, dialogue).await?;
                     Ok(())
                 },
             )
@@ -86,7 +86,7 @@ impl BotDispatcher {
                         });
 
                     if let Some((msg, command)) = maybe_tuple {
-                        handler.handle_commands(msg, command, dialogue).await?;
+                        handler.handle_commands(&msg, command, dialogue).await?;
                     }
                     Ok(())
                 },
@@ -102,7 +102,7 @@ impl BotDispatcher {
                 |msg: Message,
                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
                  handler: Arc<BotHandler>| async move {
-                    handler.handle_reply(msg, dialogue).await
+                    handler.handle_reply(&msg, &dialogue).await
                 },
             )
     }

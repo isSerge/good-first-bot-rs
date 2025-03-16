@@ -72,13 +72,13 @@ impl BotHandler {
     /// Dispatches the incoming command to the appropriate handler.
     pub async fn handle_commands(
         &self,
-        msg: Message,
+        msg: &Message,
         cmd: Command,
         dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
     ) -> anyhow::Result<()> {
         let ctx = CommandContext {
             handler: self,
-            message: &msg,
+            message: msg,
             dialogue: &dialogue,
         };
 
@@ -88,13 +88,13 @@ impl BotHandler {
     /// Handle a reply message when we're waiting for repository input.
     pub async fn handle_reply(
         &self,
-        msg: Message,
-        dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+        msg: &Message,
+        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
     ) -> Result<()> {
         // Check if we're waiting for repository input.
         match dialogue.get().await? {
-            Some(CommandState::AwaitingAddRepo) => self.process_add(&msg).await?,
-            Some(CommandState::AwaitingRemoveRepo) => self.process_remove(&msg).await?,
+            Some(CommandState::AwaitingAddRepo) => self.process_add(msg).await?,
+            Some(CommandState::AwaitingRemoveRepo) => self.process_remove(msg).await?,
             _ => {}
         }
         dialogue.exit().await?;
@@ -130,7 +130,9 @@ impl BotHandler {
     }
 
     async fn process_add(&self, msg: &Message) -> Result<()> {
-        let repo_url = msg.text().unwrap();
+        let repo_url = msg
+            .text()
+            .ok_or_else(|| anyhow::anyhow!("No repository url provided"))?;
 
         // Try to parse the repository.
         let repo = match Repository::from_url(repo_url) {
@@ -180,7 +182,9 @@ impl BotHandler {
     }
 
     async fn process_remove(&self, msg: &Message) -> Result<()> {
-        let repo_url = msg.text().unwrap();
+        let repo_url = msg
+            .text()
+            .ok_or_else(|| anyhow::anyhow!("No repository url provided"))?;
 
         // Try to parse the repository.
         let repo = match Repository::from_url(repo_url) {
