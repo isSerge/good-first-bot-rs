@@ -13,7 +13,11 @@ pub trait RepoStorage: Send + Sync {
     async fn add_repository(&self, chat_id: ChatId, repository: Repository) -> Result<(), Error>;
 
     /// Remove a repository from the storage.
-    async fn remove_repository(&self, chat_id: ChatId, repo_name: &str) -> Result<bool, Error>;
+    async fn remove_repository(
+        &self,
+        chat_id: ChatId,
+        repo_name_with_owner: &str,
+    ) -> Result<bool, Error>;
 
     /// Get all repositories for a user.
     async fn get_repos_per_user(&self, chat_id: ChatId) -> Result<HashSet<Repository>, Error>;

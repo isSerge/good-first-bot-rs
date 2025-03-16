@@ -15,7 +15,7 @@ use teloxide::{Bot, prelude::*, types::ChatId};
 // TODO: consider replacing polling with webhooks
 /// A poller for polling issues from GitHub and sending messages to Telegram.
 pub struct GithubPoller {
-    github_client: github::GithubClient,
+    github_client: Arc<github::GithubClient>,
     storage: Arc<dyn RepoStorage>,
     bot: Bot,
     // The interval to poll GitHub for new issues.
@@ -33,7 +33,7 @@ lazy_static! {
 impl GithubPoller {
     /// Create a new GithubPoller.
     pub fn new(
-        github_client: github::GithubClient,
+        github_client: Arc<github::GithubClient>,
         storage: Arc<dyn RepoStorage>,
         bot: Bot,
         poll_interval: u64,

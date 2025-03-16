@@ -1,11 +1,12 @@
 mod commands;
-pub mod messaging;
+pub mod services;
 mod utils;
 
-use crate::bot_handler::commands::{CommandContext, CommandHandler};
-use crate::bot_handler::messaging::MessagingService;
-use crate::github;
-use crate::storage::{RepoStorage, Repository};
+use crate::bot_handler::{
+    commands::{CommandContext, CommandHandler},
+    services::{messaging::MessagingService, repository::RepositoryService},
+};
+use crate::storage::Repository;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -33,9 +34,8 @@ pub enum Command {
 
 /// Encapsulates the bot, storage and GitHub client.
 pub struct BotHandler {
-    github_client: github::GithubClient,
-    storage: Arc<dyn RepoStorage>,
     messaging_service: Arc<dyn MessagingService>,
+    repository_service: Arc<dyn RepositoryService>,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -49,14 +49,12 @@ pub enum CommandState {
 impl BotHandler {
     /// Creates a new `BotHandler` instance.
     pub fn new(
-        github_client: github::GithubClient,
-        storage: Arc<dyn RepoStorage>,
         messaging_service: Arc<dyn MessagingService>,
+        repository_service: Arc<dyn RepositoryService>,
     ) -> Self {
         Self {
-            github_client,
-            storage,
             messaging_service,
+            repository_service,
         }
     }
 
@@ -69,7 +67,6 @@ impl BotHandler {
     ) -> anyhow::Result<()> {
         let ctx = CommandContext {
             handler: self,
-            messaging_service: self.messaging_service.clone(),
             message: msg,
             dialogue: &dialogue,
         };
@@ -128,12 +125,16 @@ impl BotHandler {
 
         // Check if the repository exists on GitHub.
         match self
-            .github_client
+            .repository_service
             .repo_exists(&repo.owner, &repo.name)
             .await
         {
             Ok(true) => {
-                if self.storage.contains(msg.chat.id, &repo).await? {
+                if self
+                    .repository_service
+                    .storage_contains(msg.chat.id, &repo)
+                    .await?
+                {
                     self.messaging_service
                         .send_response_with_keyboard(
                             msg.chat.id,
@@ -144,8 +145,8 @@ impl BotHandler {
                         )
                         .await?;
                 } else {
-                    self.storage
-                        .add_repository(msg.chat.id, repo.clone())
+                    self.repository_service
+                        .add_repo(msg.chat.id, repo.clone())
                         .await?;
                     self.messaging_service
                         .send_response_with_keyboard(msg.chat.id, format!("Added repo: {}", repo))
@@ -187,8 +188,8 @@ impl BotHandler {
         };
 
         if self
-            .storage
-            .remove_repository(msg.chat.id, &repo.name_with_owner)
+            .repository_service
+            .remove_repo(msg.chat.id, repo.clone())
             .await?
         {
             self.messaging_service

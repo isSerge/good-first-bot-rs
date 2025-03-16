@@ -11,7 +11,9 @@ mod github;
 mod poller;
 mod storage;
 
-use crate::bot_handler::messaging::TelegramMessagingService;
+use crate::bot_handler::services::{
+    messaging::TelegramMessagingService, repository::DefaultRepositoryService,
+};
 use crate::bot_handler::{BotHandler, CommandState};
 use crate::config::Config;
 use crate::poller::GithubPoller;
@@ -36,8 +38,10 @@ async fn run() -> Result<()> {
     let config = Config::from_env()?;
     let storage = Arc::new(SqliteStorage::new(&config.database_url).await?);
     let bot = Bot::new(config.telegram_bot_token.clone());
-    let github_client =
-        github::GithubClient::new(&config.github_token, &config.github_graphql_url)?;
+    let github_client = Arc::new(github::GithubClient::new(
+        &config.github_token,
+        &config.github_graphql_url,
+    )?);
 
     // Spawn a polling task for issues.
     let mut github_poller = GithubPoller::new(
@@ -55,7 +59,11 @@ async fn run() -> Result<()> {
 
     let dialogue_storage = InMemStorage::<CommandState>::new();
     let messaging_service = Arc::new(TelegramMessagingService::new(bot.clone()));
-    let handler = Arc::new(BotHandler::new(github_client, storage, messaging_service));
+    let repo_manager_service = Arc::new(DefaultRepositoryService::new(
+        storage.clone(),
+        github_client.clone(),
+    ));
+    let handler = Arc::new(BotHandler::new(messaging_service, repo_manager_service));
     let mut dispatcher = dispatcher::BotDispatcher::new(handler, dialogue_storage).build(bot);
     debug!("Dispatcher built successfully.");
 

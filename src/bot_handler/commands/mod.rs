@@ -4,11 +4,9 @@ mod list;
 mod remove;
 mod start;
 
-use crate::bot_handler::messaging::MessagingService;
 use crate::bot_handler::{BotHandler, CommandState};
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::Arc;
 use teloxide::dispatching::dialogue::InMemStorage;
 use teloxide::prelude::*;
 
@@ -17,7 +15,6 @@ pub struct CommandContext<'a> {
     pub handler: &'a BotHandler,
     pub message: &'a Message,
     pub dialogue: &'a Dialogue<CommandState, InMemStorage<CommandState>>,
-    pub messaging_service: Arc<dyn MessagingService>,
 }
 
 #[async_trait]
