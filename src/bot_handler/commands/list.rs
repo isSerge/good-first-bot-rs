@@ -10,15 +10,18 @@ pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
 
     if user_repos.is_empty() {
         return ctx
-            .handler
-            .send_response(ctx.message.chat.id, "No repositories tracked.")
+            .messaging_service
+            .send_response_with_keyboard(
+                ctx.message.chat.id,
+                "No repositories tracked.".to_string(),
+            )
             .await;
     }
 
     let repos_msg = utils::format_tracked_repos(&user_repos);
 
-    ctx.handler
-        .send_response(
+    ctx.messaging_service
+        .send_response_with_keyboard(
             ctx.message.chat.id,
             format!("Your tracked repositories:\n{}", repos_msg),
         )

@@ -1,17 +1,18 @@
 mod commands;
+pub mod messaging;
 mod utils;
 
 use crate::bot_handler::commands::{CommandContext, CommandHandler};
+use crate::bot_handler::messaging::MessagingService;
 use crate::github;
 use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage},
     prelude::*,
-    types::{ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Message},
+    types::Message,
     utils::command::BotCommands,
 };
 
@@ -34,7 +35,7 @@ pub enum Command {
 pub struct BotHandler {
     github_client: github::GithubClient,
     storage: Arc<dyn RepoStorage>,
-    bot: Bot,
+    messaging_service: Arc<dyn MessagingService>,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -50,23 +51,13 @@ impl BotHandler {
     pub fn new(
         github_client: github::GithubClient,
         storage: Arc<dyn RepoStorage>,
-        bot: Bot,
+        messaging_service: Arc<dyn MessagingService>,
     ) -> Self {
         Self {
             github_client,
             storage,
-            bot,
+            messaging_service,
         }
-    }
-
-    /// Sends a text message to the provided chat.
-    async fn send_response(&self, chat_id: ChatId, text: impl ToString) -> Result<()> {
-        self.bot
-            .send_message(chat_id, text.to_string())
-            .reply_markup(COMMAND_KEYBOARD.clone())
-            .await
-            .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
     }
 
     /// Dispatches the incoming command to the appropriate handler.
@@ -78,6 +69,7 @@ impl BotHandler {
     ) -> anyhow::Result<()> {
         let ctx = CommandContext {
             handler: self,
+            messaging_service: self.messaging_service.clone(),
             message: msg,
             dialogue: &dialogue,
         };
@@ -101,17 +93,6 @@ impl BotHandler {
         Ok(())
     }
 
-    /// Prompts the user for repository input if there was no repository provided initially.
-    async fn prompt_for_repo(&self, chat_id: ChatId) -> Result<()> {
-        let prompt = "Please reply with the repository url.";
-        self.bot
-            .send_message(chat_id, prompt)
-            .reply_markup(ForceReply::new())
-            .await
-            .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
-    }
-
     /// Prompts the user for repository input and sets the state to waiting for repository input.
     async fn prompt_and_wait_for_reply(
         &self,
@@ -119,7 +100,9 @@ impl BotHandler {
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
         command: Command,
     ) -> Result<()> {
-        self.prompt_for_repo(chat_id).await?;
+        self.messaging_service
+            .prompt_for_repo_input(chat_id)
+            .await?;
         let state = match command {
             Command::Add => CommandState::AwaitingAddRepo,
             Command::Remove => CommandState::AwaitingRemoveRepo,
@@ -133,7 +116,11 @@ impl BotHandler {
         let repo = match self.parse_repo_from_msg(msg) {
             Ok(repo) => repo,
             Err(e) => {
-                self.send_response(msg.chat.id, format!("Error parsing repository: {}", e))
+                self.messaging_service
+                    .send_response_with_keyboard(
+                        msg.chat.id,
+                        format!("Error parsing repository: {}", e),
+                    )
                     .await?;
                 return Ok(());
             }
@@ -147,28 +134,38 @@ impl BotHandler {
         {
             Ok(true) => {
                 if self.storage.contains(msg.chat.id, &repo).await? {
-                    self.send_response(
-                        msg.chat.id,
-                        format!(
-                            "Repository {} is already in your list",
-                            repo.name_with_owner
-                        ),
-                    )
-                    .await?;
+                    self.messaging_service
+                        .send_response_with_keyboard(
+                            msg.chat.id,
+                            format!(
+                                "Repository {} is already in your list",
+                                repo.name_with_owner
+                            ),
+                        )
+                        .await?;
                 } else {
                     self.storage
                         .add_repository(msg.chat.id, repo.clone())
                         .await?;
-                    self.send_response(msg.chat.id, format!("Added repo: {}", repo))
+                    self.messaging_service
+                        .send_response_with_keyboard(msg.chat.id, format!("Added repo: {}", repo))
                         .await?;
                 }
             }
             Ok(false) => {
-                self.send_response(msg.chat.id, "Repository does not exist on GitHub.")
+                self.messaging_service
+                    .send_response_with_keyboard(
+                        msg.chat.id,
+                        "Repository does not exist on GitHub.".to_string(),
+                    )
                     .await?;
             }
             Err(e) => {
-                self.send_response(msg.chat.id, format!("Error checking repository: {}", e))
+                self.messaging_service
+                    .send_response_with_keyboard(
+                        msg.chat.id,
+                        format!("Error checking repository: {}", e),
+                    )
                     .await?;
             }
         }
@@ -179,7 +176,11 @@ impl BotHandler {
         let repo = match self.parse_repo_from_msg(msg) {
             Ok(repo) => repo,
             Err(e) => {
-                self.send_response(msg.chat.id, format!("Error parsing repository: {}", e))
+                self.messaging_service
+                    .send_response_with_keyboard(
+                        msg.chat.id,
+                        format!("Error parsing repository: {}", e),
+                    )
                     .await?;
                 return Ok(());
             }
@@ -190,14 +191,16 @@ impl BotHandler {
             .remove_repository(msg.chat.id, &repo.name_with_owner)
             .await?
         {
-            self.send_response(msg.chat.id, format!("Removed repo: {}", repo.name))
+            self.messaging_service
+                .send_response_with_keyboard(msg.chat.id, format!("Removed repo: {}", repo.name))
                 .await?;
         } else {
-            self.send_response(
-                msg.chat.id,
-                format!("You are not tracking repo: {}", repo.name),
-            )
-            .await?;
+            self.messaging_service
+                .send_response_with_keyboard(
+                    msg.chat.id,
+                    format!("You are not tracking repo: {}", repo.name),
+                )
+                .await?;
         }
         Ok(())
     }
@@ -210,17 +213,4 @@ impl BotHandler {
                     .map_err(|e| anyhow::anyhow!("Failed to parse repository: {}", e))
             })
     }
-}
-
-lazy_static! {
-    static ref COMMAND_KEYBOARD: InlineKeyboardMarkup = InlineKeyboardMarkup::new(vec![
-        vec![
-            InlineKeyboardButton::callback("Help", "help"),
-            InlineKeyboardButton::callback("List", "list"),
-        ],
-        vec![
-            InlineKeyboardButton::callback("Add", "add"),
-            InlineKeyboardButton::callback("Remove", "remove"),
-        ],
-    ]);
 }

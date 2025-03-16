@@ -11,6 +11,7 @@ mod github;
 mod poller;
 mod storage;
 
+use crate::bot_handler::messaging::TelegramMessagingService;
 use crate::bot_handler::{BotHandler, CommandState};
 use crate::config::Config;
 use crate::poller::GithubPoller;
@@ -53,7 +54,8 @@ async fn run() -> Result<()> {
     });
 
     let dialogue_storage = InMemStorage::<CommandState>::new();
-    let handler = Arc::new(BotHandler::new(github_client, storage, bot.clone()));
+    let messaging_service = Arc::new(TelegramMessagingService::new(bot.clone()));
+    let handler = Arc::new(BotHandler::new(github_client, storage, messaging_service));
     let mut dispatcher = dispatcher::BotDispatcher::new(handler, dialogue_storage).build(bot);
     debug!("Dispatcher built successfully.");
 

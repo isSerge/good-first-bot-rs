@@ -4,8 +4,8 @@ use teloxide::utils::command::BotCommands;
 
 pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
     let help_text = Command::descriptions();
-    ctx.handler
-        .send_response(ctx.message.chat.id, help_text)
+    ctx.messaging_service
+        .send_response_with_keyboard(ctx.message.chat.id, help_text.to_string())
         .await?;
     Ok(())
 }
