@@ -6,7 +6,7 @@ pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
         "Welcome! Use the buttons below to track repositories with good first issues.";
     ctx.handler
         .messaging_service
-        .send_response_with_keyboard(ctx.message.chat.id, welcome_text.to_string())
+        .send_response_with_keyboard(ctx.message.chat.id, welcome_text.to_string(), None)
         .await?;
     Ok(())
 }

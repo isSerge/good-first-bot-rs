@@ -6,7 +6,7 @@ pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
     let help_text = Command::descriptions();
     ctx.handler
         .messaging_service
-        .send_response_with_keyboard(ctx.message.chat.id, help_text.to_string())
+        .send_response_with_keyboard(ctx.message.chat.id, help_text.to_string(), None)
         .await?;
     Ok(())
 }

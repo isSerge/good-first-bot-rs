@@ -1,6 +1,5 @@
 mod commands;
 pub mod services;
-mod utils;
 
 use crate::bot_handler::{
     commands::{CommandContext, CommandHandler},
@@ -117,24 +116,27 @@ impl BotHandler {
                     .send_response_with_keyboard(
                         msg.chat.id,
                         format!("Error parsing repository: {}", e),
+                        None,
                     )
                     .await?;
                 return Ok(());
             }
         };
 
-        // Check if the repository exists on GitHub.
-        match self
+        let repo_exists = self
             .repository_service
             .repo_exists(&repo.owner, &repo.name)
-            .await
-        {
+            .await;
+
+        // Check if the repository exists on GitHub.
+        match repo_exists {
             Ok(true) => {
-                if self
+                let is_already_tracked = self
                     .repository_service
                     .contains_repo(msg.chat.id, &repo)
-                    .await?
-                {
+                    .await?;
+
+                if is_already_tracked {
                     self.messaging_service
                         .send_response_with_keyboard(
                             msg.chat.id,
@@ -142,6 +144,7 @@ impl BotHandler {
                                 "Repository {} is already in your list",
                                 repo.name_with_owner
                             ),
+                            None,
                         )
                         .await?;
                 } else {
@@ -149,7 +152,11 @@ impl BotHandler {
                         .add_repo(msg.chat.id, repo.clone())
                         .await?;
                     self.messaging_service
-                        .send_response_with_keyboard(msg.chat.id, format!("Added repo: {}", repo))
+                        .send_response_with_keyboard(
+                            msg.chat.id,
+                            format!("Added repo: {}", repo),
+                            None,
+                        )
                         .await?;
                 }
             }
@@ -158,6 +165,7 @@ impl BotHandler {
                     .send_response_with_keyboard(
                         msg.chat.id,
                         "Repository does not exist on GitHub.".to_string(),
+                        None,
                     )
                     .await?;
             }
@@ -166,6 +174,7 @@ impl BotHandler {
                     .send_response_with_keyboard(
                         msg.chat.id,
                         format!("Error checking repository: {}", e),
+                        None,
                     )
                     .await?;
             }
@@ -181,6 +190,7 @@ impl BotHandler {
                     .send_response_with_keyboard(
                         msg.chat.id,
                         format!("Error parsing repository: {}", e),
+                        None,
                     )
                     .await?;
                 return Ok(());
@@ -193,13 +203,18 @@ impl BotHandler {
             .await?
         {
             self.messaging_service
-                .send_response_with_keyboard(msg.chat.id, format!("Removed repo: {}", repo.name))
+                .send_response_with_keyboard(
+                    msg.chat.id,
+                    format!("Removed repo: {}", repo.name),
+                    None,
+                )
                 .await?;
         } else {
             self.messaging_service
                 .send_response_with_keyboard(
                     msg.chat.id,
                     format!("You are not tracking repo: {}", repo.name),
+                    None,
                 )
                 .await?;
         }
