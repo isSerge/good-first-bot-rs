@@ -1,6 +1,7 @@
 use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::Utc;
 use log::debug;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate, query};
 use std::collections::{HashMap, HashSet};
@@ -115,5 +116,39 @@ impl RepoStorage for SqliteStorage {
         }
 
         Ok(result)
+    }
+
+    async fn get_last_poll_time(&self, chat_id: ChatId, repository: &Repository) -> Result<i64> {
+        debug!("Getting last poll time for repository: {:?}", repository);
+        let chat_id = chat_id.0;
+
+        let result = query!(
+            "SELECT last_poll_time FROM poller_states WHERE chat_id = ? AND repository_full_name = ?",
+            chat_id,
+            repository.name_with_owner,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        // If the repository is not found, return 0
+        Ok(result.map_or(0, |r| r.last_poll_time))
+    }
+
+    async fn set_last_poll_time(&self, chat_id: ChatId, repository: &Repository) -> Result<()> {
+        debug!("Setting last poll time for repository: {:?}", repository);
+        let chat_id = chat_id.0;
+
+        let current_time = Utc::now().timestamp();
+
+        query!(
+            "INSERT OR REPLACE INTO poller_states (chat_id, repository_full_name, last_poll_time) VALUES (?, ?, ?)",
+            chat_id,
+            repository.name_with_owner,
+            current_time,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 }

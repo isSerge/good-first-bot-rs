@@ -19,8 +19,6 @@ pub struct GithubPoller {
     bot: Bot,
     // The interval to poll GitHub for new issues.
     poll_interval: u64,
-    // This map tracks the last poll time per (chat, repository) pair.
-    last_poll_times: HashMap<(ChatId, String), SystemTime>,
 }
 
 lazy_static! {
@@ -44,7 +42,6 @@ impl GithubPoller {
             storage,
             bot,
             poll_interval,
-            last_poll_times: HashMap::new(),
         }
     }
 
@@ -81,12 +78,9 @@ impl GithubPoller {
     async fn poll_user_repo(&mut self, chat_id: ChatId, repo: Repository) -> Result<()> {
         debug!("Polling issues for repository: {}", repo.name_with_owner);
 
-        let key = (chat_id, repo.name_with_owner.clone());
-
-        let last_poll_time = self
-            .last_poll_times
-            .entry(key.clone())
-            .or_insert(SystemTime::UNIX_EPOCH);
+        // Get the last poll time for this repo
+        let last_poll_time = self.storage.get_last_poll_time(chat_id, &repo).await?;
+        let last_poll_time = SystemTime::UNIX_EPOCH + Duration::from_secs(last_poll_time as u64);
 
         let issues = self
             .github_client
@@ -95,17 +89,18 @@ impl GithubPoller {
 
         match issues {
             Result::Ok(issues) => {
-                let issues_to_notify = Self::filter_new_issues(issues, last_poll_time);
+                let issues_to_notify = Self::filter_new_issues(issues, &last_poll_time);
 
                 if !issues_to_notify.is_empty() {
                     debug!("Sending new issuesmessage to chat: {}", chat_id);
 
-                    let message = Self::format_message(repo.name_with_owner, issues_to_notify);
+                    let message =
+                        Self::format_message(repo.name_with_owner.clone(), issues_to_notify);
 
                     self.bot.send_message(chat_id, message).await?;
 
                     // Update the last poll time for this chat/repo pair to now.
-                    self.last_poll_times.insert(key, SystemTime::now());
+                    self.storage.set_last_poll_time(chat_id, &repo).await?;
                 } else {
                     debug!("No new issues to notify for {}", repo.name_with_owner);
                 }
