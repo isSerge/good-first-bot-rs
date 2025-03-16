@@ -132,7 +132,7 @@ impl BotHandler {
             Ok(true) => {
                 if self
                     .repository_service
-                    .storage_contains(msg.chat.id, &repo)
+                    .contains_repo(msg.chat.id, &repo)
                     .await?
                 {
                     self.messaging_service
@@ -189,7 +189,7 @@ impl BotHandler {
 
         if self
             .repository_service
-            .remove_repo(msg.chat.id, repo.clone())
+            .remove_repo(msg.chat.id, &repo)
             .await?
         {
             self.messaging_service
