@@ -79,9 +79,9 @@ impl GithubPoller {
 
     /// Poll a single repo for a single user.
     async fn poll_user_repo(&mut self, chat_id: ChatId, repo: Repository) -> Result<()> {
-        debug!("Polling issues for repository: {}", repo.full_name);
+        debug!("Polling issues for repository: {}", repo.name_with_owner);
 
-        let key = (chat_id, repo.full_name.clone());
+        let key = (chat_id, repo.name_with_owner.clone());
 
         let last_poll_time = self
             .last_poll_times
@@ -100,14 +100,14 @@ impl GithubPoller {
                 if !issues_to_notify.is_empty() {
                     debug!("Sending new issuesmessage to chat: {}", chat_id);
 
-                    let message = Self::format_message(repo.full_name, issues_to_notify);
+                    let message = Self::format_message(repo.name_with_owner, issues_to_notify);
 
                     self.bot.send_message(chat_id, message).await?;
 
                     // Update the last poll time for this chat/repo pair to now.
                     self.last_poll_times.insert(key, SystemTime::now());
                 } else {
-                    debug!("No new issues to notify for {}", repo.full_name);
+                    debug!("No new issues to notify for {}", repo.name_with_owner);
                 }
             }
             Result::Err(e) => {
@@ -134,12 +134,12 @@ impl GithubPoller {
     }
 
     fn format_message(
-        repo_full_name: String,
+        repo_name_with_owner: String,
         issues: Vec<github::issues::IssuesRepositoryIssuesNodes>,
     ) -> String {
         format!(
             "🚨 New issues in {}:\n\n{}",
-            repo_full_name,
+            repo_name_with_owner,
             issues
                 .iter()
                 .map(|issue| format!("- {}: {}", issue.title, issue.url))

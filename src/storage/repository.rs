@@ -6,7 +6,7 @@ use url::Url;
 pub struct Repository {
     pub owner: String,
     pub name: String,
-    pub full_name: String,
+    pub name_with_owner: String,
 }
 
 impl Repository {
@@ -18,7 +18,7 @@ impl Repository {
 
 impl fmt::Display for Repository {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({})", self.full_name, self.url())
+        write!(f, "{} ({})", self.name_with_owner, self.url())
     }
 }
 
@@ -46,12 +46,12 @@ impl FromStr for Repository {
             return Err(anyhow!("Owner or repository name cannot be empty"));
         }
 
-        let full_name = format!("{}/{}", owner, name);
+        let name_with_owner = format!("{}/{}", owner, name);
 
         Ok(Self {
             owner,
             name,
-            full_name,
+            name_with_owner,
         })
     }
 }

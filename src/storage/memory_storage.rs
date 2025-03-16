@@ -27,12 +27,12 @@ impl RepoStorage for InMemoryStorage {
     }
 
     /// Remove a repository from the storage.
-    async fn remove_repository(&self, chat_id: ChatId, repo_name: &str) -> Result<bool> {
-        debug!("Removing repository from storage: {}", repo_name);
+    async fn remove_repository(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool> {
+        debug!("Removing repository from storage: {}", repo_name_with_owner);
         let mut data = self.data.lock().await;
         if let Some(repos) = data.get_mut(&chat_id) {
             let initial_len = repos.len();
-            repos.retain(|r| r.full_name != repo_name);
+            repos.retain(|r| r.name_with_owner != repo_name_with_owner);
             Ok(repos.len() != initial_len)
         } else {
             Ok(false)
