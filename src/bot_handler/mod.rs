@@ -117,12 +117,12 @@ impl BotHandler {
         &self,
         chat_id: ChatId,
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
-        command: &str,
+        command: Command,
     ) -> Result<()> {
         self.prompt_for_repo(chat_id).await?;
         let state = match command {
-            "add" => CommandState::AwaitingAddRepo,
-            "remove" => CommandState::AwaitingRemoveRepo,
+            Command::Add => CommandState::AwaitingAddRepo,
+            Command::Remove => CommandState::AwaitingRemoveRepo,
             _ => unreachable!(),
         };
         dialogue.update(state).await?;
