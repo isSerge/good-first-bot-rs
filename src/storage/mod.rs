@@ -9,14 +9,18 @@ use teloxide::types::ChatId;
 
 #[async_trait]
 pub trait RepoStorage: Send + Sync {
+    /// Add a repository to the storage.
     #[must_use = "This function returns a boolean that should not be ignored"]
     async fn add_repository(&self, chat_id: ChatId, repository: Repository) -> Result<(), Error>;
+    /// Remove a repository from the storage.
     #[must_use = "This function returns a boolean that should not be ignored"]
     async fn remove_repository(&self, chat_id: ChatId, repo_name: &str) -> Result<bool, Error>;
+    /// Get all repositories for a user.
     #[must_use = "This function returns a boolean that should not be ignored"]
     async fn get_repos_per_user(&self, chat_id: ChatId) -> Result<HashSet<Repository>, Error>;
-    #[must_use = "This function returns a boolean that should not be ignored"]
+    /// Check if a repository exists in the storage.
     async fn contains(&self, chat_id: ChatId, repository: &Repository) -> Result<bool, Error>;
+    /// Get all repositories from the storage.
     #[must_use = "This function returns a boolean that should not be ignored"]
     async fn get_all_repos(&self) -> Result<HashMap<ChatId, HashSet<Repository>>, Error>;
 }
