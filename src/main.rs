@@ -43,11 +43,13 @@ async fn run() -> Result<()> {
         &config.github_graphql_url,
     )?);
 
+    let messaging_service = Arc::new(TelegramMessagingService::new(bot.clone()));
+
     // Spawn a polling task for issues.
     let mut github_poller = GithubPoller::new(
         github_client.clone(),
         storage.clone(),
-        bot.clone(),
+        messaging_service.clone(),
         config.poll_interval,
     );
 
@@ -58,7 +60,6 @@ async fn run() -> Result<()> {
     });
 
     let dialogue_storage = InMemStorage::<CommandState>::new();
-    let messaging_service = Arc::new(TelegramMessagingService::new(bot.clone()));
     let repo_manager_service = Arc::new(DefaultRepositoryService::new(
         storage.clone(),
         github_client.clone(),

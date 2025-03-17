@@ -1,4 +1,5 @@
 use crate::bot_handler::Command;
+use crate::github::issues::IssuesRepositoryIssuesNodes;
 use crate::storage::Repository;
 use anyhow::{Error, Result};
 use async_trait::async_trait;
@@ -87,6 +88,14 @@ pub trait MessagingService: Send + Sync {
         chat_id: ChatId,
         message_id: MessageId,
         repos: HashSet<Repository>,
+    ) -> Result<()>;
+
+    /// Sends a message to the user that there are new issues.
+    async fn send_new_issues_msg(
+        &self,
+        chat_id: ChatId,
+        repo_name_with_owner: &str,
+        issues: Vec<IssuesRepositoryIssuesNodes>,
     ) -> Result<()>;
 }
 
@@ -269,6 +278,29 @@ impl MessagingService for TelegramMessagingService {
             .await
             .map(|_| ())
             .map_err(|e| anyhow::anyhow!("Failed to edit message: {}", e))
+    }
+
+    async fn send_new_issues_msg(
+        &self,
+        chat_id: ChatId,
+        repo_name_with_owner: &str,
+        issues: Vec<IssuesRepositoryIssuesNodes>,
+    ) -> Result<()> {
+        let message = format!(
+            "🚨 New issues in {}:\n\n{}",
+            repo_name_with_owner,
+            issues
+                .iter()
+                .map(|issue| format!("- {}: {}", issue.title, issue.url))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+
+        self.bot
+            .send_message(chat_id, message)
+            .await
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
     }
 }
 

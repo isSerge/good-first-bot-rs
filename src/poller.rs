@@ -1,3 +1,4 @@
+use crate::bot_handler::services::messaging::MessagingService;
 use crate::github::{GithubClient, issues};
 use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
@@ -10,14 +11,14 @@ use std::{
     time::Duration,
     time::SystemTime,
 };
-use teloxide::{Bot, prelude::*, types::ChatId};
+use teloxide::prelude::*;
 
 // TODO: consider replacing polling with webhooks
 /// A poller for polling issues from GitHub and sending messages to Telegram.
 pub struct GithubPoller {
     github_client: Arc<dyn GithubClient>,
     storage: Arc<dyn RepoStorage>,
-    bot: Bot,
+    messaging_service: Arc<dyn MessagingService>,
     // The interval to poll GitHub for new issues.
     poll_interval: u64,
 }
@@ -35,13 +36,13 @@ impl GithubPoller {
     pub fn new(
         github_client: Arc<dyn GithubClient>,
         storage: Arc<dyn RepoStorage>,
-        bot: Bot,
+        messaging_service: Arc<dyn MessagingService>,
         poll_interval: u64,
     ) -> Self {
         Self {
             github_client,
             storage,
-            bot,
+            messaging_service,
             poll_interval,
         }
     }
@@ -97,11 +98,9 @@ impl GithubPoller {
                 if !issues_to_notify.is_empty() {
                     debug!("Sending new issuesmessage to chat: {}", chat_id);
 
-                    let message =
-                        Self::format_message(repo.name_with_owner.clone(), issues_to_notify);
-
-                    // TODO: should use messaging service
-                    self.bot.send_message(chat_id, message).await?;
+                    self.messaging_service
+                        .send_new_issues_msg(chat_id, &repo.name_with_owner, issues_to_notify)
+                        .await?;
 
                     // Update the last poll time for this chat/repo pair to now.
                     self.storage.set_last_poll_time(chat_id, &repo).await?;
@@ -130,20 +129,5 @@ impl GithubPoller {
                     .unwrap_or(false)
             })
             .collect()
-    }
-
-    fn format_message(
-        repo_name_with_owner: String,
-        issues: Vec<issues::IssuesRepositoryIssuesNodes>,
-    ) -> String {
-        format!(
-            "🚨 New issues in {}:\n\n{}",
-            repo_name_with_owner,
-            issues
-                .iter()
-                .map(|issue| format!("- {}: {}", issue.title, issue.url))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
     }
 }
