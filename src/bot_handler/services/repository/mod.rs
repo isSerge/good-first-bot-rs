@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use crate::github::GithubClient;
 use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
@@ -17,11 +20,11 @@ pub trait RepositoryService: Send + Sync {
 
 pub struct DefaultRepositoryService {
     storage: Arc<dyn RepoStorage>,
-    github_client: Arc<GithubClient>,
+    github_client: Arc<dyn GithubClient>,
 }
 
 impl DefaultRepositoryService {
-    pub fn new(storage: Arc<dyn RepoStorage>, github_client: Arc<GithubClient>) -> Self {
+    pub fn new(storage: Arc<dyn RepoStorage>, github_client: Arc<dyn GithubClient>) -> Self {
         Self {
             storage,
             github_client,
