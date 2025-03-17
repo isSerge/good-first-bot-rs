@@ -5,10 +5,12 @@ use crate::github::GithubClient;
 use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
 use async_trait::async_trait;
+use mockall::automock;
 use std::collections::HashSet;
 use std::sync::Arc;
 use teloxide::types::ChatId;
 
+#[automock]
 #[async_trait]
 pub trait RepositoryService: Send + Sync {
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;

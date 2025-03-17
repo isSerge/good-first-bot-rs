@@ -1,5 +1,7 @@
 mod commands;
 pub mod services;
+#[cfg(test)]
+mod tests;
 
 use crate::bot_handler::{
     commands::{CommandContext, CommandHandler},
@@ -37,6 +39,7 @@ pub struct BotHandler {
     repository_service: Arc<dyn RepositoryService>,
 }
 
+/// The state of the command.
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub enum CommandState {
     #[default]
@@ -79,11 +82,22 @@ impl BotHandler {
         msg: &Message,
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
     ) -> Result<()> {
+        let text = msg.text();
+        let dialogue_state = dialogue.get().await?;
         // Check if we're waiting for repository input.
-        match dialogue.get().await? {
-            Some(CommandState::AwaitingAddRepo) => self.process_add(msg).await?,
-            Some(CommandState::AwaitingRemoveRepo) => self.process_remove(msg).await?,
-            _ => {}
+        match (dialogue_state, text) {
+            (Some(CommandState::AwaitingAddRepo), Some(text)) => {
+                self.process_add(text, msg.chat.id).await?
+            }
+            (Some(CommandState::AwaitingRemoveRepo), Some(text)) => {
+                self.process_remove(text, msg.chat.id).await?
+            }
+            _ => {
+                // Should not happen, because force reply does not accept empty input and there are only two possible states, but just in case
+                self.messaging_service
+                    .send_error_msg(msg.chat.id, anyhow::anyhow!("Invalid input"))
+                    .await?;
+            }
         }
         dialogue.exit().await?;
         Ok(())
@@ -143,17 +157,17 @@ impl BotHandler {
     }
 
     /// Add a repository to the user's list.
-    async fn process_add(&self, msg: &Message) -> Result<()> {
-        let repo = match self.parse_repo_from_msg(msg) {
+    async fn process_add(&self, text: &str, chat_id: ChatId) -> Result<()> {
+        // Parse the repository from the text.
+        let repo = match Repository::from_url(text) {
             Ok(repo) => repo,
             Err(e) => {
-                self.messaging_service
-                    .send_error_msg(msg.chat.id, e)
-                    .await?;
+                self.messaging_service.send_error_msg(chat_id, e).await?;
                 return Ok(());
             }
         };
 
+        // Check if the repository exists on GitHub.
         let repo_exists = self
             .repository_service
             .repo_exists(&repo.owner, &repo.name)
@@ -164,72 +178,59 @@ impl BotHandler {
             Ok(true) => {
                 let is_already_tracked = self
                     .repository_service
-                    .contains_repo(msg.chat.id, &repo)
+                    .contains_repo(chat_id, &repo)
                     .await?;
 
                 if is_already_tracked {
                     self.messaging_service
-                        .send_already_tracked_msg(msg.chat.id, repo.name_with_owner)
+                        .send_already_tracked_msg(chat_id, repo.name_with_owner)
                         .await?;
                 } else {
                     self.repository_service
-                        .add_repo(msg.chat.id, repo.clone())
+                        .add_repo(chat_id, repo.clone())
                         .await?;
                     self.messaging_service
-                        .send_repo_added_msg(msg.chat.id, repo.name_with_owner)
+                        .send_repo_added_msg(chat_id, repo.name_with_owner)
                         .await?;
                 }
             }
             Ok(false) => {
                 self.messaging_service
-                    .send_no_repo_exists_msg(msg.chat.id, repo.name_with_owner)
+                    .send_no_repo_exists_msg(chat_id, repo.name_with_owner)
                     .await?;
             }
             Err(e) => {
-                self.messaging_service
-                    .send_error_msg(msg.chat.id, e)
-                    .await?;
+                self.messaging_service.send_error_msg(chat_id, e).await?;
             }
         }
         Ok(())
     }
 
     /// Remove a repository from the user's list.
-    async fn process_remove(&self, msg: &Message) -> Result<()> {
-        let repo = match self.parse_repo_from_msg(msg) {
+    async fn process_remove(&self, text: &str, chat_id: ChatId) -> Result<()> {
+        // Parse the repository from the text.
+        let repo = match Repository::from_url(text) {
             Ok(repo) => repo,
             Err(e) => {
-                self.messaging_service
-                    .send_error_msg(msg.chat.id, e)
-                    .await?;
+                self.messaging_service.send_error_msg(chat_id, e).await?;
                 return Ok(());
             }
         };
 
         let repo_removed = self
             .repository_service
-            .remove_repo(msg.chat.id, &repo.name_with_owner)
+            .remove_repo(chat_id, &repo.name_with_owner)
             .await?;
 
         if repo_removed {
             self.messaging_service
-                .send_repo_removed_msg(msg.chat.id, repo.name_with_owner)
+                .send_repo_removed_msg(chat_id, repo.name_with_owner)
                 .await?;
         } else {
             self.messaging_service
-                .send_repo_not_tracked_msg(msg.chat.id, repo.name_with_owner)
+                .send_repo_not_tracked_msg(chat_id, repo.name_with_owner)
                 .await?;
         }
         Ok(())
-    }
-
-    /// Parse a repository from a message. Used for both add and remove.
-    fn parse_repo_from_msg(&self, msg: &Message) -> anyhow::Result<Repository> {
-        msg.text()
-            .ok_or_else(|| anyhow::anyhow!("No repository url provided"))
-            .and_then(|text| {
-                Repository::from_url(text)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse repository: {}", e))
-            })
     }
 }

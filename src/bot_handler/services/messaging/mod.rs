@@ -3,6 +3,7 @@ use crate::storage::Repository;
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use lazy_static::lazy_static;
+use mockall::automock;
 use std::collections::HashSet;
 use teloxide::types::ChatId;
 use teloxide::utils::command::BotCommands;
@@ -13,6 +14,7 @@ use teloxide::{
 use url::Url;
 
 /// Trait for sending messages to the user.
+#[automock]
 #[async_trait]
 pub trait MessagingService: Send + Sync {
     /// Sends a text message to the provided chat with a keyboard. If no keyboard is provided, the default command keyboard is used.
