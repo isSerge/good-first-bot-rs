@@ -7,6 +7,7 @@ use teloxide::types::ChatId;
 
 #[tokio::test]
 async fn test_process_add_success() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
 
@@ -33,12 +34,16 @@ async fn test_process_add_success() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "https://github.com/owner/repo";
 
+    // Act
     let result = bot_handler.process_add(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_process_add_already_tracked() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
 
@@ -61,12 +66,16 @@ async fn test_process_add_already_tracked() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "https://github.com/owner/repo";
 
+    // Act
     let result = bot_handler.process_add(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_process_add_repo_does_not_exist() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
 
@@ -85,13 +94,17 @@ async fn test_process_add_repo_does_not_exist() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "https://github.com/owner/repo";
 
+    // Act
     let result = bot_handler.process_add(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     // The error is handled by sending an error message, so process_add returns Ok(()).
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_process_add_parse_error() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mock_repository = MockRepositoryService::new();
 
@@ -106,13 +119,17 @@ async fn test_process_add_parse_error() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "invalid_repo_url";
 
+    // Act
     let result = bot_handler.process_add(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     // The error is handled by sending an error message, so process_add returns Ok(()).
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_process_add_error() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
 
@@ -131,13 +148,17 @@ async fn test_process_add_error() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "https://github.com/owner/repo";
 
+    // Act
     let result = bot_handler.process_add(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     // The error is handled by sending an error message, so process_add returns Ok(()).
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_process_remove_success() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
 
@@ -156,12 +177,16 @@ async fn test_process_remove_success() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "https://github.com/owner/repo";
 
+    // Act
     let result = bot_handler.process_remove(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_process_remove_not_tracked() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
 
@@ -180,12 +205,16 @@ async fn test_process_remove_not_tracked() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "https://github.com/owner/repo";
 
+    // Act
     let result = bot_handler.process_remove(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_process_remove_parse_error() {
+    // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mock_repository = MockRepositoryService::new();
 
@@ -200,7 +229,10 @@ async fn test_process_remove_parse_error() {
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = "invalid_repo_url";
 
+    // Act
     let result = bot_handler.process_remove(mock_msg_text, ChatId(123)).await;
+
+    // Assert
     // The error is handled by sending an error message, so process_remove returns Ok(()).
     assert!(result.is_ok());
 }
