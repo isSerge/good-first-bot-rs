@@ -80,3 +80,66 @@ impl FromStr for Repository {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_str() {
+        let repo = Repository::from_str("rust-lang/rust").unwrap();
+        assert_eq!(repo.owner, "rust-lang");
+        assert_eq!(repo.name, "rust");
+        assert_eq!(repo.name_with_owner, "rust-lang/rust");
+    }
+
+    #[test]
+    fn test_from_url() {
+        let repo = Repository::from_url("https://github.com/rust-lang/rust").unwrap();
+        assert_eq!(repo.owner, "rust-lang");
+        assert_eq!(repo.name, "rust");
+        assert_eq!(repo.name_with_owner, "rust-lang/rust");
+    }
+
+    #[test]
+    fn test_from_url_invalid() {
+        let repo = Repository::from_url("https://gitlab.com/rust-lang/rust");
+        assert!(repo.is_err());
+    }
+
+    #[test]
+    fn test_from_str_invalid() {
+        let repo = Repository::from_str("rust-lang");
+        assert!(repo.is_err());
+    }
+
+    #[test]
+    fn test_from_str_invalid_owner() {
+        let repo = Repository::from_str("/rust-lang/rust");
+        assert!(repo.is_err());
+    }
+
+    #[test]
+    fn test_from_str_missing_name() {
+        let repo = Repository::from_str("rust-lang/");
+        assert!(repo.is_err());
+    }
+
+    #[test]
+    fn test_from_url_with_path() {
+        let repo = Repository::from_url("https://github.com/rust-lang/rust/issues").unwrap();
+
+        assert_eq!(repo.owner, "rust-lang");
+        assert_eq!(repo.name, "rust");
+        assert_eq!(repo.name_with_owner, "rust-lang/rust");
+    }
+
+    #[test]
+    fn test_from_url_with_query() {
+        let repo = Repository::from_url("https://github.com/rust-lang/rust?tab=issues").unwrap();
+
+        assert_eq!(repo.owner, "rust-lang");
+        assert_eq!(repo.name, "rust");
+        assert_eq!(repo.name_with_owner, "rust-lang/rust");
+    }
+}
