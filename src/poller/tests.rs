@@ -1,7 +1,7 @@
 use super::*;
-use crate::bot_handler::services::messaging::MockMessagingService;
 use crate::github::MockGithubClient;
-use crate::storage::MockRepoStorage;
+use crate::messaging::MockMessagingService;
+use crate::storage::{MockRepoStorage, RepoEntity};
 use chrono::{DateTime, Utc};
 use mockall::predicate::*;
 use std::str::FromStr;
@@ -101,7 +101,7 @@ async fn test_poll_user_repo_new_issues() {
         10,
     );
 
-    let repo = Repository::from_str(REPO_NAME_WITH_OWNER).unwrap();
+    let repo = RepoEntity::from_str(REPO_NAME_WITH_OWNER).unwrap();
 
     // Act
     let result = poller.poll_user_repo(CHAT_ID, repo).await;
@@ -157,7 +157,7 @@ async fn test_poll_user_repo_no_issues() {
         10,
     );
 
-    let repo = Repository::from_str(REPO_NAME_WITH_OWNER).unwrap();
+    let repo = RepoEntity::from_str(REPO_NAME_WITH_OWNER).unwrap();
 
     // Act
     let result = poller.poll_user_repo(CHAT_ID, repo).await;
@@ -191,7 +191,7 @@ async fn test_poll_user_repo_github_error() {
         10,
     );
 
-    let repo = Repository::from_str(REPO_NAME_WITH_OWNER).unwrap();
+    let repo = RepoEntity::from_str(REPO_NAME_WITH_OWNER).unwrap();
 
     // Act
     let result = poller.poll_user_repo(CHAT_ID, repo).await;

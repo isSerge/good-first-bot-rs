@@ -1,6 +1,6 @@
 use crate::bot_handler::Command;
 use crate::github::issues::IssuesRepositoryIssuesNodes;
-use crate::storage::Repository;
+use crate::storage::RepoEntity;
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use lazy_static::lazy_static;
@@ -77,7 +77,7 @@ pub trait MessagingService: Send + Sync {
     async fn send_list_empty_msg(&self, chat_id: ChatId) -> Result<()>;
 
     /// Sends a message with repo list keyboard.
-    async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<Repository>) -> Result<()>;
+    async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<RepoEntity>) -> Result<()>;
 
     /// Sends a callback query to the user.
     async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()>;
@@ -87,7 +87,7 @@ pub trait MessagingService: Send + Sync {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        repos: HashSet<Repository>,
+        repos: HashSet<RepoEntity>,
     ) -> Result<()>;
 
     /// Sends a message to the user that there are new issues.
@@ -237,7 +237,7 @@ impl MessagingService for TelegramMessagingService {
             .await
     }
 
-    async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<Repository>) -> Result<()> {
+    async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<RepoEntity>) -> Result<()> {
         let keyboard = build_repo_list_keyboard(&repos);
         self.send_response_with_keyboard(
             chat_id,
@@ -266,7 +266,7 @@ impl MessagingService for TelegramMessagingService {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        repos: HashSet<Repository>,
+        repos: HashSet<RepoEntity>,
     ) -> Result<()> {
         // Rebuild the inline keyboard (each row has a repo link and a remove button).
         let new_keyboard = build_repo_list_keyboard(&repos);
@@ -304,7 +304,7 @@ impl MessagingService for TelegramMessagingService {
     }
 }
 
-fn build_repo_list_keyboard(repos: &HashSet<Repository>) -> InlineKeyboardMarkup {
+fn build_repo_list_keyboard(repos: &HashSet<RepoEntity>) -> InlineKeyboardMarkup {
     let buttons: Vec<Vec<InlineKeyboardButton>> = repos
         .iter()
         .map(|repo| {

@@ -8,15 +8,16 @@ mod bot_handler;
 mod config;
 mod dispatcher;
 mod github;
+mod messaging;
 mod poller;
+mod repository;
 mod storage;
 
-use crate::bot_handler::services::{
-    messaging::TelegramMessagingService, repository::DefaultRepositoryService,
-};
 use crate::bot_handler::{BotHandler, CommandState};
 use crate::config::Config;
+use crate::messaging::TelegramMessagingService;
 use crate::poller::GithubPoller;
+use crate::repository::DefaultRepositoryService;
 use crate::storage::sqlite::SqliteStorage;
 use anyhow::Result;
 use log::debug;

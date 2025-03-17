@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests;
 
-use crate::bot_handler::services::messaging::MessagingService;
 use crate::github::{GithubClient, issues};
-use crate::storage::{RepoStorage, Repository};
+use crate::messaging::MessagingService;
+use crate::storage::{RepoEntity, RepoStorage};
 use anyhow::Result;
 use chrono::DateTime;
 use lazy_static::lazy_static;
@@ -66,7 +66,7 @@ impl GithubPoller {
     /// Poll all repos for all users.
     async fn poll_all_repos(
         &mut self,
-        repos_by_chat_id: HashMap<ChatId, HashSet<Repository>>,
+        repos_by_chat_id: HashMap<ChatId, HashSet<RepoEntity>>,
     ) -> Result<()> {
         for (chat_id, repos) in repos_by_chat_id {
             debug!("Polling issues for chat: {}", chat_id);
@@ -80,7 +80,7 @@ impl GithubPoller {
     }
 
     /// Poll a single repo for a single user.
-    async fn poll_user_repo(&mut self, chat_id: ChatId, repo: Repository) -> Result<()> {
+    async fn poll_user_repo(&mut self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
         debug!("Polling issues for repository: {}", repo.name_with_owner);
 
         // Get the last poll time for this repo

@@ -1,6 +1,6 @@
 use crate::bot_handler::BotHandler;
-use crate::bot_handler::services::messaging::MockMessagingService;
-use crate::bot_handler::services::repository::MockRepositoryService;
+use crate::messaging::MockMessagingService;
+use crate::repository::MockRepositoryService;
 use mockall::predicate::*;
 use std::sync::Arc;
 use teloxide::types::ChatId;

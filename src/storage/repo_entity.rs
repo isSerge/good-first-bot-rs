@@ -3,7 +3,7 @@ use std::{fmt, str::FromStr};
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Repository {
+pub struct RepoEntity {
     pub owner: String,
     pub name: String,
     pub name_with_owner: String,
@@ -11,7 +11,7 @@ pub struct Repository {
 
 const GITHUB_URL: &str = "https://github.com";
 
-impl Repository {
+impl RepoEntity {
     /// Returns the URL of the repository on GitHub.
     pub fn url(&self) -> String {
         format!("{}/{}/{}", GITHUB_URL, self.owner, self.name)
@@ -48,13 +48,13 @@ impl Repository {
     }
 }
 
-impl fmt::Display for Repository {
+impl fmt::Display for RepoEntity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} ({})", self.name_with_owner, self.url())
     }
 }
 
-impl FromStr for Repository {
+impl FromStr for RepoEntity {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        let repo = Repository::from_str("rust-lang/rust").unwrap();
+        let repo = RepoEntity::from_str("rust-lang/rust").unwrap();
         assert_eq!(repo.owner, "rust-lang");
         assert_eq!(repo.name, "rust");
         assert_eq!(repo.name_with_owner, "rust-lang/rust");
@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_from_url() {
-        let repo = Repository::from_url("https://github.com/rust-lang/rust").unwrap();
+        let repo = RepoEntity::from_url("https://github.com/rust-lang/rust").unwrap();
         assert_eq!(repo.owner, "rust-lang");
         assert_eq!(repo.name, "rust");
         assert_eq!(repo.name_with_owner, "rust-lang/rust");
@@ -103,31 +103,31 @@ mod tests {
 
     #[test]
     fn test_from_url_invalid() {
-        let repo = Repository::from_url("https://gitlab.com/rust-lang/rust");
+        let repo = RepoEntity::from_url("https://gitlab.com/rust-lang/rust");
         assert!(repo.is_err());
     }
 
     #[test]
     fn test_from_str_invalid() {
-        let repo = Repository::from_str("rust-lang");
+        let repo = RepoEntity::from_str("rust-lang");
         assert!(repo.is_err());
     }
 
     #[test]
     fn test_from_str_invalid_owner() {
-        let repo = Repository::from_str("/rust-lang/rust");
+        let repo = RepoEntity::from_str("/rust-lang/rust");
         assert!(repo.is_err());
     }
 
     #[test]
     fn test_from_str_missing_name() {
-        let repo = Repository::from_str("rust-lang/");
+        let repo = RepoEntity::from_str("rust-lang/");
         assert!(repo.is_err());
     }
 
     #[test]
     fn test_from_url_with_path() {
-        let repo = Repository::from_url("https://github.com/rust-lang/rust/issues").unwrap();
+        let repo = RepoEntity::from_url("https://github.com/rust-lang/rust/issues").unwrap();
 
         assert_eq!(repo.owner, "rust-lang");
         assert_eq!(repo.name, "rust");
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_from_url_with_query() {
-        let repo = Repository::from_url("https://github.com/rust-lang/rust?tab=issues").unwrap();
+        let repo = RepoEntity::from_url("https://github.com/rust-lang/rust?tab=issues").unwrap();
 
         assert_eq!(repo.owner, "rust-lang");
         assert_eq!(repo.name, "rust");

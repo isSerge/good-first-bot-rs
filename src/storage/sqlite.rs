@@ -1,4 +1,4 @@
-use crate::storage::{RepoStorage, Repository};
+use crate::storage::{RepoEntity, RepoStorage};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -28,7 +28,7 @@ impl SqliteStorage {
 
 #[async_trait]
 impl RepoStorage for SqliteStorage {
-    async fn add_repository(&self, chat_id: ChatId, repository: Repository) -> Result<()> {
+    async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> Result<()> {
         debug!("Adding repository to SQLite: {:?}", repository);
 
         let chat_id = chat_id.0;
@@ -62,7 +62,7 @@ impl RepoStorage for SqliteStorage {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn get_repos_per_user(&self, chat_id: ChatId) -> Result<HashSet<Repository>> {
+    async fn get_repos_per_user(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>> {
         debug!("Getting repositories for user: {}", chat_id);
 
         let repos = query!(
@@ -75,14 +75,14 @@ impl RepoStorage for SqliteStorage {
         Ok(repos
             .into_iter()
             .map(|r| {
-                Repository::from_str(&r.name_with_owner).map_err(|e| {
+                RepoEntity::from_str(&r.name_with_owner).map_err(|e| {
                     anyhow::anyhow!("Failed to parse repository {}: {}", r.name_with_owner, e)
                 })
             })
             .collect::<Result<HashSet<_>>>()?)
     }
 
-    async fn contains(&self, chat_id: ChatId, repository: &Repository) -> Result<bool> {
+    async fn contains(&self, chat_id: ChatId, repository: &RepoEntity) -> Result<bool> {
         debug!("Checking if repository exists in SQLite: {:?}", repository);
         let chat_id = chat_id.0;
 
@@ -97,7 +97,7 @@ impl RepoStorage for SqliteStorage {
         Ok(result.count > 0)
     }
 
-    async fn get_all_repos(&self) -> Result<HashMap<ChatId, HashSet<Repository>>> {
+    async fn get_all_repos(&self) -> Result<HashMap<ChatId, HashSet<RepoEntity>>> {
         debug!("Getting all repositories from SQLite");
 
         let repos = query!("SELECT chat_id, owner, name, name_with_owner FROM repositories",)
@@ -107,7 +107,7 @@ impl RepoStorage for SqliteStorage {
         let mut result = HashMap::new();
         for r in repos {
             let chat_id = ChatId(r.chat_id);
-            let repo = Repository {
+            let repo = RepoEntity {
                 owner: r.owner,
                 name: r.name,
                 name_with_owner: r.name_with_owner,
@@ -124,7 +124,7 @@ impl RepoStorage for SqliteStorage {
     async fn get_last_poll_time(
         &self,
         chat_id: ChatId,
-        repository: &Repository,
+        repository: &RepoEntity,
     ) -> Result<Option<i64>> {
         debug!("Getting last poll time for repository: {:?}", repository);
         let chat_id = chat_id.0;
@@ -141,7 +141,7 @@ impl RepoStorage for SqliteStorage {
         Ok(result.map(|r| r.last_poll_time))
     }
 
-    async fn set_last_poll_time(&self, chat_id: ChatId, repository: &Repository) -> Result<()> {
+    async fn set_last_poll_time(&self, chat_id: ChatId, repository: &RepoEntity) -> Result<()> {
         debug!("Setting last poll time for repository: {:?}", repository);
         let chat_id = chat_id.0;
 

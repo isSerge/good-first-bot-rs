@@ -1,7 +1,7 @@
 use super::*;
 use crate::github::MockGithubClient;
 use crate::storage::MockRepoStorage;
-use crate::storage::Repository;
+use crate::storage::RepoEntity;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -36,7 +36,7 @@ async fn test_contains_repo() {
         Arc::new(MockGithubClient::new()),
     );
 
-    let repo = Repository::from_str("owner/repo").unwrap();
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
 
     // Act
     let contains = repository_service.contains_repo(ChatId(1), &repo).await;
@@ -59,7 +59,7 @@ async fn test_add_repo() {
     );
 
     // Act
-    let repo = Repository::from_str("owner/repo").unwrap();
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
     let result = repository_service.add_repo(ChatId(1), repo).await;
 
     // Assert
@@ -91,8 +91,8 @@ async fn test_remove_repo() {
 #[tokio::test]
 async fn test_get_user_repos() {
     // Arrange
-    let repo1 = Repository::from_str("owner/repo").unwrap();
-    let repo2 = Repository::from_str("owner/repo2").unwrap();
+    let repo1 = RepoEntity::from_str("owner/repo").unwrap();
+    let repo2 = RepoEntity::from_str("owner/repo2").unwrap();
     let mut repos = HashSet::new();
     repos.insert(repo1);
     repos.insert(repo2);
@@ -152,7 +152,7 @@ async fn test_contains_repo_error() {
 
     // Act
     let result = repository_service
-        .contains_repo(ChatId(1), &Repository::from_str("owner/repo").unwrap())
+        .contains_repo(ChatId(1), &RepoEntity::from_str("owner/repo").unwrap())
         .await;
 
     // Assert
@@ -174,7 +174,7 @@ async fn test_add_repo_error() {
 
     // Act
     let result = repository_service
-        .add_repo(ChatId(1), Repository::from_str("owner/repo").unwrap())
+        .add_repo(ChatId(1), RepoEntity::from_str("owner/repo").unwrap())
         .await;
 
     // Assert

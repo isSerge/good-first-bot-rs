@@ -1,13 +1,11 @@
 mod commands;
-pub mod services;
 #[cfg(test)]
 mod tests;
 
-use crate::bot_handler::{
-    commands::{CommandContext, CommandHandler},
-    services::{messaging::MessagingService, repository::RepositoryService},
-};
-use crate::storage::Repository;
+use crate::bot_handler::commands::{CommandContext, CommandHandler};
+use crate::messaging::MessagingService;
+use crate::repository::RepositoryService;
+use crate::storage::RepoEntity;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -159,7 +157,7 @@ impl BotHandler {
     /// Add a repository to the user's list.
     async fn process_add(&self, text: &str, chat_id: ChatId) -> Result<()> {
         // Parse the repository from the text.
-        let repo = match Repository::from_url(text) {
+        let repo = match RepoEntity::from_url(text) {
             Ok(repo) => repo,
             Err(e) => {
                 self.messaging_service.send_error_msg(chat_id, e).await?;
@@ -209,7 +207,7 @@ impl BotHandler {
     /// Remove a repository from the user's list.
     async fn process_remove(&self, text: &str, chat_id: ChatId) -> Result<()> {
         // Parse the repository from the text.
-        let repo = match Repository::from_url(text) {
+        let repo = match RepoEntity::from_url(text) {
             Ok(repo) => repo,
             Err(e) => {
                 self.messaging_service.send_error_msg(chat_id, e).await?;

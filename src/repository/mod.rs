@@ -2,7 +2,7 @@
 mod tests;
 
 use crate::github::GithubClient;
-use crate::storage::{RepoStorage, Repository};
+use crate::storage::{RepoEntity, RepoStorage};
 use anyhow::Result;
 use async_trait::async_trait;
 use mockall::automock;
@@ -14,10 +14,10 @@ use teloxide::types::ChatId;
 #[async_trait]
 pub trait RepositoryService: Send + Sync {
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;
-    async fn contains_repo(&self, chat_id: ChatId, repo: &Repository) -> Result<bool>;
-    async fn add_repo(&self, chat_id: ChatId, repo: Repository) -> Result<()>;
+    async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool>;
+    async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
-    async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<Repository>>;
+    async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>>;
 }
 
 pub struct DefaultRepositoryService {
@@ -40,11 +40,11 @@ impl RepositoryService for DefaultRepositoryService {
         self.github_client.repo_exists(owner, name).await
     }
 
-    async fn contains_repo(&self, chat_id: ChatId, repo: &Repository) -> Result<bool> {
+    async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool> {
         self.storage.contains(chat_id, repo).await
     }
 
-    async fn add_repo(&self, chat_id: ChatId, repo: Repository) -> Result<()> {
+    async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
         self.storage.add_repository(chat_id, repo).await
     }
 
@@ -54,7 +54,7 @@ impl RepositoryService for DefaultRepositoryService {
             .await
     }
 
-    async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<Repository>> {
+    async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>> {
         self.storage.get_repos_per_user(chat_id).await
     }
 }
