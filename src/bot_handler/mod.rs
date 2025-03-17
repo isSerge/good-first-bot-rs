@@ -113,11 +113,7 @@ impl BotHandler {
             Ok(repo) => repo,
             Err(e) => {
                 self.messaging_service
-                    .send_response_with_keyboard(
-                        msg.chat.id,
-                        format!("Error parsing repository: {}", e),
-                        None,
-                    )
+                    .send_error_msg(msg.chat.id, e)
                     .await?;
                 return Ok(());
             }
@@ -138,44 +134,25 @@ impl BotHandler {
 
                 if is_already_tracked {
                     self.messaging_service
-                        .send_response_with_keyboard(
-                            msg.chat.id,
-                            format!(
-                                "Repository {} is already in your list",
-                                repo.name_with_owner
-                            ),
-                            None,
-                        )
+                        .send_already_tracked_msg(msg.chat.id, repo.name_with_owner)
                         .await?;
                 } else {
                     self.repository_service
                         .add_repo(msg.chat.id, repo.clone())
                         .await?;
                     self.messaging_service
-                        .send_response_with_keyboard(
-                            msg.chat.id,
-                            format!("Added repo: {}", repo),
-                            None,
-                        )
+                        .send_repo_added_msg(msg.chat.id, repo.name_with_owner)
                         .await?;
                 }
             }
             Ok(false) => {
                 self.messaging_service
-                    .send_response_with_keyboard(
-                        msg.chat.id,
-                        "Repository does not exist on GitHub.".to_string(),
-                        None,
-                    )
+                    .send_no_repo_exists_msg(msg.chat.id, repo.name_with_owner)
                     .await?;
             }
             Err(e) => {
                 self.messaging_service
-                    .send_response_with_keyboard(
-                        msg.chat.id,
-                        format!("Error checking repository: {}", e),
-                        None,
-                    )
+                    .send_error_msg(msg.chat.id, e)
                     .await?;
             }
         }
@@ -187,35 +164,24 @@ impl BotHandler {
             Ok(repo) => repo,
             Err(e) => {
                 self.messaging_service
-                    .send_response_with_keyboard(
-                        msg.chat.id,
-                        format!("Error parsing repository: {}", e),
-                        None,
-                    )
+                    .send_error_msg(msg.chat.id, e)
                     .await?;
                 return Ok(());
             }
         };
 
-        if self
+        let repo_removed = self
             .repository_service
             .remove_repo(msg.chat.id, &repo)
-            .await?
-        {
+            .await?;
+
+        if repo_removed {
             self.messaging_service
-                .send_response_with_keyboard(
-                    msg.chat.id,
-                    format!("Removed repo: {}", repo.name),
-                    None,
-                )
+                .send_repo_removed_msg(msg.chat.id, repo.name_with_owner)
                 .await?;
         } else {
             self.messaging_service
-                .send_response_with_keyboard(
-                    msg.chat.id,
-                    format!("You are not tracking repo: {}", repo.name),
-                    None,
-                )
+                .send_repo_not_tracked_msg(msg.chat.id, repo.name_with_owner)
                 .await?;
         }
         Ok(())
