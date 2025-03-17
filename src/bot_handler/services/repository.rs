@@ -11,7 +11,7 @@ pub trait RepositoryService: Send + Sync {
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;
     async fn contains_repo(&self, chat_id: ChatId, repo: &Repository) -> Result<bool>;
     async fn add_repo(&self, chat_id: ChatId, repo: Repository) -> Result<()>;
-    async fn remove_repo(&self, chat_id: ChatId, repo: &Repository) -> Result<bool>;
+    async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
     async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<Repository>>;
 }
 
@@ -43,9 +43,9 @@ impl RepositoryService for DefaultRepositoryService {
         self.storage.add_repository(chat_id, repo).await
     }
 
-    async fn remove_repo(&self, chat_id: ChatId, repo: &Repository) -> Result<bool> {
+    async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool> {
         self.storage
-            .remove_repository(chat_id, &repo.name_with_owner)
+            .remove_repository(chat_id, repo_name_with_owner)
             .await
     }
 

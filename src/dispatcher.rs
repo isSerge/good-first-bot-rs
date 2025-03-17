@@ -72,6 +72,15 @@ impl BotDispatcher {
                 |query: CallbackQuery,
                  dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
                  handler: Arc<BotHandler>| async move {
+                    // If the callback query is a remove query, handle it as a callback query.
+                    if let Some(data) = query.data.as_deref() {
+                        if data.starts_with("remove:") {
+                            handler.handle_remove_callback_query(query).await?;
+                            return Ok(());
+                        }
+                    }
+
+                    // If the callback query is not a remove query, handle it as a command.
                     let maybe_tuple = query
                         .message
                         .as_ref()

@@ -89,6 +89,40 @@ impl BotHandler {
         Ok(())
     }
 
+    /// Handle a callback query to remove a repository when the user clicks the remove button on the inline keyboard.
+    pub async fn handle_remove_callback_query(&self, query: CallbackQuery) -> Result<()> {
+        if let Some(data) = query.data {
+            // Extract repository name with owner
+            let repo_name_with_owner = data.trim_start_matches("remove:").to_string();
+
+            if let Some(message) = query.message {
+                let chat_id = message.chat().id;
+
+                // Attempt to remove the repository.
+                let removed = self
+                    .repository_service
+                    .remove_repo(chat_id, &repo_name_with_owner)
+                    .await?;
+
+                // Answer the callback query to clear the spinner.
+                self.messaging_service
+                    .answer_remove_callback_query(query.id, removed)
+                    .await?;
+
+                // If removal was successful, update the inline keyboard on the original message.
+                if removed {
+                    // Get the updated repository list.
+                    let user_repos = self.repository_service.get_user_repos(chat_id).await?;
+
+                    self.messaging_service
+                        .edit_list_msg(chat_id, message.id(), user_repos)
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Prompts the user for repository input and sets the state to waiting for repository input.
     async fn prompt_and_wait_for_reply(
         &self,
@@ -108,6 +142,7 @@ impl BotHandler {
         Ok(())
     }
 
+    /// Add a repository to the user's list.
     async fn process_add(&self, msg: &Message) -> Result<()> {
         let repo = match self.parse_repo_from_msg(msg) {
             Ok(repo) => repo,
@@ -159,6 +194,7 @@ impl BotHandler {
         Ok(())
     }
 
+    /// Remove a repository from the user's list.
     async fn process_remove(&self, msg: &Message) -> Result<()> {
         let repo = match self.parse_repo_from_msg(msg) {
             Ok(repo) => repo,
@@ -172,7 +208,7 @@ impl BotHandler {
 
         let repo_removed = self
             .repository_service
-            .remove_repo(msg.chat.id, &repo)
+            .remove_repo(msg.chat.id, &repo.name_with_owner)
             .await?;
 
         if repo_removed {
@@ -187,6 +223,7 @@ impl BotHandler {
         Ok(())
     }
 
+    /// Parse a repository from a message. Used for both add and remove.
     fn parse_repo_from_msg(&self, msg: &Message) -> anyhow::Result<Repository> {
         msg.text()
             .ok_or_else(|| anyhow::anyhow!("No repository url provided"))

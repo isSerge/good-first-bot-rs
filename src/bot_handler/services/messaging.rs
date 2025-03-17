@@ -8,7 +8,7 @@ use teloxide::types::ChatId;
 use teloxide::utils::command::BotCommands;
 use teloxide::{
     prelude::*,
-    types::{ForceReply, InlineKeyboardButton, InlineKeyboardMarkup},
+    types::{ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
 };
 use url::Url;
 
@@ -75,6 +75,17 @@ pub trait MessagingService: Send + Sync {
 
     /// Sends a message with repo list keyboard.
     async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<Repository>) -> Result<()>;
+
+    /// Sends a callback query to the user.
+    async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()>;
+
+    /// Edits the list of repositories on the user's message after a repository has been removed.
+    async fn edit_list_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        repos: HashSet<Repository>,
+    ) -> Result<()>;
 }
 
 /// Telegram messaging service.
@@ -223,6 +234,39 @@ impl MessagingService for TelegramMessagingService {
             Some(keyboard),
         )
         .await
+    }
+
+    async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()> {
+        let removed_msg = if removed {
+            "Repository removed successfully."
+        } else {
+            "Repository not found."
+        };
+
+        self.bot
+            .answer_callback_query(query_id)
+            .text(removed_msg)
+            .await
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to answer callback query: {}", e))
+    }
+
+    async fn edit_list_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        repos: HashSet<Repository>,
+    ) -> Result<()> {
+        // Rebuild the inline keyboard (each row has a repo link and a remove button).
+        let new_keyboard = build_repo_list_keyboard(&repos);
+
+        // Edit the original message to update the inline keyboard.
+        self.bot
+            .edit_message_reply_markup(chat_id, message_id)
+            .reply_markup(new_keyboard)
+            .await
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Failed to edit message: {}", e))
     }
 }
 
