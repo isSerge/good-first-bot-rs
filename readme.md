@@ -93,6 +93,12 @@ To run tests:
 cargo test
 ```
 
+## Future improvements
+- Add multiple repositories
+- Create Config from file (`config.toml`)
+- Retry for Github API queries
+- Github Webhooks integration (replaces polling)
+
 ## License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
