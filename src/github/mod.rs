@@ -1,8 +1,25 @@
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use graphql_client::{GraphQLQuery, Response};
 use log::debug;
+use mockall::automock;
 use reqwest::Client;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
+
+#[automock]
+#[async_trait]
+pub trait GithubClient: Send + Sync {
+    /// Check if a repository exists.
+    async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;
+
+    /// Get issues by label.
+    async fn repo_issues_by_label(
+        &self,
+        owner: &str,
+        name: &str,
+        labels: Vec<String>,
+    ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>>;
+}
 
 // GraphQL DateTime scalar type.
 type DateTime = String;
@@ -26,12 +43,12 @@ pub struct Repository;
 pub struct Issues;
 
 #[derive(Clone)]
-pub struct GithubClient {
+pub struct DefaultGithubClient {
     client: Client,
     graphql_url: String,
 }
 
-impl GithubClient {
+impl DefaultGithubClient {
     pub fn new(github_token: &str, graphql_url: &str) -> Result<Self> {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
@@ -53,9 +70,12 @@ impl GithubClient {
             graphql_url: graphql_url.to_string(),
         })
     }
+}
 
+#[async_trait]
+impl GithubClient for DefaultGithubClient {
     /// Check if a repository exists.
-    pub async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool> {
+    async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool> {
         debug!("Checking if repository {}/{} exists", owner, name);
         let variables = repository::Variables {
             owner: owner.to_string(),
@@ -89,7 +109,7 @@ impl GithubClient {
     }
 
     /// Get issues by label.
-    pub async fn repo_issues_by_label(
+    async fn repo_issues_by_label(
         &self,
         owner: &str,
         name: &str,

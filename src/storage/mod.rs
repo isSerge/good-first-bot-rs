@@ -3,10 +3,12 @@ pub mod sqlite;
 
 use anyhow::{Error, Result};
 use async_trait::async_trait;
+use mockall::automock;
 pub use repository::Repository;
 use std::collections::{HashMap, HashSet};
 use teloxide::types::ChatId;
 
+#[automock]
 #[async_trait]
 pub trait RepoStorage: Send + Sync {
     /// Add a repository to the storage.

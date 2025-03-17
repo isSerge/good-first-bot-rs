@@ -1,4 +1,4 @@
-use crate::github;
+use crate::github::{GithubClient, issues};
 use crate::storage::{RepoStorage, Repository};
 use anyhow::Result;
 use chrono::DateTime;
@@ -15,7 +15,7 @@ use teloxide::{Bot, prelude::*, types::ChatId};
 // TODO: consider replacing polling with webhooks
 /// A poller for polling issues from GitHub and sending messages to Telegram.
 pub struct GithubPoller {
-    github_client: Arc<github::GithubClient>,
+    github_client: Arc<dyn GithubClient>,
     storage: Arc<dyn RepoStorage>,
     bot: Bot,
     // The interval to poll GitHub for new issues.
@@ -33,7 +33,7 @@ lazy_static! {
 impl GithubPoller {
     /// Create a new GithubPoller.
     pub fn new(
-        github_client: Arc<github::GithubClient>,
+        github_client: Arc<dyn GithubClient>,
         storage: Arc<dyn RepoStorage>,
         bot: Bot,
         poll_interval: u64,
@@ -100,6 +100,7 @@ impl GithubPoller {
                     let message =
                         Self::format_message(repo.name_with_owner.clone(), issues_to_notify);
 
+                    // TODO: should use messaging service
                     self.bot.send_message(chat_id, message).await?;
 
                     // Update the last poll time for this chat/repo pair to now.
@@ -118,9 +119,9 @@ impl GithubPoller {
     }
 
     fn filter_new_issues(
-        issues: Vec<github::issues::IssuesRepositoryIssuesNodes>,
+        issues: Vec<issues::IssuesRepositoryIssuesNodes>,
         last_poll_time: &SystemTime,
-    ) -> Vec<github::issues::IssuesRepositoryIssuesNodes> {
+    ) -> Vec<issues::IssuesRepositoryIssuesNodes> {
         issues
             .into_iter()
             .filter(|issue| {
@@ -133,7 +134,7 @@ impl GithubPoller {
 
     fn format_message(
         repo_name_with_owner: String,
-        issues: Vec<github::issues::IssuesRepositoryIssuesNodes>,
+        issues: Vec<issues::IssuesRepositoryIssuesNodes>,
     ) -> String {
         format!(
             "🚨 New issues in {}:\n\n{}",

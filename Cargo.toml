@@ -21,3 +21,4 @@ url = "2.5.4"
 chrono = "0.4.40"
 sqlx = { version = "0.8.3", features = ["runtime-tokio-rustls", "sqlite"] }
 temp-env = "0.3.6"
+mockall = "0.13.1"

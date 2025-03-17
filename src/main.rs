@@ -38,7 +38,7 @@ async fn run() -> Result<()> {
     let config = Config::from_env()?;
     let storage = Arc::new(SqliteStorage::new(&config.database_url).await?);
     let bot = Bot::new(config.telegram_bot_token.clone());
-    let github_client = Arc::new(github::GithubClient::new(
+    let github_client = Arc::new(github::DefaultGithubClient::new(
         &config.github_token,
         &config.github_graphql_url,
     )?);
