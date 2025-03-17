@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use crate::bot_handler::services::messaging::MessagingService;
 use crate::github::{GithubClient, issues};
 use crate::storage::{RepoStorage, Repository};
@@ -109,8 +112,9 @@ impl GithubPoller {
                 }
             }
             Result::Err(e) => {
+                // just log the error and keep going for now
+                // TODO: handle specific errors
                 log::error!("Error polling issues: {:?}", e);
-                // TODO: handle error
             }
         }
 
