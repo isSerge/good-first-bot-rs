@@ -100,6 +100,12 @@ impl GithubClient for DefaultGithubClient {
 
         debug!("Response body: {:?}", response_body);
 
+        let graphql_errors = response_body.errors.iter().collect::<Vec<_>>();
+
+        if !graphql_errors.is_empty() {
+            return Err(anyhow::anyhow!("GraphQL errors: {:?}", graphql_errors));
+        }
+
         let repo_exists = response_body
             .data
             .and_then(|data| data.repository)
@@ -139,6 +145,12 @@ impl GithubClient for DefaultGithubClient {
             .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
 
         debug!("Response body: {:?}", response_body);
+
+        let graphql_errors = response_body.errors.iter().collect::<Vec<_>>();
+
+        if !graphql_errors.is_empty() {
+            return Err(anyhow::anyhow!("GraphQL errors: {:?}", graphql_errors));
+        }
 
         let issues = response_body
             .data
