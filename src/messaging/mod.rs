@@ -152,7 +152,7 @@ impl MessagingService for TelegramMessagingService {
         self.send_response_with_keyboard(
             chat_id,
             format!(
-                "Repository {} is already in your list",
+                "❌ Repository {} is already in your list",
                 repo_name_with_owner
             ),
             None,
@@ -167,7 +167,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("Repository {} added to your list", repo_name_with_owner),
+            format!("✅ Repository {} added to your list", repo_name_with_owner),
             None,
         )
         .await
@@ -181,7 +181,7 @@ impl MessagingService for TelegramMessagingService {
         self.send_response_with_keyboard(
             chat_id,
             format!(
-                "Repository {} does not exist on GitHub.",
+                "❌ Repository {} does not exist on GitHub.",
                 repo_name_with_owner
             ),
             None,
@@ -196,7 +196,10 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("Repository {} removed from your list", repo_name_with_owner),
+            format!(
+                "✅ Repository {} removed from your list",
+                repo_name_with_owner
+            ),
             None,
         )
         .await
@@ -209,7 +212,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("Repository {} is not tracked", repo_name_with_owner),
+            format!("❌ Repository {} is not tracked", repo_name_with_owner),
             None,
         )
         .await
@@ -227,7 +230,7 @@ impl MessagingService for TelegramMessagingService {
 
     async fn send_start_msg(&self, chat_id: ChatId) -> Result<()> {
         let start_text =
-            "Welcome! Use the buttons below to track repositories with good first issues.";
+            "👋 Welcome! Use the buttons below to track repositories with good first issues.";
         self.send_response_with_keyboard(chat_id, start_text.to_string(), None)
             .await
     }
@@ -241,7 +244,7 @@ impl MessagingService for TelegramMessagingService {
         let keyboard = build_repo_list_keyboard(&repos);
         self.send_response_with_keyboard(
             chat_id,
-            "Your tracked repositories:".to_string(),
+            "🔍 Your tracked repositories:".to_string(),
             Some(keyboard),
         )
         .await
@@ -249,9 +252,9 @@ impl MessagingService for TelegramMessagingService {
 
     async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()> {
         let removed_msg = if removed {
-            "Repository removed successfully."
+            "✅ Repository removed successfully."
         } else {
-            "Repository not found."
+            "❌ Repository not found."
         };
 
         self.bot
