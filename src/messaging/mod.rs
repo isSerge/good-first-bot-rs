@@ -1,24 +1,26 @@
-use crate::bot_handler::Command;
-use crate::github::issues::IssuesRepositoryIssuesNodes;
-use crate::storage::RepoEntity;
+use std::collections::HashSet;
+
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use mockall::automock;
-use std::collections::HashSet;
-use teloxide::types::ChatId;
-use teloxide::utils::command::BotCommands;
 use teloxide::{
     prelude::*,
-    types::{ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
+    types::{ChatId, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
+    utils::command::BotCommands,
 };
 use url::Url;
+
+use crate::{
+    bot_handler::Command, github::issues::IssuesRepositoryIssuesNodes, storage::RepoEntity,
+};
 
 /// Trait for sending messages to the user.
 #[automock]
 #[async_trait]
 pub trait MessagingService: Send + Sync {
-    /// Sends a text message to the provided chat with a keyboard. If no keyboard is provided, the default command keyboard is used.
+    /// Sends a text message to the provided chat with a keyboard. If no
+    /// keyboard is provided, the default command keyboard is used.
     async fn send_response_with_keyboard(
         &self,
         chat_id: ChatId,
@@ -46,7 +48,8 @@ pub trait MessagingService: Send + Sync {
         repo_name_with_owner: String,
     ) -> Result<()>;
 
-    /// Sends a message to the user that the repository does not exist on GitHub.
+    /// Sends a message to the user that the repository does not exist on
+    /// GitHub.
     async fn send_no_repo_exists_msg(
         &self,
         chat_id: ChatId,
@@ -82,7 +85,8 @@ pub trait MessagingService: Send + Sync {
     /// Sends a callback query to the user.
     async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()>;
 
-    /// Edits the list of repositories on the user's message after a repository has been removed.
+    /// Edits the list of repositories on the user's message after a repository
+    /// has been removed.
     async fn edit_list_msg(
         &self,
         chat_id: ChatId,
@@ -140,8 +144,7 @@ impl MessagingService for TelegramMessagingService {
     }
 
     async fn send_error_msg(&self, chat_id: ChatId, error: Error) -> Result<()> {
-        self.send_response_with_keyboard(chat_id, error.to_string(), None)
-            .await
+        self.send_response_with_keyboard(chat_id, error.to_string(), None).await
     }
 
     async fn send_already_tracked_msg(
@@ -151,10 +154,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!(
-                "❌ Repository {} is already in your list",
-                repo_name_with_owner
-            ),
+            format!("❌ Repository {} is already in your list", repo_name_with_owner),
             None,
         )
         .await
@@ -180,10 +180,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!(
-                "❌ Repository {} does not exist on GitHub.",
-                repo_name_with_owner
-            ),
+            format!("❌ Repository {} does not exist on GitHub.", repo_name_with_owner),
             None,
         )
         .await
@@ -196,10 +193,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!(
-                "✅ Repository {} removed from your list",
-                repo_name_with_owner
-            ),
+            format!("✅ Repository {} removed from your list", repo_name_with_owner),
             None,
         )
         .await
@@ -231,8 +225,7 @@ impl MessagingService for TelegramMessagingService {
     async fn send_start_msg(&self, chat_id: ChatId) -> Result<()> {
         let start_text =
             "👋 Welcome! Use the buttons below to track repositories with good first issues.";
-        self.send_response_with_keyboard(chat_id, start_text.to_string(), None)
-            .await
+        self.send_response_with_keyboard(chat_id, start_text.to_string(), None).await
     }
 
     async fn send_list_empty_msg(&self, chat_id: ChatId) -> Result<()> {

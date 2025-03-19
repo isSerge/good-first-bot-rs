@@ -1,20 +1,23 @@
 #[cfg(test)]
 mod tests;
 
-use crate::github::{GithubClient, issues};
-use crate::messaging::MessagingService;
-use crate::storage::{RepoEntity, RepoStorage};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
+
 use anyhow::Result;
 use chrono::DateTime;
 use lazy_static::lazy_static;
 use log::debug;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-    time::Duration,
-    time::SystemTime,
-};
 use teloxide::prelude::*;
+
+use crate::{
+    github::{GithubClient, issues},
+    messaging::MessagingService,
+    storage::{RepoEntity, RepoStorage},
+};
 
 // TODO: consider replacing polling with webhooks
 /// A poller for polling issues from GitHub and sending messages to Telegram.
@@ -42,12 +45,7 @@ impl GithubPoller {
         messaging_service: Arc<dyn MessagingService>,
         poll_interval: u64,
     ) -> Self {
-        Self {
-            github_client,
-            storage,
-            messaging_service,
-            poll_interval,
-        }
+        Self { github_client, storage, messaging_service, poll_interval }
     }
 
     /// Run the Poller.

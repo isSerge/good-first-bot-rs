@@ -1,17 +1,16 @@
+use std::{str::FromStr, sync::Arc};
+
 use super::*;
-use crate::github::MockGithubClient;
-use crate::storage::MockRepoStorage;
-use crate::storage::RepoEntity;
-use std::str::FromStr;
-use std::sync::Arc;
+use crate::{
+    github::MockGithubClient,
+    storage::{MockRepoStorage, RepoEntity},
+};
 
 #[tokio::test]
 async fn test_repo_exists() {
     // Arrange
     let mut mock_github_client = MockGithubClient::new();
-    mock_github_client
-        .expect_repo_exists()
-        .returning(|_, _| Ok(true));
+    mock_github_client.expect_repo_exists().returning(|_, _| Ok(true));
     let mock_repo_storage = MockRepoStorage::new();
     let repository_service =
         DefaultRepositoryService::new(Arc::new(mock_repo_storage), Arc::new(mock_github_client));
@@ -28,9 +27,7 @@ async fn test_repo_exists() {
 async fn test_contains_repo() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_contains()
-        .returning(|_, _| Ok(true));
+    mock_repo_storage.expect_contains().returning(|_, _| Ok(true));
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
         Arc::new(MockGithubClient::new()),
@@ -50,9 +47,7 @@ async fn test_contains_repo() {
 async fn test_add_repo() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_add_repository()
-        .returning(|_, _| Ok(()));
+    mock_repo_storage.expect_add_repository().returning(|_, _| Ok(()));
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
         Arc::new(MockGithubClient::new()),
@@ -70,9 +65,7 @@ async fn test_add_repo() {
 async fn test_remove_repo() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_remove_repository()
-        .returning(|_, _| Ok(true));
+    mock_repo_storage.expect_remove_repository().returning(|_, _| Ok(true));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
@@ -80,9 +73,7 @@ async fn test_remove_repo() {
     );
 
     // Act
-    let result = repository_service
-        .remove_repo(ChatId(1), "owner/repo")
-        .await;
+    let result = repository_service.remove_repo(ChatId(1), "owner/repo").await;
 
     // Assert
     assert!(result.is_ok());
@@ -100,9 +91,7 @@ async fn test_get_user_repos() {
     let repos_clone = repos.clone();
 
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_get_repos_per_user()
-        .returning(move |_| Ok(repos.clone()));
+    mock_repo_storage.expect_get_repos_per_user().returning(move |_| Ok(repos.clone()));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
@@ -121,9 +110,7 @@ async fn test_get_user_repos() {
 async fn test_repo_exists_error() {
     // Arrange
     let mut mock_github_client = MockGithubClient::new();
-    mock_github_client
-        .expect_repo_exists()
-        .returning(|_, _| Err(anyhow::anyhow!("error")));
+    mock_github_client.expect_repo_exists().returning(|_, _| Err(anyhow::anyhow!("error")));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(MockRepoStorage::new()),
@@ -141,9 +128,7 @@ async fn test_repo_exists_error() {
 async fn test_contains_repo_error() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_contains()
-        .returning(|_, _| Err(anyhow::anyhow!("error")));
+    mock_repo_storage.expect_contains().returning(|_, _| Err(anyhow::anyhow!("error")));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
@@ -163,9 +148,7 @@ async fn test_contains_repo_error() {
 async fn test_add_repo_error() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_add_repository()
-        .returning(|_, _| Err(anyhow::anyhow!("error")));
+    mock_repo_storage.expect_add_repository().returning(|_, _| Err(anyhow::anyhow!("error")));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
@@ -173,9 +156,8 @@ async fn test_add_repo_error() {
     );
 
     // Act
-    let result = repository_service
-        .add_repo(ChatId(1), RepoEntity::from_str("owner/repo").unwrap())
-        .await;
+    let result =
+        repository_service.add_repo(ChatId(1), RepoEntity::from_str("owner/repo").unwrap()).await;
 
     // Assert
     assert!(result.is_err());
@@ -185,9 +167,7 @@ async fn test_add_repo_error() {
 async fn test_remove_repo_error() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_remove_repository()
-        .returning(|_, _| Err(anyhow::anyhow!("error")));
+    mock_repo_storage.expect_remove_repository().returning(|_, _| Err(anyhow::anyhow!("error")));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
@@ -195,9 +175,7 @@ async fn test_remove_repo_error() {
     );
 
     // Act
-    let result = repository_service
-        .remove_repo(ChatId(1), "owner/repo")
-        .await;
+    let result = repository_service.remove_repo(ChatId(1), "owner/repo").await;
 
     // Assert
     assert!(result.is_err());
@@ -207,9 +185,7 @@ async fn test_remove_repo_error() {
 async fn test_get_user_repos_error() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_get_repos_per_user()
-        .returning(|_| Err(anyhow::anyhow!("error")));
+    mock_repo_storage.expect_get_repos_per_user().returning(|_| Err(anyhow::anyhow!("error")));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),

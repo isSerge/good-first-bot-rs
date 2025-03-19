@@ -4,11 +4,11 @@ mod list;
 mod remove;
 mod start;
 
-use crate::bot_handler::{BotHandler, CommandState};
 use anyhow::Result;
 use async_trait::async_trait;
-use teloxide::dispatching::dialogue::InMemStorage;
-use teloxide::prelude::*;
+use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
+
+use crate::bot_handler::{BotHandler, CommandState};
 
 /// CommandContext groups the data needed by all command handlers.
 pub struct CommandContext<'a> {

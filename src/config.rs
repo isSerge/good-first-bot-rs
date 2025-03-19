@@ -1,5 +1,6 @@
-use anyhow::{Context, Result};
 use std::env;
+
+use anyhow::{Context, Result};
 
 const DEFAULT_DATABASE_URL: &str = "sqlite://data/data.db";
 const DEFAULT_GITHUB_GRAPHQL_URL: &str = "https://api.github.com/graphql";
@@ -35,8 +36,9 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use temp_env::with_vars;
+
+    use super::*;
 
     #[test]
     fn test_from_env() {

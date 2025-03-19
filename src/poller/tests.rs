@@ -1,10 +1,14 @@
-use super::*;
-use crate::github::MockGithubClient;
-use crate::messaging::MockMessagingService;
-use crate::storage::{MockRepoStorage, RepoEntity};
+use std::str::FromStr;
+
 use chrono::{DateTime, Utc};
 use mockall::predicate::*;
-use std::str::FromStr;
+
+use super::*;
+use crate::{
+    github::MockGithubClient,
+    messaging::MockMessagingService,
+    storage::{MockRepoStorage, RepoEntity},
+};
 
 const OWNER: &str = "owner";
 const REPO_NAME: &str = "repo";
@@ -50,7 +54,8 @@ async fn test_poll_user_repo_new_issues() {
     let before_last_poll_time_system_time = last_poll_time_system_time - Duration::from_secs(1);
     let after_last_poll_time_system_time = last_poll_time_system_time + Duration::from_secs(1);
 
-    // Create two issues: one new (after the last poll) and one old (before the last poll)
+    // Create two issues: one new (after the last poll) and one old (before the last
+    // poll)
     let issue_new = issues::IssuesRepositoryIssuesNodes {
         created_at: DateTime::<Utc>::from(after_last_poll_time_system_time).to_rfc3339(),
         ..Default::default()

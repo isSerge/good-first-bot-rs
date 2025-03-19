@@ -3,8 +3,10 @@ use async_trait::async_trait;
 use graphql_client::{GraphQLQuery, Response};
 use log::debug;
 use mockall::automock;
-use reqwest::Client;
-use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::{
+    Client,
+    header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
+};
 
 #[automock]
 #[async_trait]
@@ -53,10 +55,7 @@ impl DefaultGithubClient {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
 
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(&format!("Bearer {}", github_token))?,
-        );
+        headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {}", github_token))?);
         headers.insert(USER_AGENT, HeaderValue::from_static("github-activity-rs"));
 
         let client = reqwest::Client::builder()
@@ -65,10 +64,7 @@ impl DefaultGithubClient {
             .context("Failed to build HTTP client")?;
         debug!("HTTP client built successfully.");
 
-        Ok(Self {
-            client,
-            graphql_url: graphql_url.to_string(),
-        })
+        Ok(Self { client, graphql_url: graphql_url.to_string() })
     }
 }
 
@@ -77,10 +73,7 @@ impl GithubClient for DefaultGithubClient {
     /// Check if a repository exists.
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool> {
         debug!("Checking if repository {}/{} exists", owner, name);
-        let variables = repository::Variables {
-            owner: owner.to_string(),
-            name: name.to_string(),
-        };
+        let variables = repository::Variables { owner: owner.to_string(), name: name.to_string() };
 
         let request = Repository::build_query(variables);
         debug!("GraphQL request: {:?}", request);
@@ -93,10 +86,8 @@ impl GithubClient for DefaultGithubClient {
             .await
             .context("Failed to send request")?;
 
-        let response_body: Response<repository::ResponseData> = res
-            .json()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
+        let response_body: Response<repository::ResponseData> =
+            res.json().await.map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
 
         debug!("Response body: {:?}", response_body);
 
@@ -106,10 +97,7 @@ impl GithubClient for DefaultGithubClient {
             return Err(anyhow::anyhow!("GraphQL errors: {:?}", graphql_errors));
         }
 
-        let repo_exists = response_body
-            .data
-            .and_then(|data| data.repository)
-            .is_some();
+        let repo_exists = response_body.data.and_then(|data| data.repository).is_some();
 
         Ok(repo_exists)
     }
@@ -139,10 +127,8 @@ impl GithubClient for DefaultGithubClient {
             .await
             .context("Failed to send request")?;
 
-        let response_body: Response<issues::ResponseData> = res
-            .json()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
+        let response_body: Response<issues::ResponseData> =
+            res.json().await.map_err(|e| anyhow::anyhow!("Failed to parse response: {}", e))?;
 
         debug!("Response body: {:?}", response_body);
 

@@ -1,6 +1,6 @@
-use crate::bot_handler::{BotHandler, Command, CommandState};
-use anyhow::Result;
 use std::sync::Arc;
+
+use anyhow::Result;
 use teloxide::{
     dispatching::{
         DefaultKey, DpHandlerDescription,
@@ -11,6 +11,8 @@ use teloxide::{
     types::Update,
     utils::command::BotCommands,
 };
+
+use crate::bot_handler::{BotHandler, Command, CommandState};
 
 /// Type alias to simplify handler type signatures.
 type BotResultHandler = Handler<'static, DependencyMap, Result<()>, DpHandlerDescription>;
@@ -27,10 +29,7 @@ impl BotDispatcher {
         handler: Arc<BotHandler>,
         dialogue_storage: Arc<InMemStorage<CommandState>>,
     ) -> Self {
-        Self {
-            handler,
-            dialogue_storage,
-        }
+        Self { handler, dialogue_storage }
     }
 
     /// Builds the dispatcher using the provided `bot` instance.
@@ -64,42 +63,38 @@ impl BotDispatcher {
             )
     }
 
-    /// Builds the branch for handling callback queries using combinators to reduce nesting.
+    /// Builds the branch for handling callback queries using combinators to
+    /// reduce nesting.
     fn build_callback_queries_branch(&self) -> BotResultHandler {
-        Update::filter_callback_query()
-            .chain(filter_map(extract_dialogue))
-            .endpoint(
-                |query: CallbackQuery,
-                 dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
-                 handler: Arc<BotHandler>| async move {
-                    // If the callback query is a remove query, handle it as a callback query.
-                    if let Some(data) = query.data.as_deref() {
-                        if data.starts_with("remove:") {
-                            handler.handle_remove_callback_query(query).await?;
-                            return Ok(());
-                        }
+        Update::filter_callback_query().chain(filter_map(extract_dialogue)).endpoint(
+            |query: CallbackQuery,
+             dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+             handler: Arc<BotHandler>| async move {
+                // If the callback query is a remove query, handle it as a callback query.
+                if let Some(data) = query.data.as_deref() {
+                    if data.starts_with("remove:") {
+                        handler.handle_remove_callback_query(query).await?;
+                        return Ok(());
                     }
+                }
 
-                    // If the callback query is not a remove query, handle it as a command.
-                    let maybe_tuple = query
-                        .message
-                        .as_ref()
-                        .and_then(|m| m.regular_message().cloned())
-                        .and_then(|msg| {
+                // If the callback query is not a remove query, handle it as a command.
+                let maybe_tuple =
+                    query.message.as_ref().and_then(|m| m.regular_message().cloned()).and_then(
+                        |msg| {
                             query.data.as_deref().and_then(|data| {
                                 let cmd_str = format!("/{}", data);
-                                Command::parse(&cmd_str, "botname")
-                                    .ok()
-                                    .map(|cmd| (msg, cmd))
+                                Command::parse(&cmd_str, "botname").ok().map(|cmd| (msg, cmd))
                             })
-                        });
+                        },
+                    );
 
-                    if let Some((msg, command)) = maybe_tuple {
-                        handler.handle_commands(&msg, command, dialogue).await?;
-                    }
-                    Ok(())
-                },
-            )
+                if let Some((msg, command)) = maybe_tuple {
+                    handler.handle_commands(&msg, command, dialogue).await?;
+                }
+                Ok(())
+            },
+        )
     }
 
     /// Builds the branch for handling messages that are force-reply responses.

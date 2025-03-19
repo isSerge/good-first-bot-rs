@@ -1,8 +1,9 @@
 #![warn(missing_docs)]
 //! A Telegram bot for tracking beginner-friendly GitHub issues.
 //!
-//! This bot allows users to track repositories and receive notifications for new issues labeled as "good first issue".
-//! It provides a simple interface to add, remove, and list tracked repositories.
+//! This bot allows users to track repositories and receive notifications for
+//! new issues labeled as "good first issue". It provides a simple interface to
+//! add, remove, and list tracked repositories.
 
 mod bot_handler;
 mod config;
@@ -13,16 +14,20 @@ mod poller;
 mod repository;
 mod storage;
 
-use crate::bot_handler::{BotHandler, CommandState};
-use crate::config::Config;
-use crate::messaging::TelegramMessagingService;
-use crate::poller::GithubPoller;
-use crate::repository::DefaultRepositoryService;
-use crate::storage::sqlite::SqliteStorage;
+use std::sync::Arc;
+
 use anyhow::Result;
 use log::debug;
-use std::sync::Arc;
 use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
+
+use crate::{
+    bot_handler::{BotHandler, CommandState},
+    config::Config,
+    messaging::TelegramMessagingService,
+    poller::GithubPoller,
+    repository::DefaultRepositoryService,
+    storage::sqlite::SqliteStorage,
+};
 
 #[tokio::main]
 async fn main() {
@@ -61,10 +66,8 @@ async fn run() -> Result<()> {
     });
 
     let dialogue_storage = InMemStorage::<CommandState>::new();
-    let repo_manager_service = Arc::new(DefaultRepositoryService::new(
-        storage.clone(),
-        github_client.clone(),
-    ));
+    let repo_manager_service =
+        Arc::new(DefaultRepositoryService::new(storage.clone(), github_client.clone()));
     let handler = Arc::new(BotHandler::new(messaging_service, repo_manager_service));
     let mut dispatcher = dispatcher::BotDispatcher::new(handler, dialogue_storage).build(bot);
     debug!("Dispatcher built successfully.");

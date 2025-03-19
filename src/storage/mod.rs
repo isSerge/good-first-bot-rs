@@ -1,11 +1,12 @@
 mod repo_entity;
 pub mod sqlite;
 
+use std::collections::{HashMap, HashSet};
+
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use mockall::automock;
 pub use repo_entity::RepoEntity;
-use std::collections::{HashMap, HashSet};
 use teloxide::types::ChatId;
 
 #[automock]

@@ -1,14 +1,17 @@
 #[cfg(test)]
 mod tests;
 
-use crate::github::GithubClient;
-use crate::storage::{RepoEntity, RepoStorage};
+use std::{collections::HashSet, sync::Arc};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use mockall::automock;
-use std::collections::HashSet;
-use std::sync::Arc;
 use teloxide::types::ChatId;
+
+use crate::{
+    github::GithubClient,
+    storage::{RepoEntity, RepoStorage},
+};
 
 #[automock]
 #[async_trait]
@@ -27,10 +30,7 @@ pub struct DefaultRepositoryService {
 
 impl DefaultRepositoryService {
     pub fn new(storage: Arc<dyn RepoStorage>, github_client: Arc<dyn GithubClient>) -> Self {
-        Self {
-            storage,
-            github_client,
-        }
+        Self { storage, github_client }
     }
 }
 
@@ -49,9 +49,7 @@ impl RepositoryService for DefaultRepositoryService {
     }
 
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool> {
-        self.storage
-            .remove_repository(chat_id, repo_name_with_owner)
-            .await
+        self.storage.remove_repository(chat_id, repo_name_with_owner).await
     }
 
     async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>> {

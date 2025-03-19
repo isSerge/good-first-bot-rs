@@ -2,18 +2,22 @@ mod commands;
 #[cfg(test)]
 mod tests;
 
-use crate::bot_handler::commands::{CommandContext, CommandHandler};
-use crate::messaging::MessagingService;
-use crate::repository::RepositoryService;
-use crate::storage::RepoEntity;
+use std::sync::Arc;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage},
     prelude::*,
     types::Message,
     utils::command::BotCommands,
+};
+
+use crate::{
+    bot_handler::commands::{CommandContext, CommandHandler},
+    messaging::MessagingService,
+    repository::RepositoryService,
+    storage::RepoEntity,
 };
 
 #[derive(BotCommands, Clone)]
@@ -52,10 +56,7 @@ impl BotHandler {
         messaging_service: Arc<dyn MessagingService>,
         repository_service: Arc<dyn RepositoryService>,
     ) -> Self {
-        Self {
-            messaging_service,
-            repository_service,
-        }
+        Self { messaging_service, repository_service }
     }
 
     /// Dispatches the incoming command to the appropriate handler.
@@ -65,11 +66,7 @@ impl BotHandler {
         cmd: Command,
         dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
     ) -> anyhow::Result<()> {
-        let ctx = CommandContext {
-            handler: self,
-            message: msg,
-            dialogue: &dialogue,
-        };
+        let ctx = CommandContext { handler: self, message: msg, dialogue: &dialogue };
 
         cmd.handle(ctx).await
     }
@@ -84,14 +81,13 @@ impl BotHandler {
         let dialogue_state = dialogue.get().await?;
         // Check if we're waiting for repository input.
         match (dialogue_state, text) {
-            (Some(CommandState::AwaitingAddRepo), Some(text)) => {
-                self.process_add(text, msg.chat.id).await?
-            }
-            (Some(CommandState::AwaitingRemoveRepo), Some(text)) => {
-                self.process_remove(text, msg.chat.id).await?
-            }
+            (Some(CommandState::AwaitingAddRepo), Some(text)) =>
+                self.process_add(text, msg.chat.id).await?,
+            (Some(CommandState::AwaitingRemoveRepo), Some(text)) =>
+                self.process_remove(text, msg.chat.id).await?,
             _ => {
-                // Should not happen, because force reply does not accept empty input and there are only two possible states, but just in case
+                // Should not happen, because force reply does not accept empty input and there
+                // are only two possible states, but just in case
                 self.messaging_service
                     .send_error_msg(msg.chat.id, anyhow::anyhow!("Invalid input"))
                     .await?;
@@ -101,7 +97,8 @@ impl BotHandler {
         Ok(())
     }
 
-    /// Handle a callback query to remove a repository when the user clicks the remove button on the inline keyboard.
+    /// Handle a callback query to remove a repository when the user clicks the
+    /// remove button on the inline keyboard.
     pub async fn handle_remove_callback_query(&self, query: CallbackQuery) -> Result<()> {
         if let Some(data) = query.data {
             // Extract repository name with owner
@@ -111,40 +108,34 @@ impl BotHandler {
                 let chat_id = message.chat().id;
 
                 // Attempt to remove the repository.
-                let removed = self
-                    .repository_service
-                    .remove_repo(chat_id, &repo_name_with_owner)
-                    .await?;
+                let removed =
+                    self.repository_service.remove_repo(chat_id, &repo_name_with_owner).await?;
 
                 // Answer the callback query to clear the spinner.
-                self.messaging_service
-                    .answer_remove_callback_query(query.id, removed)
-                    .await?;
+                self.messaging_service.answer_remove_callback_query(query.id, removed).await?;
 
-                // If removal was successful, update the inline keyboard on the original message.
+                // If removal was successful, update the inline keyboard on the original
+                // message.
                 if removed {
                     // Get the updated repository list.
                     let user_repos = self.repository_service.get_user_repos(chat_id).await?;
 
-                    self.messaging_service
-                        .edit_list_msg(chat_id, message.id(), user_repos)
-                        .await?;
+                    self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
                 }
             }
         }
         Ok(())
     }
 
-    /// Prompts the user for repository input and sets the state to waiting for repository input.
+    /// Prompts the user for repository input and sets the state to waiting for
+    /// repository input.
     async fn prompt_and_wait_for_reply(
         &self,
         chat_id: ChatId,
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
         command: Command,
     ) -> Result<()> {
-        self.messaging_service
-            .prompt_for_repo_input(chat_id)
-            .await?;
+        self.messaging_service.prompt_for_repo_input(chat_id).await?;
         let state = match command {
             Command::Add => CommandState::AwaitingAddRepo,
             Command::Remove => CommandState::AwaitingRemoveRepo,
@@ -166,27 +157,20 @@ impl BotHandler {
         };
 
         // Check if the repository exists on GitHub.
-        let repo_exists = self
-            .repository_service
-            .repo_exists(&repo.owner, &repo.name)
-            .await;
+        let repo_exists = self.repository_service.repo_exists(&repo.owner, &repo.name).await;
 
         // Check if the repository exists on GitHub.
         match repo_exists {
             Ok(true) => {
-                let is_already_tracked = self
-                    .repository_service
-                    .contains_repo(chat_id, &repo)
-                    .await?;
+                let is_already_tracked =
+                    self.repository_service.contains_repo(chat_id, &repo).await?;
 
                 if is_already_tracked {
                     self.messaging_service
                         .send_already_tracked_msg(chat_id, repo.name_with_owner)
                         .await?;
                 } else {
-                    self.repository_service
-                        .add_repo(chat_id, repo.clone())
-                        .await?;
+                    self.repository_service.add_repo(chat_id, repo.clone()).await?;
                     self.messaging_service
                         .send_repo_added_msg(chat_id, repo.name_with_owner)
                         .await?;
@@ -215,19 +199,13 @@ impl BotHandler {
             }
         };
 
-        let repo_removed = self
-            .repository_service
-            .remove_repo(chat_id, &repo.name_with_owner)
-            .await?;
+        let repo_removed =
+            self.repository_service.remove_repo(chat_id, &repo.name_with_owner).await?;
 
         if repo_removed {
-            self.messaging_service
-                .send_repo_removed_msg(chat_id, repo.name_with_owner)
-                .await?;
+            self.messaging_service.send_repo_removed_msg(chat_id, repo.name_with_owner).await?;
         } else {
-            self.messaging_service
-                .send_repo_not_tracked_msg(chat_id, repo.name_with_owner)
-                .await?;
+            self.messaging_service.send_repo_not_tracked_msg(chat_id, repo.name_with_owner).await?;
         }
         Ok(())
     }

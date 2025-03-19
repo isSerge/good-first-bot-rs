@@ -1,14 +1,16 @@
-use crate::storage::{RepoEntity, RepoStorage};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
 use log::debug;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate, query};
-use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
-};
 use teloxide::types::ChatId;
+
+use crate::storage::{RepoEntity, RepoStorage};
 
 pub struct SqliteStorage {
     pool: Pool<Sqlite>,
@@ -34,7 +36,8 @@ impl RepoStorage for SqliteStorage {
         let chat_id = chat_id.0;
 
         query!(
-            "INSERT OR IGNORE INTO repositories (chat_id, owner, name, name_with_owner) VALUES (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO repositories (chat_id, owner, name, name_with_owner) VALUES \
+             (?, ?, ?, ?)",
             chat_id,
             repository.owner,
             repository.name,
@@ -107,15 +110,9 @@ impl RepoStorage for SqliteStorage {
         let mut result = HashMap::new();
         for r in repos {
             let chat_id = ChatId(r.chat_id);
-            let repo = RepoEntity {
-                owner: r.owner,
-                name: r.name,
-                name_with_owner: r.name_with_owner,
-            };
-            result
-                .entry(chat_id)
-                .or_insert_with(HashSet::new)
-                .insert(repo);
+            let repo =
+                RepoEntity { owner: r.owner, name: r.name, name_with_owner: r.name_with_owner };
+            result.entry(chat_id).or_insert_with(HashSet::new).insert(repo);
         }
 
         Ok(result)
@@ -130,7 +127,8 @@ impl RepoStorage for SqliteStorage {
         let chat_id = chat_id.0;
 
         let result = query!(
-            "SELECT last_poll_time FROM poller_states WHERE chat_id = ? AND repository_full_name = ?",
+            "SELECT last_poll_time FROM poller_states WHERE chat_id = ? AND repository_full_name \
+             = ?",
             chat_id,
             repository.name_with_owner,
         )
@@ -148,7 +146,8 @@ impl RepoStorage for SqliteStorage {
         let current_time = Utc::now().timestamp();
 
         query!(
-            "INSERT OR REPLACE INTO poller_states (chat_id, repository_full_name, last_poll_time) VALUES (?, ?, ?)",
+            "INSERT OR REPLACE INTO poller_states (chat_id, repository_full_name, last_poll_time) \
+             VALUES (?, ?, ?)",
             chat_id,
             repository.name_with_owner,
             current_time,

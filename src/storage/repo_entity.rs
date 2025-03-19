@@ -1,5 +1,6 @@
-use anyhow::{Result, anyhow};
 use std::{fmt, str::FromStr};
+
+use anyhow::{Result, anyhow};
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -23,14 +24,10 @@ impl RepoEntity {
         if url.domain() != Some("github.com") {
             return Err(anyhow!("URL must be from github.com"));
         }
-        let segments: Vec<_> = url
-            .path_segments()
-            .map(|c| c.collect::<Vec<_>>())
-            .unwrap_or_default();
+        let segments: Vec<_> =
+            url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap_or_default();
         if segments.len() < 2 {
-            return Err(anyhow!(
-                "URL must be in the format https://github.com/owner/repo"
-            ));
+            return Err(anyhow!("URL must be in the format https://github.com/owner/repo"));
         }
         let owner = segments[0].to_string();
         let name = segments[1].to_string();
@@ -40,11 +37,7 @@ impl RepoEntity {
 
         let name_with_owner = format!("{}/{}", owner, name);
 
-        Ok(Self {
-            owner,
-            name,
-            name_with_owner,
-        })
+        Ok(Self { owner, name, name_with_owner })
     }
 }
 
@@ -73,11 +66,7 @@ impl FromStr for RepoEntity {
         }
 
         let name_with_owner = format!("{}/{}", owner, name);
-        Ok(Self {
-            owner: owner.to_string(),
-            name: name.to_string(),
-            name_with_owner,
-        })
+        Ok(Self { owner: owner.to_string(), name: name.to_string(), name_with_owner })
     }
 }
 
