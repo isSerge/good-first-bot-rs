@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT chat_id, owner, name, name_with_owner FROM repositories",
+  "describe": {
+    "columns": [
+      {
+        "name": "chat_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "owner",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "name_with_owner",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5b457fc81da3bd31d0bcac6c04bbd09baacdf67dc58c990efc8d0af9b88792c1"
+}

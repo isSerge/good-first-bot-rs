@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR REPLACE INTO poller_states (chat_id, repository_full_name, last_poll_time) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b23f2f3da31f2227cd85c1d72f07677aca12e983c96c192fea6b639899bd5172"
+}

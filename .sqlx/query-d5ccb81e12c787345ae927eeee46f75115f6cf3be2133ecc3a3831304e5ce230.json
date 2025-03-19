@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT last_poll_time FROM poller_states WHERE chat_id = ? AND repository_full_name = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_poll_time",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d5ccb81e12c787345ae927eeee46f75115f6cf3be2133ecc3a3831304e5ce230"
+}

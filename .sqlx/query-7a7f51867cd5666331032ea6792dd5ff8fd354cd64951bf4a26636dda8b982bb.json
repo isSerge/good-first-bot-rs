@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM repositories WHERE chat_id = ? AND name_with_owner = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "7a7f51867cd5666331032ea6792dd5ff8fd354cd64951bf4a26636dda8b982bb"
+}
