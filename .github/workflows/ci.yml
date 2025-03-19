@@ -20,9 +20,9 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           override: true
-          profile: minimal
+          components: clippy, rustfmt
 
       # Cache Cargo registry (dependencies) and Git repositories
       - name: Cache Cargo registry
