@@ -35,7 +35,7 @@ impl RepoEntity {
             return Err(anyhow!("Owner or repository name cannot be empty"));
         }
 
-        let name_with_owner = format!("{}/{}", owner, name);
+        let name_with_owner = format!("{owner}/{name}");
 
         Ok(Self { owner, name, name_with_owner })
     }
@@ -65,7 +65,7 @@ impl FromStr for RepoEntity {
             return Err(anyhow!("Repository name cannot contain '/'"));
         }
 
-        let name_with_owner = format!("{}/{}", owner, name);
+        let name_with_owner = format!("{owner}/{name}");
         Ok(Self { owner: owner.to_string(), name: name.to_string(), name_with_owner })
     }
 }

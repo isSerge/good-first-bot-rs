@@ -18,7 +18,7 @@ pub struct SqliteStorage {
 
 impl SqliteStorage {
     pub async fn new(database_url: &str) -> Result<Self> {
-        debug!("Connecting to SQLite database: {}", database_url);
+        debug!("Connecting to SQLite database: {database_url}");
         let pool = SqlitePool::connect(database_url).await?;
 
         migrate!("./migrations").run(&pool).await?;

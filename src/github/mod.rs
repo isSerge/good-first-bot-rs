@@ -69,7 +69,7 @@ impl DefaultGithubClient {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
 
-        headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {}", github_token))?);
+        headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {github_token}"))?);
         headers.insert(USER_AGENT, HeaderValue::from_static("github-activity-rs"));
 
         let client = reqwest::Client::builder()
@@ -108,7 +108,7 @@ impl DefaultGithubClient {
             let resp =
                 self.client.post(&self.graphql_url).json(&request_body).send().await.map_err(
                     |e| {
-                        warn!("Network error sending GraphQL request: {}. Retrying...", e);
+                        warn!("Network error sending GraphQL request: {e}. Retrying...");
                         BackoffError::transient(anyhow::Error::new(e))
                     },
                 )?;
@@ -119,11 +119,11 @@ impl DefaultGithubClient {
                 let text = match resp.text().await {
                     Ok(body) => body,
                     Err(e) => {
-                        warn!("Failed to read response text: {}. Using empty fallback.", e);
+                        warn!("Failed to read response text: {e}. Using empty fallback.");
                         String::new()
                     }
                 };
-                warn!("Non-success HTTP {}: {}. Retrying if transient...", status, text);
+                warn!("Non-success HTTP {status}: {text}. Retrying if transient...");
                 let err = anyhow::anyhow!("HTTP {}: {}", status, text);
                 let be = if status.is_server_error()
                     || status == reqwest::StatusCode::TOO_MANY_REQUESTS
@@ -137,7 +137,7 @@ impl DefaultGithubClient {
 
             // 4. Parse JSON
             let body: Response<Q::ResponseData> = resp.json().await.map_err(|e| {
-                warn!("Failed to parse JSON: {}. Retrying...", e);
+                warn!("Failed to parse JSON: {e}. Retrying...");
                 BackoffError::transient(anyhow::Error::new(e))
             })?;
 
@@ -145,12 +145,12 @@ impl DefaultGithubClient {
             if let Some(errors) = &body.errors {
                 if !errors.is_empty() {
                     let retryable = errors.iter().any(is_retryable_graphql_error);
-                    let msg = format!("GraphQL errors: {:?}", errors);
+                    let msg = format!("GraphQL errors: {errors:?}");
                     if retryable {
-                        warn!("Retryable GraphQL error: {}. Retrying...", msg);
+                        warn!("Retryable GraphQL error: {msg}. Retrying...");
                         return Err(BackoffError::transient(anyhow::anyhow!(msg)));
                     } else {
-                        error!("Permanent GraphQL error: {}", msg);
+                        error!("Permanent GraphQL error: {msg}");
                         return Err(BackoffError::permanent(anyhow::anyhow!(msg)));
                     }
                 }

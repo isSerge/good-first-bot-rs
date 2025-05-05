@@ -154,7 +154,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("❌ Repository {} is already in your list", repo_name_with_owner),
+            format!("❌ Repository {repo_name_with_owner} is already in your list"),
             None,
         )
         .await
@@ -167,7 +167,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("✅ Repository {} added to your list", repo_name_with_owner),
+            format!("✅ Repository {repo_name_with_owner} added to your list"),
             None,
         )
         .await
@@ -180,7 +180,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("❌ Repository {} does not exist on GitHub.", repo_name_with_owner),
+            format!("❌ Repository {repo_name_with_owner} does not exist on GitHub."),
             None,
         )
         .await
@@ -193,7 +193,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("✅ Repository {} removed from your list", repo_name_with_owner),
+            format!("✅ Repository {repo_name_with_owner} removed from your list"),
             None,
         )
         .await
@@ -206,7 +206,7 @@ impl MessagingService for TelegramMessagingService {
     ) -> Result<()> {
         self.send_response_with_keyboard(
             chat_id,
-            format!("❌ Repository {} is not tracked", repo_name_with_owner),
+            format!("❌ Repository {repo_name_with_owner} is not tracked"),
             None,
         )
         .await
