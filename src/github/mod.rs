@@ -116,7 +116,13 @@ impl DefaultGithubClient {
             // 3. HTTP-status check
             if !resp.status().is_success() {
                 let status = resp.status();
-                let text = resp.text().await.unwrap_or_default();
+                let text = match resp.text().await {
+                    Ok(body) => body,
+                    Err(e) => {
+                        warn!("Failed to read response text: {}. Using empty fallback.", e);
+                        String::new()
+                    }
+                };
                 warn!("Non-success HTTP {}: {}. Retrying if transient...", status, text);
                 let err = anyhow::anyhow!("HTTP {}: {}", status, text);
                 let be = if status.is_server_error()
