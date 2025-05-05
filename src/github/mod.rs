@@ -159,7 +159,7 @@ impl DefaultGithubClient {
 
         // kick off the retry loop, then convert any backoff::Error into an
         // anyhow::Error
-        retry(Self::backoff_config(), operation).await.map_err(Into::into)
+        retry(Self::backoff_config(), operation).await
     }
 }
 
