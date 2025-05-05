@@ -35,7 +35,7 @@ async fn main() {
     env_logger::init();
 
     if let Err(err) = run().await {
-        log::error!("Error: {}", err);
+        log::error!("Error: {err}");
         std::process::exit(1);
     }
 }
@@ -61,7 +61,7 @@ async fn run() -> Result<()> {
 
     tokio::spawn(async move {
         if let Err(e) = github_poller.run().await {
-            log::error!("Error in poller: {}", e);
+            log::error!("Error in poller: {e}");
         }
     });
 

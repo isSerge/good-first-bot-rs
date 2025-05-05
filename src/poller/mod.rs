@@ -67,7 +67,7 @@ impl GithubPoller {
         repos_by_chat_id: HashMap<ChatId, HashSet<RepoEntity>>,
     ) -> Result<()> {
         for (chat_id, repos) in repos_by_chat_id {
-            debug!("Polling issues for chat: {}", chat_id);
+            debug!("Polling issues for chat: {chat_id}");
             for repo in repos {
                 // TODO: consider using tokio::spawn to poll repos concurrently
                 self.poll_user_repo(chat_id, repo).await?;
@@ -97,7 +97,7 @@ impl GithubPoller {
                 let issues_to_notify = Self::filter_new_issues(issues, &last_poll_time);
 
                 if !issues_to_notify.is_empty() {
-                    debug!("Sending new issuesmessage to chat: {}", chat_id);
+                    debug!("Sending new issuesmessage to chat: {chat_id}");
 
                     self.messaging_service
                         .send_new_issues_msg(chat_id, &repo.name_with_owner, issues_to_notify)
@@ -112,7 +112,7 @@ impl GithubPoller {
             Result::Err(e) => {
                 // just log the error and keep going for now
                 // TODO: handle specific errors
-                log::error!("Error polling issues: {:?}", e);
+                log::error!("Error polling issues: {e:?}");
             }
         }
 

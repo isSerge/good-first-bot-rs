@@ -83,7 +83,7 @@ impl BotDispatcher {
                     query.message.as_ref().and_then(|m| m.regular_message().cloned()).and_then(
                         |msg| {
                             query.data.as_deref().and_then(|data| {
-                                let cmd_str = format!("/{}", data);
+                                let cmd_str = format!("/{data}");
                                 Command::parse(&cmd_str, "botname").ok().map(|cmd| (msg, cmd))
                             })
                         },
