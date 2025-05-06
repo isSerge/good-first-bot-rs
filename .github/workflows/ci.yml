@@ -97,7 +97,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: |
+            ghcr.io/${{ format('{0}/{1}', github.repository_owner, github.event.repository.name) | lower }}
 
       # Build and push Docker image
       - name: Build and push Docker image
@@ -107,6 +108,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ format('{0}/{1}', github.repository_owner, github.event.repository.name) | lower }}:latest
+            ghcr.io/${{ format('{0}/{1}', github.repository_owner, github.event.repository.name) | lower }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
