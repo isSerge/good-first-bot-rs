@@ -2,16 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: "sqlite://data/data.db"
+      DATABASE_URL: 'sqlite://data/data.db'
 
     steps:
       # Checkout the repository
@@ -49,19 +49,19 @@ jobs:
       # Run cargo check to verify the project compiles
       - name: Run cargo check
         env:
-          SQLX_OFFLINE: "1"
+          SQLX_OFFLINE: '1'
         run: cargo check --workspace
 
       # Run clippy to catch lints and warnings (treat warnings as errors)
       - name: Run cargo clippy
         env:
-          SQLX_OFFLINE: "1"
+          SQLX_OFFLINE: '1'
         run: cargo clippy --workspace -- -D warnings
 
       # Run tests
       - name: Run tests
         env:
-          SQLX_OFFLINE: "1"
+          SQLX_OFFLINE: '1'
         run: cargo test --workspace
 
   docker:
@@ -70,7 +70,9 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if:
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      github.event_name == 'workflow_dispatch'
     steps:
       # Checkout the repository
       - name: Checkout repository
@@ -97,8 +99,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: |
-            ghcr.io/${{ format('{0}/{1}', github.repository_owner, github.event.repository.name) | lower }}
+          images: ghcr.io/${{ github.repository }}
 
       # Build and push Docker image
       - name: Build and push Docker image
@@ -108,6 +109,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ format('{0}/{1}', github.repository_owner, github.event.repository.name) | lower }}:latest
-            ghcr.io/${{ format('{0}/{1}', github.repository_owner, github.event.repository.name) | lower }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
