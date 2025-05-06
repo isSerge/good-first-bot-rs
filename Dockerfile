@@ -1,5 +1,9 @@
 # Builder stage
-FROM rust:latest as builder
+FROM rust:latest AS builder
+
+# Install specific nightly toolchain
+RUN rustup default nightly-2025-05-04
+RUN rustup component add clippy rustfmt
 
 # Install required system dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,7 +20,7 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && \
   echo "fn main() {}" > src/main.rs && \
   cargo build --release && \
-  rm -rf target/release/.fingerprint/myapp-*
+  rm -rf target/release/.fingerprint/good-first-bot-rs
 
 # Copy actual source code
 COPY src ./src
@@ -36,7 +40,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy binary and resources from builder
-COPY --from=builder /app/target/release/myapp /app/myapp
+COPY --from=builder /app/target/release/good-first-bot-rs /app/
 COPY --from=builder /app/migrations /app/migrations
 
 # Create data directory for SQLite
@@ -50,4 +54,4 @@ ENV RUST_LOG=info
 EXPOSE 8080
 
 # Set entrypoint
-ENTRYPOINT ["/app/myapp"]
+ENTRYPOINT ["/app/good-first-bot-rs"]
