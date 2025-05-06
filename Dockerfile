@@ -1,5 +1,5 @@
 # Builder stage
-FROM rust:nightly as builder
+FROM rust:latest as builder
 
 # Install required system dependencies
 RUN apt-get update && apt-get install -y \
