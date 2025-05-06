@@ -70,7 +70,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     steps:
       # Checkout the repository
       - name: Checkout repository
