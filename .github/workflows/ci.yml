@@ -20,7 +20,6 @@ jobs:
 
       # Set up the Rust toolchain
       - name: Set up Rust nightly
-        uses: actions-rs/toolchain@v1
         run: |
           rustup default nightly-2025-05-04
           rustup component add clippy rustfmt
