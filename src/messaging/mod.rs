@@ -289,7 +289,7 @@ impl MessagingService for TelegramMessagingService {
             summary.push(already);
         }
 
-        if let Some(not_found) = format_summary_category("❓ Not Found on Github", &not_found) {
+        if let Some(not_found) = format_summary_category("❓ Not Found on GitHub", &not_found) {
             summary.push(not_found);
         }
 

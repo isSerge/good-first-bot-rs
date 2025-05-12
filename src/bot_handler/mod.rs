@@ -145,7 +145,7 @@ impl BotHandler {
         Ok(())
     }
 
-    /// Add a repository to the user's list.
+    /// Add single or multiple repositories to the user's list.
     async fn process_add(&self, urls: &str, chat_id: ChatId) -> Result<()> {
         // Split the input by newlines or whitespaces
         let urls = urls.split_whitespace().collect::<Vec<_>>();
