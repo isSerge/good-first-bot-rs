@@ -303,7 +303,7 @@ impl MessagingService for TelegramMessagingService {
                 .map(|(repo, error)| format!("- {}: {}", html::escape(repo), html::escape(error)))
                 .collect::<Vec<_>>()
                 .join("\n");
-            summary.push(format!("❌ <b>Errors:</b>\n{}", error_messages));
+            summary.push(format!("❌ <b>Errors:</b>\n{error_messages}"));
         }
 
         // Only the main title
