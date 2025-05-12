@@ -6,8 +6,8 @@ use lazy_static::lazy_static;
 use mockall::automock;
 use teloxide::{
     prelude::*,
-    types::{ChatId, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageId},
-    utils::command::BotCommands,
+    types::{ChatId, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode},
+    utils::{command::BotCommands, html},
 };
 use url::Url;
 
@@ -33,28 +33,6 @@ pub trait MessagingService: Send + Sync {
 
     /// Sends an error message to the provided chat.
     async fn send_error_msg(&self, chat_id: ChatId, error: Error) -> Result<()>;
-
-    /// Sends a message to the user that the repository is already tracked.
-    async fn send_already_tracked_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()>;
-
-    /// Sends a message to the user that the repository has been added.
-    async fn send_repo_added_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()>;
-
-    /// Sends a message to the user that the repository does not exist on
-    /// GitHub.
-    async fn send_no_repo_exists_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()>;
 
     /// Sends a message to the user that the repository has been removed.
     async fn send_repo_removed_msg(
@@ -101,6 +79,19 @@ pub trait MessagingService: Send + Sync {
         repo_name_with_owner: &str,
         issues: Vec<IssuesRepositoryIssuesNodes>,
     ) -> Result<()>;
+
+    /// Sends a summary message after adding repositories.
+    /// This message includes the number of successfully added, already
+    /// tracked, not found, invalid URLs, and errors.
+    async fn send_add_summary_msg(
+        &self,
+        chat_id: ChatId,
+        successfully_added: HashSet<String>,
+        already_tracked: HashSet<String>,
+        not_found: HashSet<String>,
+        invalid_urls: HashSet<String>,
+        errors: HashSet<(String, String)>,
+    ) -> Result<()>;
 }
 
 /// Telegram messaging service.
@@ -127,6 +118,7 @@ impl MessagingService for TelegramMessagingService {
 
         self.bot
             .send_message(chat_id, text)
+            .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
             .await
             .map(|_| ())
@@ -134,7 +126,7 @@ impl MessagingService for TelegramMessagingService {
     }
 
     async fn prompt_for_repo_input(&self, chat_id: ChatId) -> Result<()> {
-        let prompt = "Please reply with the repository url.";
+        let prompt = "Please reply with repository URLs separated by spaces or new lines.";
         self.bot
             .send_message(chat_id, prompt)
             .reply_markup(ForceReply::new())
@@ -144,46 +136,7 @@ impl MessagingService for TelegramMessagingService {
     }
 
     async fn send_error_msg(&self, chat_id: ChatId, error: Error) -> Result<()> {
-        self.send_response_with_keyboard(chat_id, error.to_string(), None).await
-    }
-
-    async fn send_already_tracked_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()> {
-        self.send_response_with_keyboard(
-            chat_id,
-            format!("❌ Repository {repo_name_with_owner} is already in your list"),
-            None,
-        )
-        .await
-    }
-
-    async fn send_repo_added_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()> {
-        self.send_response_with_keyboard(
-            chat_id,
-            format!("✅ Repository {repo_name_with_owner} added to your list"),
-            None,
-        )
-        .await
-    }
-
-    async fn send_no_repo_exists_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()> {
-        self.send_response_with_keyboard(
-            chat_id,
-            format!("❌ Repository {repo_name_with_owner} does not exist on GitHub."),
-            None,
-        )
-        .await
+        self.send_response_with_keyboard(chat_id, html::escape(&error.to_string()), None).await
     }
 
     async fn send_repo_removed_msg(
@@ -297,6 +250,68 @@ impl MessagingService for TelegramMessagingService {
             .await
             .map(|_| ())
             .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
+    }
+
+    async fn send_add_summary_msg(
+        &self,
+        chat_id: ChatId,
+        successfully_added: HashSet<String>,
+        already_tracked: HashSet<String>,
+        not_found: HashSet<String>,
+        invalid_urls: HashSet<String>,
+        errors: HashSet<(String, String)>,
+    ) -> Result<()> {
+        let mut summary = Vec::new();
+        summary.push("<b>Summary of repository addition:</b>".to_string());
+
+        let format_summary_category = |title: &str, items: &HashSet<String>| {
+            if !items.is_empty() {
+                Some(format!(
+                    "<b>{}:</b>\n{}",
+                    html::escape(title),
+                    items
+                        .iter()
+                        .map(|item| format!("- {}", html::escape(item)))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ))
+            } else {
+                None
+            }
+        };
+
+        if let Some(success) = format_summary_category("✅ Successfully Added", &successfully_added)
+        {
+            summary.push(success);
+        }
+
+        if let Some(already) = format_summary_category("➡️ Already Tracked", &already_tracked) {
+            summary.push(already);
+        }
+
+        if let Some(not_found) = format_summary_category("❓ Not Found on Github", &not_found) {
+            summary.push(not_found);
+        }
+
+        if let Some(invalid_urls) = format_summary_category("⚠️ Invalid URL", &invalid_urls) {
+            summary.push(invalid_urls);
+        }
+
+        if !errors.is_empty() {
+            let error_messages = errors
+                .iter()
+                .map(|(repo, error)| format!("- {}: {}", html::escape(repo), html::escape(error)))
+                .collect::<Vec<_>>()
+                .join("\n");
+            summary.push(format!("❌ <b>Errors:</b>\n{}", error_messages));
+        }
+
+        // Only the main title
+        if summary.len() == 1 {
+            summary.push("No valid URLs were processed, or all inputs were empty.".to_string());
+        }
+
+        self.send_response_with_keyboard(chat_id, summary.join("\n\n"), None).await
     }
 }
 
