@@ -2,7 +2,7 @@ mod commands;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -145,46 +145,93 @@ impl BotHandler {
         Ok(())
     }
 
-    /// Add a repository to the user's list.
-    async fn process_add(&self, text: &str, chat_id: ChatId) -> Result<()> {
-        // Parse the repository from the text.
-        let repo = match RepoEntity::from_url(text) {
-            Ok(repo) => repo,
-            Err(e) => {
-                self.messaging_service.send_error_msg(chat_id, e).await?;
-                return Ok(());
+    /// Add single or multiple repositories to the user's list.
+    async fn process_add(&self, urls: &str, chat_id: ChatId) -> Result<()> {
+        // Split the input by newlines or whitespaces
+        let urls = urls.split_whitespace().collect::<Vec<_>>();
+
+        // Check if the user provided any URLs
+        if urls.is_empty() {
+            self.messaging_service
+                .send_error_msg(chat_id, anyhow::anyhow!("No URLs provided"))
+                .await?;
+            return Ok(());
+        }
+
+        // Track the results for summary message
+        let mut successfully_added = HashSet::<String>::new();
+        let mut already_tracked = HashSet::<String>::new();
+        let mut not_found = HashSet::<String>::new();
+        let mut invalid_urls = HashSet::<String>::new();
+        let mut errors = HashSet::<(String, String)>::new();
+
+        // Process each URL separately
+        for url in urls {
+            // Trim the URL to remove leading and trailing whitespace
+            if url.trim().is_empty() {
+                continue;
             }
-        };
 
-        // Check if the repository exists on GitHub.
-        let repo_exists = self.repository_service.repo_exists(&repo.owner, &repo.name).await;
+            // Parse the repository from the text.
+            let repo = match RepoEntity::from_url(url) {
+                Ok(repo) => repo,
+                Err(_) => {
+                    invalid_urls.insert(url.to_string());
+                    continue;
+                }
+            };
 
-        // Check if the repository exists on GitHub.
-        match repo_exists {
-            Ok(true) => {
-                let is_already_tracked =
-                    self.repository_service.contains_repo(chat_id, &repo).await?;
+            // Check if the repository exists on GitHub.
+            let repo_exists = self.repository_service.repo_exists(&repo.owner, &repo.name).await;
 
-                if is_already_tracked {
-                    self.messaging_service
-                        .send_already_tracked_msg(chat_id, repo.name_with_owner)
-                        .await?;
-                } else {
-                    self.repository_service.add_repo(chat_id, repo.clone()).await?;
-                    self.messaging_service
-                        .send_repo_added_msg(chat_id, repo.name_with_owner)
-                        .await?;
+            // Check if the repository exists on GitHub.
+            match repo_exists {
+                Ok(true) => {
+                    let is_already_tracked =
+                        self.repository_service.contains_repo(chat_id, &repo).await;
+
+                    match is_already_tracked {
+                        Ok(true) => {
+                            already_tracked.insert(repo.name_with_owner);
+                        }
+                        Ok(false) => {
+                            let add = self.repository_service.add_repo(chat_id, repo.clone()).await;
+
+                            match add {
+                                Ok(_) => {
+                                    successfully_added.insert(repo.name_with_owner);
+                                }
+                                Err(e) => {
+                                    errors.insert((repo.name_with_owner, e.to_string()));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            errors.insert((repo.name_with_owner, e.to_string()));
+                        }
+                    }
+                }
+                Ok(false) => {
+                    not_found.insert(repo.name_with_owner);
+                }
+                Err(e) => {
+                    errors.insert((repo.name_with_owner, e.to_string()));
                 }
             }
-            Ok(false) => {
-                self.messaging_service
-                    .send_no_repo_exists_msg(chat_id, repo.name_with_owner)
-                    .await?;
-            }
-            Err(e) => {
-                self.messaging_service.send_error_msg(chat_id, e).await?;
-            }
         }
+
+        // Send add summary message
+        self.messaging_service
+            .send_add_summary_msg(
+                chat_id,
+                successfully_added,
+                already_tracked,
+                not_found,
+                invalid_urls,
+                errors,
+            )
+            .await?;
+
         Ok(())
     }
 
