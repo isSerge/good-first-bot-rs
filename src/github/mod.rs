@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use anyhow::{Context, Result};
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
 use graphql_client::{GraphQLQuery, Response};
@@ -10,6 +9,29 @@ use reqwest::{
     Client,
     header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
 };
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum GithubError {
+    #[error("Network or HTTP request error: {source}")]
+    RequestError {
+        #[from]
+        source: reqwest::Error,
+    },
+    #[error("Invalid HTTP header value: {0}")]
+    InvalidHeader(#[from] reqwest::header::InvalidHeaderValue),
+    #[error("GraphQL API error: {0}")]
+    GraphQLApiError(String),
+    #[error("Failed to (de)serialize JSON: {source}")]
+    SerializationError {
+        #[from]
+        source: serde_json::Error,
+    },
+    #[error("GitHub API rate limited")]
+    RateLimited,
+    #[error("GitHub authentication failed")]
+    Unauthorized,
+}
 
 // Helper function to check if a GraphQL error is retryable
 fn is_retryable_graphql_error(error: &graphql_client::Error) -> bool {
@@ -26,7 +48,7 @@ fn is_retryable_graphql_error(error: &graphql_client::Error) -> bool {
 #[async_trait]
 pub trait GithubClient: Send + Sync {
     /// Check if a repository exists.
-    async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;
+    async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool, GithubError>;
 
     /// Get issues by label.
     async fn repo_issues_by_label(
@@ -34,7 +56,7 @@ pub trait GithubClient: Send + Sync {
         owner: &str,
         name: &str,
         labels: Vec<String>,
-    ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>>;
+    ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>, GithubError>;
 }
 
 // GraphQL DateTime scalar type.
@@ -65,17 +87,15 @@ pub struct DefaultGithubClient {
 }
 
 impl DefaultGithubClient {
-    pub fn new(github_token: &str, graphql_url: &str) -> Result<Self> {
+    pub fn new(github_token: &str, graphql_url: &str) -> Result<Self, GithubError> {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
 
         headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {github_token}"))?);
         headers.insert(USER_AGENT, HeaderValue::from_static("github-activity-rs"));
 
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .build()
-            .context("Failed to build HTTP client")?;
+        let client = reqwest::Client::builder().default_headers(headers).build()?;
+
         debug!("HTTP client built successfully.");
 
         Ok(Self { client, graphql_url: graphql_url.to_string() })
@@ -93,7 +113,10 @@ impl DefaultGithubClient {
     }
 
     /// Build, send, parse, retry, and unwrap a GraphQL query of type `Q`.
-    async fn execute_graphql<Q>(&self, variables: Q::Variables) -> anyhow::Result<Q::ResponseData>
+    async fn execute_graphql<Q>(
+        &self,
+        variables: Q::Variables,
+    ) -> Result<Q::ResponseData, GithubError>
     where
         Q: GraphQLQuery,
         Q::Variables: Clone,
@@ -108,29 +131,54 @@ impl DefaultGithubClient {
             let resp =
                 self.client.post(&self.graphql_url).json(&request_body).send().await.map_err(
                     |e| {
-                        warn!("Network error sending GraphQL request: {e}. Retrying...");
-                        BackoffError::transient(anyhow::Error::new(e))
+                        warn!("Network error sending GraphQL request: {}. Retrying...", e);
+                        BackoffError::transient(GithubError::RequestError { source: e })
                     },
                 )?;
 
             // 3. HTTP-status check
             if !resp.status().is_success() {
                 let status = resp.status();
-                let text = match resp.text().await {
-                    Ok(body) => body,
-                    Err(e) => {
-                        warn!("Failed to read response text: {e}. Using empty fallback.");
-                        String::new()
+                let text = resp.text().await.unwrap_or_else(|e| {
+                    warn!(
+                        "Failed to read response text for HTTP error {}: {}. Using empty fallback.",
+                        status, e
+                    );
+                    format!("Status: {}, No response body available.", status)
+                });
+                warn!(
+                    "Non-success HTTP {status}: {}. Retrying if transient...",
+                    text.chars().take(200).collect::<String>()
+                );
+
+                // Map HTTP status to specific GithubError variants
+                let github_err = match status {
+                    reqwest::StatusCode::UNAUTHORIZED => GithubError::Unauthorized,
+                    reqwest::StatusCode::FORBIDDEN => {
+                        if text.to_lowercase().contains("rate limit")
+                            || text.to_lowercase().contains("secondary rate")
+                        {
+                            GithubError::RateLimited
+                        } else {
+                            GithubError::GraphQLApiError(format!(
+                                "HTTP Forbidden ({}): {}",
+                                status, text
+                            ))
+                        }
                     }
+                    reqwest::StatusCode::NOT_FOUND => GithubError::GraphQLApiError(format!(
+                        "HTTP Not Found ({}): {}",
+                        status, text
+                    )),
+                    _ => GithubError::GraphQLApiError(format!("HTTP Error ({}): {}", status, text)),
                 };
-                warn!("Non-success HTTP {status}: {text}. Retrying if transient...");
-                let err = anyhow::anyhow!("HTTP {}: {}", status, text);
-                let be = if status.is_server_error()
-                    || status == reqwest::StatusCode::TOO_MANY_REQUESTS
-                {
-                    BackoffError::transient(err)
-                } else {
-                    BackoffError::permanent(err)
+
+                let be = match github_err {
+                    GithubError::RateLimited => BackoffError::transient(github_err),
+                    _ if status.is_server_error()
+                        || status == reqwest::StatusCode::TOO_MANY_REQUESTS =>
+                        BackoffError::transient(github_err),
+                    _ => BackoffError::permanent(github_err),
                 };
                 return Err(be);
             }
@@ -138,33 +186,36 @@ impl DefaultGithubClient {
             // 4. Parse JSON
             let body: Response<Q::ResponseData> = resp.json().await.map_err(|e| {
                 warn!("Failed to parse JSON: {e}. Retrying...");
-                BackoffError::transient(anyhow::Error::new(e))
+                BackoffError::transient(GithubError::GraphQLApiError(format!("JSON parse error: {}", e)))
             })?;
 
             // 5. GraphQL errors?
             if let Some(errors) = &body.errors {
-                if !errors.is_empty() {
-                    let retryable = errors.iter().any(is_retryable_graphql_error);
-                    let msg = format!("GraphQL errors: {errors:?}");
-                    if retryable {
-                        warn!("Retryable GraphQL error: {msg}. Retrying...");
-                        return Err(BackoffError::transient(anyhow::anyhow!(msg)));
-                    } else {
-                        error!("Permanent GraphQL error: {msg}");
-                        return Err(BackoffError::permanent(anyhow::anyhow!(msg)));
-                    }
+                let is_rate_limit_error = errors.iter().any(|e| {
+                    e.message.to_lowercase().contains("rate limit") || is_retryable_graphql_error(e)
+                });
+
+                let msg = format!("GraphQL API reported errors: {:?}", errors);
+
+                if is_rate_limit_error {
+                    warn!("Retryable GraphQL API error: {}. Retrying...", msg);
+                    return Err(BackoffError::transient(GithubError::RateLimited));
+                } else {
+                    error!("Permanent GraphQL API error: {}", msg);
+                    return Err(BackoffError::permanent(GithubError::GraphQLApiError(msg)));
                 }
             }
 
             // 6. Unwrap the data or permanent-fail
             body.data.ok_or_else(|| {
                 error!("GraphQL response had no data field; permanent failure");
-                BackoffError::permanent(anyhow::anyhow!("No data in GraphQL response"))
+                BackoffError::permanent(GithubError::GraphQLApiError(
+                    "GraphQL response had no data field and no errors reported".to_string(),
+                ))
             })
         };
 
-        // kick off the retry loop, then convert any backoff::Error into an
-        // anyhow::Error
+        // kick off the retry loop
         retry(Self::backoff_config(), operation).await
     }
 }
@@ -172,7 +223,7 @@ impl DefaultGithubClient {
 #[async_trait]
 impl GithubClient for DefaultGithubClient {
     /// Check if a repository exists.
-    async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool> {
+    async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool, GithubError> {
         debug!("Checking if repository {}/{} exists", owner, name);
         let data = self
             .execute_graphql::<Repository>(repository::Variables {
@@ -190,7 +241,7 @@ impl GithubClient for DefaultGithubClient {
         owner: &str,
         name: &str,
         labels: Vec<String>,
-    ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>> {
+    ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>, GithubError> {
         let data = self
             .execute_graphql::<Issues>(issues::Variables {
                 owner: owner.to_string(),
