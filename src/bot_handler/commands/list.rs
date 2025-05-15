@@ -1,13 +1,14 @@
-use anyhow::Result;
+use crate::bot_handler::{BotHandlerResult, commands::CommandContext};
 
-use crate::bot_handler::commands::CommandContext;
-
-pub async fn handle(ctx: CommandContext<'_>) -> Result<()> {
+pub async fn handle(ctx: CommandContext<'_>) -> BotHandlerResult<()> {
     let user_repos = ctx.handler.repository_service.get_user_repos(ctx.message.chat.id).await?;
 
     if user_repos.is_empty() {
-        return ctx.handler.messaging_service.send_list_empty_msg(ctx.message.chat.id).await;
+        ctx.handler.messaging_service.send_list_empty_msg(ctx.message.chat.id).await?;
+        return Ok(());
     }
 
-    ctx.handler.messaging_service.send_list_msg(ctx.message.chat.id, user_repos).await
+    ctx.handler.messaging_service.send_list_msg(ctx.message.chat.id, user_repos).await?;
+
+    Ok(())
 }

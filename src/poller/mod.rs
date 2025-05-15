@@ -7,17 +7,29 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use anyhow::Result;
 use chrono::DateTime;
 use lazy_static::lazy_static;
 use log::debug;
 use teloxide::prelude::*;
+use thiserror::Error;
 
 use crate::{
-    github::{GithubClient, issues},
-    messaging::MessagingService,
-    storage::{RepoEntity, RepoStorage},
+    github::{GithubClient, GithubError, issues},
+    messaging::{MessagingError, MessagingService},
+    storage::{RepoEntity, RepoStorage, StorageError},
 };
+
+#[derive(Debug, Error)]
+pub enum PollerError {
+    #[error("Failed to poll GitHub issues")]
+    Github(#[from] GithubError),
+    #[error("Failed to access storage")]
+    Storage(#[from] StorageError),
+    #[error("Failed to send message to Telegram")]
+    Messaging(#[from] MessagingError),
+}
+
+type Result<T> = std::result::Result<T, PollerError>;
 
 // TODO: consider replacing polling with webhooks
 /// A poller for polling issues from GitHub and sending messages to Telegram.
@@ -90,7 +102,8 @@ impl GithubPoller {
         let issues = self
             .github_client
             .repo_issues_by_label(&repo.owner, &repo.name, GOOD_FIRST_ISSUE_LABELS.to_vec())
-            .await;
+            .await
+            .map_err(PollerError::Github);
 
         match issues {
             Result::Ok(issues) => {

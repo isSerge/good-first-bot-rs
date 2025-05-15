@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use anyhow::{Error, Result};
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use mockall::automock;
@@ -9,11 +8,22 @@ use teloxide::{
     types::{ChatId, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode},
     utils::{command::BotCommands, html},
 };
+use thiserror::Error;
 use url::Url;
 
 use crate::{
-    bot_handler::Command, github::issues::IssuesRepositoryIssuesNodes, storage::RepoEntity,
+    bot_handler::{BotHandlerError, Command},
+    github::issues::IssuesRepositoryIssuesNodes,
+    storage::RepoEntity,
 };
+
+#[derive(Debug, Error)]
+pub enum MessagingError {
+    #[error("Teloxide API request failed: {0}")]
+    TeloxideRequest(#[from] teloxide::RequestError),
+}
+
+type Result<T> = std::result::Result<T, MessagingError>;
 
 /// Trait for sending messages to the user.
 #[automock]
@@ -32,7 +42,7 @@ pub trait MessagingService: Send + Sync {
     async fn prompt_for_repo_input(&self, chat_id: ChatId) -> Result<()>;
 
     /// Sends an error message to the provided chat.
-    async fn send_error_msg(&self, chat_id: ChatId, error: Error) -> Result<()>;
+    async fn send_error_msg(&self, chat_id: ChatId, error: BotHandlerError) -> Result<()>;
 
     /// Sends a message to the user that the repository has been removed.
     async fn send_repo_removed_msg(
@@ -122,7 +132,7 @@ impl MessagingService for TelegramMessagingService {
             .reply_markup(keyboard)
             .await
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
+            .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn prompt_for_repo_input(&self, chat_id: ChatId) -> Result<()> {
@@ -132,10 +142,10 @@ impl MessagingService for TelegramMessagingService {
             .reply_markup(ForceReply::new())
             .await
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
+            .map_err(MessagingError::TeloxideRequest)
     }
 
-    async fn send_error_msg(&self, chat_id: ChatId, error: Error) -> Result<()> {
+    async fn send_error_msg(&self, chat_id: ChatId, error: BotHandlerError) -> Result<()> {
         self.send_response_with_keyboard(chat_id, html::escape(&error.to_string()), None).await
     }
 
@@ -208,7 +218,7 @@ impl MessagingService for TelegramMessagingService {
             .text(removed_msg)
             .await
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("Failed to answer callback query: {}", e))
+            .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn edit_list_msg(
@@ -226,7 +236,7 @@ impl MessagingService for TelegramMessagingService {
             .reply_markup(new_keyboard)
             .await
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("Failed to edit message: {}", e))
+            .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn send_new_issues_msg(
@@ -249,7 +259,7 @@ impl MessagingService for TelegramMessagingService {
             .send_message(chat_id, message)
             .await
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))
+            .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn send_add_summary_msg(

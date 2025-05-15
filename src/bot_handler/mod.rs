@@ -4,21 +4,35 @@ mod tests;
 
 use std::{collections::HashSet, sync::Arc};
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use teloxide::{
-    dispatching::dialogue::{Dialogue, InMemStorage},
+    dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
     prelude::*,
     types::Message,
     utils::command::BotCommands,
 };
+use thiserror::Error;
 
 use crate::{
     bot_handler::commands::{CommandContext, CommandHandler},
-    messaging::MessagingService,
-    repository::RepositoryService,
+    messaging::{MessagingError, MessagingService},
+    repository::{RepositoryService, RepositoryServiceError},
     storage::RepoEntity,
 };
+
+#[derive(Error, Debug)]
+pub enum BotHandlerError {
+    #[error("Invalid input")]
+    InvalidInput,
+    #[error("Failed to get or update dialogue: {0}")]
+    DialogueError(#[from] InMemStorageError),
+    #[error("Failed to send message: {0}")]
+    SendMessageError(#[from] MessagingError),
+    #[error("Internal error: {0}")]
+    InternalError(#[from] RepositoryServiceError),
+}
+
+pub type BotHandlerResult<T> = Result<T, BotHandlerError>;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -65,7 +79,7 @@ impl BotHandler {
         msg: &Message,
         cmd: Command,
         dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
-    ) -> anyhow::Result<()> {
+    ) -> BotHandlerResult<()> {
         let ctx = CommandContext { handler: self, message: msg, dialogue: &dialogue };
 
         cmd.handle(ctx).await
@@ -76,9 +90,9 @@ impl BotHandler {
         &self,
         msg: &Message,
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
-    ) -> Result<()> {
+    ) -> BotHandlerResult<()> {
         let text = msg.text();
-        let dialogue_state = dialogue.get().await?;
+        let dialogue_state = dialogue.get().await.map_err(BotHandlerError::DialogueError)?;
         // Check if we're waiting for repository input.
         match (dialogue_state, text) {
             (Some(CommandState::AwaitingAddRepo), Some(text)) =>
@@ -89,8 +103,9 @@ impl BotHandler {
                 // Should not happen, because force reply does not accept empty input and there
                 // are only two possible states, but just in case
                 self.messaging_service
-                    .send_error_msg(msg.chat.id, anyhow::anyhow!("Invalid input"))
-                    .await?;
+                    .send_error_msg(msg.chat.id, BotHandlerError::InvalidInput)
+                    .await
+                    .map_err(BotHandlerError::from)?;
             }
         }
         dialogue.exit().await?;
@@ -99,7 +114,7 @@ impl BotHandler {
 
     /// Handle a callback query to remove a repository when the user clicks the
     /// remove button on the inline keyboard.
-    pub async fn handle_remove_callback_query(&self, query: CallbackQuery) -> Result<()> {
+    pub async fn handle_remove_callback_query(&self, query: CallbackQuery) -> BotHandlerResult<()> {
         if let Some(data) = query.data {
             // Extract repository name with owner
             let repo_name_with_owner = data.trim_start_matches("remove:").to_string();
@@ -108,8 +123,11 @@ impl BotHandler {
                 let chat_id = message.chat().id;
 
                 // Attempt to remove the repository.
-                let removed =
-                    self.repository_service.remove_repo(chat_id, &repo_name_with_owner).await?;
+                let removed = self
+                    .repository_service
+                    .remove_repo(chat_id, &repo_name_with_owner)
+                    .await
+                    .map_err(BotHandlerError::InternalError)?;
 
                 // Answer the callback query to clear the spinner.
                 self.messaging_service.answer_remove_callback_query(query.id, removed).await?;
@@ -134,27 +152,28 @@ impl BotHandler {
         chat_id: ChatId,
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
         command: Command,
-    ) -> Result<()> {
-        self.messaging_service.prompt_for_repo_input(chat_id).await?;
+    ) -> BotHandlerResult<()> {
+        self.messaging_service
+            .prompt_for_repo_input(chat_id)
+            .await
+            .map_err(BotHandlerError::from)?;
         let state = match command {
             Command::Add => CommandState::AwaitingAddRepo,
             Command::Remove => CommandState::AwaitingRemoveRepo,
             _ => unreachable!(),
         };
-        dialogue.update(state).await?;
+        dialogue.update(state).await.map_err(BotHandlerError::DialogueError)?;
         Ok(())
     }
 
     /// Add single or multiple repositories to the user's list.
-    async fn process_add(&self, urls: &str, chat_id: ChatId) -> Result<()> {
+    async fn process_add(&self, urls: &str, chat_id: ChatId) -> BotHandlerResult<()> {
         // Split the input by newlines or whitespaces
         let urls = urls.split_whitespace().collect::<Vec<_>>();
 
         // Check if the user provided any URLs
         if urls.is_empty() {
-            self.messaging_service
-                .send_error_msg(chat_id, anyhow::anyhow!("No URLs provided"))
-                .await?;
+            self.messaging_service.send_error_msg(chat_id, BotHandlerError::InvalidInput).await?;
             return Ok(());
         }
 
@@ -236,12 +255,14 @@ impl BotHandler {
     }
 
     /// Remove a repository from the user's list.
-    async fn process_remove(&self, text: &str, chat_id: ChatId) -> Result<()> {
+    async fn process_remove(&self, text: &str, chat_id: ChatId) -> BotHandlerResult<()> {
         // Parse the repository from the text.
         let repo = match RepoEntity::from_url(text) {
             Ok(repo) => repo,
-            Err(e) => {
-                self.messaging_service.send_error_msg(chat_id, e).await?;
+            Err(_) => {
+                self.messaging_service
+                    .send_error_msg(chat_id, BotHandlerError::InvalidInput)
+                    .await?;
                 return Ok(());
             }
         };

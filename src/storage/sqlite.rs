@@ -3,25 +3,28 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
 use log::debug;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate, query};
 use teloxide::types::ChatId;
 
-use crate::storage::{RepoEntity, RepoStorage};
+use crate::storage::{RepoEntity, RepoStorage, StorageError, StorageResult};
 
 pub struct SqliteStorage {
     pool: Pool<Sqlite>,
 }
 
 impl SqliteStorage {
-    pub async fn new(database_url: &str) -> Result<Self> {
+    pub async fn new(database_url: &str) -> StorageResult<Self> {
         debug!("Connecting to SQLite database: {database_url}");
-        let pool = SqlitePool::connect(database_url).await?;
+        let pool = SqlitePool::connect(database_url)
+            .await
+            .map_err(|e| StorageError::DbError(format!("Failed to connect to SQLite: {e}")))?;
 
-        migrate!("./migrations").run(&pool).await?;
+        migrate!("./migrations").run(&pool).await.map_err(|e| {
+            StorageError::DbError(format!("Failed to migrate SQLite database: {e}"))
+        })?;
         debug!("SQLite database migrated");
 
         Ok(Self { pool })
@@ -30,7 +33,7 @@ impl SqliteStorage {
 
 #[async_trait]
 impl RepoStorage for SqliteStorage {
-    async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> Result<()> {
+    async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> StorageResult<()> {
         debug!("Adding repository to SQLite: {:?}", repository);
 
         let chat_id = chat_id.0;
@@ -44,12 +47,17 @@ impl RepoStorage for SqliteStorage {
             repository.name_with_owner,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(|e| StorageError::DbError(format!("Failed to add repository to SQLite: {e}")))?;
 
         Ok(())
     }
 
-    async fn remove_repository(&self, chat_id: ChatId, name_with_owner: &str) -> Result<bool> {
+    async fn remove_repository(
+        &self,
+        chat_id: ChatId,
+        name_with_owner: &str,
+    ) -> StorageResult<bool> {
         debug!("Removing repository from SQLite: {}", name_with_owner);
 
         let chat_id = chat_id.0;
@@ -60,12 +68,15 @@ impl RepoStorage for SqliteStorage {
             name_with_owner,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            StorageError::DbError(format!("Failed to remove repository from SQLite: {e}"))
+        })?;
 
         Ok(result.rows_affected() > 0)
     }
 
-    async fn get_repos_per_user(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>> {
+    async fn get_repos_per_user(&self, chat_id: ChatId) -> StorageResult<HashSet<RepoEntity>> {
         debug!("Getting repositories for user: {}", chat_id);
 
         let repos = query!(
@@ -73,19 +84,23 @@ impl RepoStorage for SqliteStorage {
             chat_id.0,
         )
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            StorageError::DbError(format!("Failed to fetch repos for user {}: {}", chat_id.0, e))
+        })?;
 
-        Ok(repos
+        let repos = repos
             .into_iter()
             .map(|r| {
-                RepoEntity::from_str(&r.name_with_owner).map_err(|e| {
-                    anyhow::anyhow!("Failed to parse repository {}: {}", r.name_with_owner, e)
-                })
+                RepoEntity::from_str(&r.name_with_owner)
+                    .map_err(|e| StorageError::DataIntegrityError(r.name_with_owner.clone(), e))
             })
-            .collect::<Result<HashSet<_>>>()?)
+            .collect::<Result<HashSet<_>, _>>()?;
+
+        Ok(repos)
     }
 
-    async fn contains(&self, chat_id: ChatId, repository: &RepoEntity) -> Result<bool> {
+    async fn contains(&self, chat_id: ChatId, repository: &RepoEntity) -> StorageResult<bool> {
         debug!("Checking if repository exists in SQLite: {:?}", repository);
         let chat_id = chat_id.0;
 
@@ -95,17 +110,21 @@ impl RepoStorage for SqliteStorage {
             repository.name_with_owner,
         )
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .map_err(|e| StorageError::DbError(format!("Failed to check repository in SQLite: {e}")))?;
 
         Ok(result.count > 0)
     }
 
-    async fn get_all_repos(&self) -> Result<HashMap<ChatId, HashSet<RepoEntity>>> {
+    async fn get_all_repos(&self) -> StorageResult<HashMap<ChatId, HashSet<RepoEntity>>> {
         debug!("Getting all repositories from SQLite");
 
         let repos = query!("SELECT chat_id, owner, name, name_with_owner FROM repositories",)
             .fetch_all(&self.pool)
-            .await?;
+            .await
+            .map_err(|e| {
+                StorageError::DbError(format!("Failed to get all repositories from SQLite: {e}"))
+            })?;
 
         let mut result = HashMap::new();
         for r in repos {
@@ -122,7 +141,7 @@ impl RepoStorage for SqliteStorage {
         &self,
         chat_id: ChatId,
         repository: &RepoEntity,
-    ) -> Result<Option<i64>> {
+    ) -> StorageResult<Option<i64>> {
         debug!("Getting last poll time for repository: {:?}", repository);
         let chat_id = chat_id.0;
 
@@ -133,13 +152,20 @@ impl RepoStorage for SqliteStorage {
             repository.name_with_owner,
         )
         .fetch_optional(&self.pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            StorageError::DbError(format!("Failed to get last poll time from SQLite: {e}"))
+        })?;
 
         // If the repository is not found, return None
         Ok(result.map(|r| r.last_poll_time))
     }
 
-    async fn set_last_poll_time(&self, chat_id: ChatId, repository: &RepoEntity) -> Result<()> {
+    async fn set_last_poll_time(
+        &self,
+        chat_id: ChatId,
+        repository: &RepoEntity,
+    ) -> StorageResult<()> {
         debug!("Setting last poll time for repository: {:?}", repository);
         let chat_id = chat_id.0;
 
@@ -153,7 +179,10 @@ impl RepoStorage for SqliteStorage {
             current_time,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(|e| {
+            StorageError::DbError(format!("Failed to set last poll time in SQLite: {e}"))
+        })?;
 
         Ok(())
     }
