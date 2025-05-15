@@ -103,7 +103,7 @@ impl GithubPoller {
             .github_client
             .repo_issues_by_label(&repo.owner, &repo.name, GOOD_FIRST_ISSUE_LABELS.to_vec())
             .await
-            .map_err(|e| PollerError::GithubError(e));
+            .map_err(PollerError::GithubError);
 
         match issues {
             Result::Ok(issues) => {

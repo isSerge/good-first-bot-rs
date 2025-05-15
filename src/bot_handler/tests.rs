@@ -228,7 +228,7 @@ async fn test_process_add_multiple_mixed_outcomes() {
     let url_add_error = "https://github.com/owner/add-error";
     let name_add_error = "owner/add-error";
     let db_failure_reason = "DB Add Failed";
-    let add_error_msg = format!("Storage error: Database error: {}", db_failure_reason);
+    let add_error_msg = format!("Storage error: Database error: {db_failure_reason}");
 
     // Mocking for 'new' repo
     mock_repository.expect_repo_exists().with(eq("owner"), eq("new")).returning(|_, _| Ok(true));
