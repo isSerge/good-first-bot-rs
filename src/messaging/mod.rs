@@ -12,7 +12,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::{
-    bot_handler::Command, github::issues::IssuesRepositoryIssuesNodes, storage::RepoEntity,
+    bot_handler::{BotHandlerError, Command}, github::issues::IssuesRepositoryIssuesNodes, storage::RepoEntity,
 };
 
 #[derive(Debug, Error)]
@@ -40,7 +40,7 @@ pub trait MessagingService: Send + Sync {
     async fn prompt_for_repo_input(&self, chat_id: ChatId) -> Result<()>;
 
     /// Sends an error message to the provided chat.
-    async fn send_error_msg(&self, chat_id: ChatId, error: MessagingError) -> Result<()>;
+    async fn send_error_msg(&self, chat_id: ChatId, error: BotHandlerError) -> Result<()>;
 
     /// Sends a message to the user that the repository has been removed.
     async fn send_repo_removed_msg(
@@ -143,7 +143,7 @@ impl MessagingService for TelegramMessagingService {
             .map_err(MessagingError::TeloxideRequest)
     }
 
-    async fn send_error_msg(&self, chat_id: ChatId, error: MessagingError) -> Result<()> {
+    async fn send_error_msg(&self, chat_id: ChatId, error: BotHandlerError) -> Result<()> {
         self.send_response_with_keyboard(chat_id, html::escape(&error.to_string()), None).await
     }
 

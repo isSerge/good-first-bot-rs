@@ -4,11 +4,9 @@ mod list;
 mod remove;
 mod start;
 
-use anyhow::Result;
 use async_trait::async_trait;
 use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
-
-use crate::bot_handler::{BotHandler, CommandState};
+use crate::bot_handler::{BotHandler, BotHandlerResult, CommandState};
 
 /// CommandContext groups the data needed by all command handlers.
 pub struct CommandContext<'a> {
@@ -19,13 +17,13 @@ pub struct CommandContext<'a> {
 
 #[async_trait]
 pub trait CommandHandler {
-    async fn handle(self, ctx: CommandContext<'_>) -> Result<()>;
+    async fn handle(self, ctx: CommandContext<'_>) -> BotHandlerResult<()>;
 }
 
 // Simplified CommandHandler implementation
 #[async_trait]
 impl CommandHandler for super::Command {
-    async fn handle(self, ctx: CommandContext<'_>) -> Result<()> {
+    async fn handle(self, ctx: CommandContext<'_>) -> BotHandlerResult<()> {
         match self {
             super::Command::Help => help::handle(ctx).await,
             super::Command::List => list::handle(ctx).await,

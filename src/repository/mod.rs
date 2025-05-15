@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[derive(Debug, Error)]
-enum RepositoryServiceError {
+pub enum RepositoryServiceError {
     #[error("Failed to check if repository exists")]
     RepoExistCheckFailed,
     #[error("Storage error: {0}")]
