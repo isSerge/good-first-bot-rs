@@ -16,7 +16,6 @@ mod storage;
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use log::debug;
 use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
 
@@ -40,7 +39,7 @@ async fn main() {
     }
 }
 
-async fn run() -> Result<()> {
+async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     let storage = Arc::new(SqliteStorage::new(&config.database_url).await?);
     let bot = Bot::new(config.telegram_bot_token.clone());
