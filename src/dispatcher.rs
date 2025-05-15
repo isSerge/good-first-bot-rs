@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use teloxide::{
     dispatching::{
         DefaultKey, DpHandlerDescription,
@@ -12,10 +11,9 @@ use teloxide::{
     utils::command::BotCommands,
 };
 
-use crate::bot_handler::{BotHandler, Command, CommandState};
+use crate::bot_handler::{BotHandler, BotHandlerError, BotHandlerResult, Command, CommandState};
 
-/// Type alias to simplify handler type signatures.
-type BotResultHandler = Handler<'static, DependencyMap, Result<()>, DpHandlerDescription>;
+type DispatchHandler = Handler<'static, DependencyMap, BotHandlerResult<()>, DpHandlerDescription>;
 
 /// Encapsulates the dispatcher logic for the bot.
 pub struct BotDispatcher {
@@ -34,7 +32,7 @@ impl BotDispatcher {
 
     /// Builds the dispatcher using the provided `bot` instance.
     #[must_use = "This function returns a Dispatcher that should not be ignored"]
-    pub fn build(&self, bot: Bot) -> Dispatcher<Bot, anyhow::Error, DefaultKey> {
+    pub fn build(&self, bot: Bot) -> Dispatcher<Bot, BotHandlerError, DefaultKey> {
         Dispatcher::builder(
             bot,
             dptree::entry()
@@ -48,7 +46,7 @@ impl BotDispatcher {
     }
 
     /// Builds the branch for handling text commands.
-    fn build_commands_branch(&self) -> BotResultHandler {
+    fn build_commands_branch(&self) -> DispatchHandler {
         Update::filter_message()
             .filter_command::<Command>()
             .chain(filter_map(extract_dialogue))
@@ -65,7 +63,7 @@ impl BotDispatcher {
 
     /// Builds the branch for handling callback queries using combinators to
     /// reduce nesting.
-    fn build_callback_queries_branch(&self) -> BotResultHandler {
+    fn build_callback_queries_branch(&self) -> DispatchHandler {
         Update::filter_callback_query().chain(filter_map(extract_dialogue)).endpoint(
             |query: CallbackQuery,
              dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
@@ -98,7 +96,7 @@ impl BotDispatcher {
     }
 
     /// Builds the branch for handling messages that are force-reply responses.
-    fn build_force_reply_branch(&self) -> BotResultHandler {
+    fn build_force_reply_branch(&self) -> DispatchHandler {
         Update::filter_message()
             .filter(|msg: Message| msg.reply_to_message().is_some())
             .chain(filter_map(extract_dialogue))
