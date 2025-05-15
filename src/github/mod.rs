@@ -131,7 +131,7 @@ impl DefaultGithubClient {
             let resp =
                 self.client.post(&self.graphql_url).json(&request_body).send().await.map_err(
                     |e| {
-                        warn!("Network error sending GraphQL request: {}. Retrying...", e);
+                        warn!("Network error sending GraphQL request: {e}. Retrying...");
                         BackoffError::transient(GithubError::RequestError { source: e })
                     },
                 )?;
@@ -141,10 +141,10 @@ impl DefaultGithubClient {
                 let status = resp.status();
                 let text = resp.text().await.unwrap_or_else(|e| {
                     warn!(
-                        "Failed to read response text for HTTP error {}: {}. Using empty fallback.",
-                        status, e
+                        "Failed to read response text for HTTP error {status}: {e}. Using empty \
+                         fallback."
                     );
-                    format!("Status: {}, No response body available.", status)
+                    format!("Status: {status}, No response body available.")
                 });
                 warn!(
                     "Non-success HTTP {status}: {}. Retrying if transient...",
@@ -161,16 +161,13 @@ impl DefaultGithubClient {
                             GithubError::RateLimited
                         } else {
                             GithubError::GraphQLApiError(format!(
-                                "HTTP Forbidden ({}): {}",
-                                status, text
+                                "HTTP Forbidden ({status}): {text}"
                             ))
                         }
                     }
-                    reqwest::StatusCode::NOT_FOUND => GithubError::GraphQLApiError(format!(
-                        "HTTP Not Found ({}): {}",
-                        status, text
-                    )),
-                    _ => GithubError::GraphQLApiError(format!("HTTP Error ({}): {}", status, text)),
+                    reqwest::StatusCode::NOT_FOUND =>
+                        GithubError::GraphQLApiError(format!("HTTP Not Found ({status}): {text}")),
+                    _ => GithubError::GraphQLApiError(format!("HTTP Error ({status}): {text}")),
                 };
 
                 let be = match github_err {
@@ -187,8 +184,7 @@ impl DefaultGithubClient {
             let body: Response<Q::ResponseData> = resp.json().await.map_err(|e| {
                 warn!("Failed to parse JSON: {e}. Retrying...");
                 BackoffError::transient(GithubError::GraphQLApiError(format!(
-                    "JSON parse error: {}",
-                    e
+                    "JSON parse error: {e}"
                 )))
             })?;
 
@@ -198,13 +194,13 @@ impl DefaultGithubClient {
                     e.message.to_lowercase().contains("rate limit") || is_retryable_graphql_error(e)
                 });
 
-                let msg = format!("GraphQL API reported errors: {:?}", errors);
+                let msg = format!("GraphQL API reported errors: {errors:?}");
 
                 if is_rate_limit_error {
-                    warn!("Retryable GraphQL API error: {}. Retrying...", msg);
+                    warn!("Retryable GraphQL API error: {msg}. Retrying...");
                     return Err(BackoffError::transient(GithubError::RateLimited));
                 } else {
-                    error!("Permanent GraphQL API error: {}", msg);
+                    error!("Permanent GraphQL API error: {msg}");
                     return Err(BackoffError::permanent(GithubError::GraphQLApiError(msg)));
                 }
             }

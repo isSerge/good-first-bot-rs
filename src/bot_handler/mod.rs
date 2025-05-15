@@ -82,7 +82,7 @@ impl BotHandler {
     ) -> BotHandlerResult<()> {
         let ctx = CommandContext { handler: self, message: msg, dialogue: &dialogue };
 
-        cmd.handle(ctx).await.map_err(BotHandlerError::from)
+        cmd.handle(ctx).await
     }
 
     /// Handle a reply message when we're waiting for repository input.
@@ -127,7 +127,7 @@ impl BotHandler {
                     .repository_service
                     .remove_repo(chat_id, &repo_name_with_owner)
                     .await
-                    .map_err(|e| BotHandlerError::InternalError(e.into()))?;
+                    .map_err(BotHandlerError::InternalError)?;
 
                 // Answer the callback query to clear the spinner.
                 self.messaging_service.answer_remove_callback_query(query.id, removed).await?;

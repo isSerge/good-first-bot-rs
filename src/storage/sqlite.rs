@@ -20,10 +20,10 @@ impl SqliteStorage {
         debug!("Connecting to SQLite database: {database_url}");
         let pool = SqlitePool::connect(database_url)
             .await
-            .map_err(|e| StorageError::DbError(format!("Failed to connect to SQLite: {}", e)))?;
+            .map_err(|e| StorageError::DbError(format!("Failed to connect to SQLite: {e}")))?;
 
         migrate!("./migrations").run(&pool).await.map_err(|e| {
-            StorageError::DbError(format!("Failed to migrate SQLite database: {}", e))
+            StorageError::DbError(format!("Failed to migrate SQLite database: {e}"))
         })?;
         debug!("SQLite database migrated");
 
@@ -48,7 +48,7 @@ impl RepoStorage for SqliteStorage {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StorageError::DbError(format!("Failed to add repository to SQLite: {}", e)))?;
+        .map_err(|e| StorageError::DbError(format!("Failed to add repository to SQLite: {e}")))?;
 
         Ok(())
     }
@@ -70,7 +70,7 @@ impl RepoStorage for SqliteStorage {
         .execute(&self.pool)
         .await
         .map_err(|e| {
-            StorageError::DbError(format!("Failed to remove repository from SQLite: {}", e))
+            StorageError::DbError(format!("Failed to remove repository from SQLite: {e}"))
         })?;
 
         Ok(result.rows_affected() > 0)
@@ -111,9 +111,7 @@ impl RepoStorage for SqliteStorage {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| {
-            StorageError::DbError(format!("Failed to check repository in SQLite: {}", e))
-        })?;
+        .map_err(|e| StorageError::DbError(format!("Failed to check repository in SQLite: {e}")))?;
 
         Ok(result.count > 0)
     }
@@ -125,7 +123,7 @@ impl RepoStorage for SqliteStorage {
             .fetch_all(&self.pool)
             .await
             .map_err(|e| {
-                StorageError::DbError(format!("Failed to get all repositories from SQLite: {}", e))
+                StorageError::DbError(format!("Failed to get all repositories from SQLite: {e}"))
             })?;
 
         let mut result = HashMap::new();
@@ -156,7 +154,7 @@ impl RepoStorage for SqliteStorage {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| {
-            StorageError::DbError(format!("Failed to get last poll time from SQLite: {}", e))
+            StorageError::DbError(format!("Failed to get last poll time from SQLite: {e}"))
         })?;
 
         // If the repository is not found, return None
@@ -183,7 +181,7 @@ impl RepoStorage for SqliteStorage {
         .execute(&self.pool)
         .await
         .map_err(|e| {
-            StorageError::DbError(format!("Failed to set last poll time in SQLite: {}", e))
+            StorageError::DbError(format!("Failed to set last poll time in SQLite: {e}"))
         })?;
 
         Ok(())

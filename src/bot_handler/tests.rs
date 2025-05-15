@@ -303,8 +303,7 @@ async fn test_process_add_multiple_mixed_outcomes() {
 
     let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
     let mock_msg_text = format!(
-        "{} {} {} {} {} {}",
-        url_new, url_tracked, url_notfound, url_invalid, url_gh_error, url_add_error
+        "{url_new} {url_tracked} {url_notfound} {url_invalid} {url_gh_error} {url_add_error}"
     );
 
     // Act
