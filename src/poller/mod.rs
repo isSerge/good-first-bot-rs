@@ -22,11 +22,11 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum PollerError {
     #[error("Failed to poll GitHub issues")]
-    GithubError(#[from] GithubError),
+    Github(#[from] GithubError),
     #[error("Failed to access storage")]
-    StorageError(#[from] StorageError),
+    Storage(#[from] StorageError),
     #[error("Failed to send message to Telegram")]
-    MessagingError(#[from] MessagingError),
+    Messaging(#[from] MessagingError),
 }
 
 type Result<T> = std::result::Result<T, PollerError>;
@@ -103,7 +103,7 @@ impl GithubPoller {
             .github_client
             .repo_issues_by_label(&repo.owner, &repo.name, GOOD_FIRST_ISSUE_LABELS.to_vec())
             .await
-            .map_err(PollerError::GithubError);
+            .map_err(PollerError::Github);
 
         match issues {
             Result::Ok(issues) => {
