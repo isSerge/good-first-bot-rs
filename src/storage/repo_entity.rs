@@ -3,7 +3,7 @@ use std::{fmt, str::FromStr};
 use thiserror::Error;
 use url::Url;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum RepoEntityError {
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
@@ -67,7 +67,7 @@ impl FromStr for RepoEntity {
         let (owner, name) =
             s.split_once('/').ok_or_else(|| RepoEntityError::InvalidFormat(s.to_string()))?;
 
-        if owner.is_empty() | name.is_empty() {
+        if owner.is_empty() || name.is_empty() {
             return Err(RepoEntityError::InvalidNameWithOwner);
         }
 
