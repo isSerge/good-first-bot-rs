@@ -1,6 +1,4 @@
-use std::env;
-
-use anyhow::{Context, Result};
+use std::env::{self, VarError};
 
 const DEFAULT_DATABASE_URL: &str = "sqlite://data/data.db";
 const DEFAULT_GITHUB_GRAPHQL_URL: &str = "https://api.github.com/graphql";
@@ -16,14 +14,12 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_env() -> Result<Self> {
+    pub fn from_env() -> Result<Self, VarError> {
         Ok(Self {
-            github_token: env::var("GITHUB_TOKEN")
-                .context("GITHUB_TOKEN environment variable is required")?,
+            github_token: env::var("GITHUB_TOKEN")?,
             github_graphql_url: env::var("GITHUB_GRAPHQL_URL")
                 .unwrap_or_else(|_| DEFAULT_GITHUB_GRAPHQL_URL.to_string()),
-            telegram_bot_token: env::var("TELOXIDE_TOKEN")
-                .context("TELOXIDE_TOKEN environment variable is required")?,
+            telegram_bot_token: env::var("TELOXIDE_TOKEN")?,
             poll_interval: env::var("POLL_INTERVAL")
                 .ok()
                 .and_then(|v| v.parse().ok())
