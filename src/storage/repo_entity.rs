@@ -1,7 +1,19 @@
 use std::{fmt, str::FromStr};
 
-use anyhow::{Result, anyhow};
+use thiserror::Error;
 use url::Url;
+
+#[derive(Error, Debug)]
+pub enum RepoEntityError {
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(String),
+    #[error("Invalid repository format: {0}")]
+    InvalidFormat(String),
+    #[error("Owner or repository name cannot be empty")]
+    InvalidNameWithOwner,
+}
+
+type Result<T> = std::result::Result<T, RepoEntityError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RepoEntity {
@@ -20,19 +32,20 @@ impl RepoEntity {
 
     /// Parses a GitHub URL into a Repository.
     pub fn from_url(url_str: &str) -> Result<Self> {
-        let url = Url::parse(url_str).map_err(|e| anyhow!("Invalid URL: {}", e))?;
+        let url =
+            Url::parse(url_str).map_err(|_| RepoEntityError::InvalidUrl(url_str.to_string()))?;
         if url.domain() != Some("github.com") {
-            return Err(anyhow!("URL must be from github.com"));
+            return Err(RepoEntityError::InvalidUrl(url_str.to_string()));
         }
         let segments: Vec<_> =
             url.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap_or_default();
         if segments.len() < 2 {
-            return Err(anyhow!("URL must be in the format https://github.com/owner/repo"));
+            return Err(RepoEntityError::InvalidUrl(url_str.to_string()));
         }
         let owner = segments[0].to_string();
         let name = segments[1].to_string();
         if owner.is_empty() || name.is_empty() {
-            return Err(anyhow!("Owner or repository name cannot be empty"));
+            return Err(RepoEntityError::InvalidNameWithOwner);
         }
 
         let name_with_owner = format!("{owner}/{name}");
@@ -48,21 +61,18 @@ impl fmt::Display for RepoEntity {
 }
 
 impl FromStr for RepoEntity {
-    type Err = anyhow::Error;
+    type Err = RepoEntityError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (owner, name) = s
-            .split_once('/')
-            .ok_or_else(|| anyhow!("Invalid repository format, expected 'owner/name'"))?;
+    fn from_str(s: &str) -> Result<Self> {
+        let (owner, name) =
+            s.split_once('/').ok_or_else(|| RepoEntityError::InvalidFormat(s.to_string()))?;
 
-        if owner.is_empty() {
-            return Err(anyhow!("Owner cannot be empty"));
+        if owner.is_empty() | name.is_empty() {
+            return Err(RepoEntityError::InvalidNameWithOwner);
         }
-        if name.is_empty() {
-            return Err(anyhow!("Repository name cannot be empty"));
-        }
+
         if name.contains('/') {
-            return Err(anyhow!("Repository name cannot contain '/'"));
+            return Err(RepoEntityError::InvalidFormat("Name contains '/'".to_string()));
         }
 
         let name_with_owner = format!("{owner}/{name}");
@@ -130,5 +140,39 @@ mod tests {
         assert_eq!(repo.owner, "rust-lang");
         assert_eq!(repo.name, "rust");
         assert_eq!(repo.name_with_owner, "rust-lang/rust");
+    }
+
+    #[test]
+    fn test_from_url_not_github_domain() {
+        let result = RepoEntity::from_url("https://gitlab.com/foo/bar");
+        assert!(
+            matches!(result, Err(RepoEntityError::InvalidUrl(s)) if s == "https://gitlab.com/foo/bar")
+        );
+    }
+
+    #[test]
+    fn test_from_str_missing_slash() {
+        let result = RepoEntity::from_str("ownerrepo");
+        assert!(matches!(result, Err(RepoEntityError::InvalidFormat(s)) if s == "ownerrepo"));
+    }
+
+    #[test]
+    fn test_from_str_empty_owner() {
+        let result = RepoEntity::from_str("/repo");
+        assert!(matches!(result, Err(RepoEntityError::InvalidNameWithOwner)));
+    }
+
+    #[test]
+    fn test_from_str_empty_name() {
+        let result = RepoEntity::from_str("owner/");
+        assert!(matches!(result, Err(RepoEntityError::InvalidNameWithOwner)));
+    }
+
+    #[test]
+    fn test_from_str_name_contains_slash() {
+        let result = RepoEntity::from_str("owner/repo/extra");
+        assert!(
+            matches!(result, Err(RepoEntityError::InvalidFormat(s)) if s == "Name contains '/'")
+        );
     }
 }
