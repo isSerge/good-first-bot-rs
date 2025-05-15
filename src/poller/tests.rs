@@ -5,7 +5,7 @@ use mockall::predicate::*;
 
 use super::*;
 use crate::{
-    github::MockGithubClient,
+    github::{GithubError, MockGithubClient},
     messaging::MockMessagingService,
     storage::{MockRepoStorage, RepoEntity},
 };
@@ -180,7 +180,7 @@ async fn test_poll_user_repo_github_error() {
 
     mock_github_client
         .expect_repo_issues_by_label()
-        .returning(move |_, _, _| Err(anyhow::anyhow!("test error")));
+        .returning(move |_, _, _| Err(GithubError::Unauthorized));
 
     mock_repo_storage
         .expect_get_last_poll_time()
