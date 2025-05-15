@@ -181,7 +181,7 @@ async fn test_process_add_error() {
 
     let repo_name_with_owner = "owner/gh-error";
     let repo_url = "https://github.com/owner/gh-error";
-    let error_msg = "GitHub API error";
+    let error_msg = "Failed to check if repository exists";
 
     mock_repository
         .expect_repo_exists()
@@ -224,10 +224,12 @@ async fn test_process_add_multiple_mixed_outcomes() {
     let url_invalid = "invalid-url";
     let url_gh_error = "https://github.com/owner/gh-error";
     let name_gh_error = "owner/gh-error";
-    let gh_error_msg = "GH API Failed";
+    let gh_error_msg = "Failed to check if repository exists";
     let url_add_error = "https://github.com/owner/add-error";
     let name_add_error = "owner/add-error";
-    let add_error_msg = "DB Add Failed";
+    let db_failure_reason = "DB Add Failed";
+    let add_error_msg =
+        format!("Storage error: Database error: {}", db_failure_reason);
 
     // Mocking for 'new' repo
     mock_repository.expect_repo_exists().with(eq("owner"), eq("new")).returning(|_, _| Ok(true));
@@ -276,7 +278,7 @@ async fn test_process_add_multiple_mixed_outcomes() {
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_add_error)
         .returning(move |_, _| {
             Err(RepositoryServiceError::StorageError(StorageError::DbError(
-                add_error_msg.to_string(),
+                db_failure_reason.to_string(),
             )))
         });
 
@@ -286,7 +288,7 @@ async fn test_process_add_multiple_mixed_outcomes() {
     let expected_n_found = str_hashset(&[name_notfound]);
     let expected_inv_urls = str_hashset(&[url_invalid]);
     let expected_p_errors =
-        str_tuple_hashset(&[(name_gh_error, gh_error_msg), (name_add_error, add_error_msg)]);
+        str_tuple_hashset(&[(name_gh_error, gh_error_msg), (name_add_error, &add_error_msg)]);
 
     mock_messaging
         .expect_send_add_summary_msg()
