@@ -4,7 +4,9 @@ use mockall::predicate::*;
 use teloxide::types::ChatId;
 
 use crate::{
-    bot_handler::BotHandler, messaging::MockMessagingService, repository::{MockRepositoryService, RepositoryServiceError},
+    bot_handler::BotHandler,
+    messaging::MockMessagingService,
+    repository::{MockRepositoryService, RepositoryServiceError},
     storage::{RepoEntity, StorageError},
 };
 
@@ -181,7 +183,9 @@ async fn test_process_add_error() {
     let repo_url = "https://github.com/owner/gh-error";
     let error_msg = "GitHub API error";
 
-    mock_repository.expect_repo_exists().returning(move |_, _| Err(RepositoryServiceError::RepoExistCheckFailed));
+    mock_repository
+        .expect_repo_exists()
+        .returning(move |_, _| Err(RepositoryServiceError::RepoExistCheckFailed));
 
     let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, error_msg)]);
     mock_messaging
@@ -270,7 +274,11 @@ async fn test_process_add_multiple_mixed_outcomes() {
     mock_repository
         .expect_add_repo()
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_add_error)
-        .returning(move |_, _| Err(RepositoryServiceError::StorageError(StorageError::DbError(add_error_msg.to_string()))));
+        .returning(move |_, _| {
+            Err(RepositoryServiceError::StorageError(StorageError::DbError(
+                add_error_msg.to_string(),
+            )))
+        });
 
     // Expected HashSets for summary
     let expected_s_added = str_hashset(&[name_new]);

@@ -186,7 +186,10 @@ impl DefaultGithubClient {
             // 4. Parse JSON
             let body: Response<Q::ResponseData> = resp.json().await.map_err(|e| {
                 warn!("Failed to parse JSON: {e}. Retrying...");
-                BackoffError::transient(GithubError::GraphQLApiError(format!("JSON parse error: {}", e)))
+                BackoffError::transient(GithubError::GraphQLApiError(format!(
+                    "JSON parse error: {}",
+                    e
+                )))
             })?;
 
             // 5. GraphQL errors?

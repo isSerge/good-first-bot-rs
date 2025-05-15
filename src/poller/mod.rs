@@ -20,7 +20,7 @@ use crate::{
 };
 
 #[derive(Debug, Error)]
-enum PollerError {
+pub enum PollerError {
     #[error("Failed to poll GitHub issues")]
     GithubError(#[from] GithubError),
     #[error("Failed to access storage")]

@@ -12,7 +12,9 @@ use thiserror::Error;
 use url::Url;
 
 use crate::{
-    bot_handler::{BotHandlerError, Command}, github::issues::IssuesRepositoryIssuesNodes, storage::RepoEntity,
+    bot_handler::{BotHandlerError, Command},
+    github::issues::IssuesRepositoryIssuesNodes,
+    storage::RepoEntity,
 };
 
 #[derive(Debug, Error)]

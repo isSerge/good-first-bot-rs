@@ -11,12 +11,10 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum StorageError {
-    #[error("Repository not found")]
-    RepoNotFound,
     #[error("Database error: {0}")]
     DbError(String),
     #[error("Data integrity error: Stored repository '{0}' is invalid: {1}")]
-    DataIntegrityError(String, #[source] repo_entity::RepoEntityError)
+    DataIntegrityError(String, #[source] repo_entity::RepoEntityError),
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
