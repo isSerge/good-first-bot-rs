@@ -1,0 +1,16 @@
+services:
+  bot:
+    image: ghcr.io/isserge/good-first-bot-rs:latest
+    container_name: good_first_bot_rs_app
+    restart: unless-stopped
+    environment:
+      - TELOXIDE_TOKEN=${TELOXIDE_TOKEN:?err_teloxide_token_not_set}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:?err_github_token_not_set}
+      - POLL_INTERVAL=${POLL_INTERVAL:-3600}
+    volumes:
+      # Persist SQLite database.
+      - ./data:/data
+
+networks:
+  default:
+    name: good_first_bot_network
