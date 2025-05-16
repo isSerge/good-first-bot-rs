@@ -15,7 +15,7 @@ issue”, “beginner-friendly”, or “help wanted.”
 
 - **GitHub Integration:**  
   Uses the GitHub GraphQL API to verify repository existence and fetch issues
-  with specific labels. 
+  with specific labels.
 
 - **Telegram Bot Commands:**  
   Supports commands like `/start`, `/help`, `/add`, `/remove`, and `/list` to
@@ -117,9 +117,7 @@ cargo test
 ## Running with Docker
 
 This project includes a `Dockerfile` and a `docker-compose.yml` for easy
-management.
-
-# Build and Run Locally with Docker Compose
+management. In order to build and run with Docker Compose:
 
 1. Create a data directory on your host machine: The `docker-compose.yml` is
    configured to mount a host directory for SQLite database persistence.
