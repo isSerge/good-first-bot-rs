@@ -4,6 +4,7 @@ FROM rust:latest AS builder
 # Install specific nightly toolchain
 RUN rustup default nightly-2025-05-04
 RUN rustup component add clippy rustfmt
+RUN rustup target add aarch64-unknown-linux-musl
 
 # Install required system dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,11 +17,8 @@ WORKDIR /app
 # Copy dependency specifications
 COPY Cargo.toml Cargo.lock ./
 
-# Create dummy source to cache dependencies
-RUN mkdir src && \
-  echo "fn main() {}" > src/main.rs && \
-  cargo build --release && \
-  rm -rf target/release/.fingerprint/good-first-bot-rs
+# Build *only* dependencies
+RUN cargo build --release --package non_existent_package_to_build_only_deps || true 
 
 # Copy actual source code
 COPY src ./src
