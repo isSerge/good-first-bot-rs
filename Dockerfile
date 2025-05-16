@@ -1,56 +1,47 @@
-# Builder stage
-FROM rust:latest AS builder
+# ---- Chef Stage ----
+FROM rust:1.77-bullseye AS chef 
 
-# Install specific nightly toolchain
-RUN rustup default nightly-2025-05-04
-RUN rustup component add clippy rustfmt
-RUN rustup target add aarch64-unknown-linux-musl
+RUN rustup update && \
+  rustup toolchain install stable --profile minimal --component cargo --component rustc && \
+  rustup default stable
+RUN cargo install cargo-chef
 
-# Install required system dependencies
-RUN apt-get update && apt-get install -y \
-  pkg-config \
-  libssl-dev \
+RUN rustup toolchain install nightly-2025-05-04 --profile minimal --component cargo --component rustc --component rust-std && \
+  rustup default nightly-2025-05-04
+
+# ---- Planner Stage ----
+FROM chef AS planner
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY .sqlx ./.sqlx 
+RUN mkdir src && echo "fn main() {println!(\"Planner dummy main\");}" > src/main.rs
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ---- Builder Stage ----
+FROM chef AS builder
+
+RUN apt-get update && apt-get install -y pkg-config libssl-dev \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy dependency specifications
-COPY Cargo.toml Cargo.lock ./
+COPY --from=planner /app/recipe.json recipe.json
 COPY .sqlx ./.sqlx
 
-# Build *only* dependencies
-RUN cargo build --release --package non_existent_package_to_build_only_deps || true 
+RUN cargo chef cook --release --recipe-path recipe.json
 
-# Copy actual source code
 COPY src ./src
 COPY migrations ./migrations
+COPY Cargo.toml Cargo.lock ./
 
-# Build the application
-RUN cargo build --release
+RUN cargo build --release --locked
 
-# Runtime stage
-FROM debian:bullseye-slim
-
-RUN apt-get update && apt-get install -y \
-  openssl \
-  ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+# ---- Runtime Stage ----
+FROM gcr.io/distroless/cc-debian11 AS runtime 
 
 WORKDIR /app
+COPY --from=builder /app/target/release/good-first-bot-rs /app/ 
+COPY --from=builder /app/migrations ./migrations
 
-# Copy binary and resources from builder
-COPY --from=builder /app/target/release/good-first-bot-rs /app/
-COPY --from=builder /app/migrations /app/migrations
-
-# Create data directory for SQLite
-RUN mkdir -p /data
-
-# Set environment variables
-ENV DATABASE_URL=sqlite:///data/data.db
-ENV RUST_LOG=info
-
-# Expose port (adjust based on your application)
-EXPOSE 8080
-
-# Set entrypoint
 ENTRYPOINT ["/app/good-first-bot-rs"]

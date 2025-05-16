@@ -7,8 +7,9 @@ services:
       - TELOXIDE_TOKEN=${TELOXIDE_TOKEN:?err_teloxide_token_not_set}
       - GITHUB_TOKEN=${GITHUB_TOKEN:?err_github_token_not_set}
       - POLL_INTERVAL=${POLL_INTERVAL:-3600}
+      - DATABASE_URL=sqlite:///data/data.db
+      - RUST_LOG=${RUST_LOG:-info,good_first_bot_rs=trace}
     volumes:
-      # Persist SQLite database.
       - ./data:/data
 
 networks:
