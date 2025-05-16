@@ -16,6 +16,7 @@ WORKDIR /app
 
 # Copy dependency specifications
 COPY Cargo.toml Cargo.lock ./
+COPY .sqlx ./.sqlx
 
 # Build *only* dependencies
 RUN cargo build --release --package non_existent_package_to_build_only_deps || true 
