@@ -70,19 +70,21 @@ impl BotDispatcher {
              handler: Arc<BotHandler>| async move {
                 // Handle the callback query based on its data.
                 if let Some(data) = query.data.as_deref() {
-                    if data.starts_with("remove:") {
-                        handler.handle_remove_callback_query(&query).await?;
-                        return Ok(());
-                    }
+                    let (prefix, _) = data.split_once(':').unwrap_or((data, ""));
 
-                    if data.starts_with("details:") {
-                        handler.handle_details_callback_query(&query).await?;
-                        return Ok(());
-                    }
+                    match prefix {
+                        "remove" => {
+                            handler.handle_remove_callback_query(&query).await?;
+                        }
 
-                    if data.starts_with("labels:") {
-                        handler.handle_labels_callback_query(&query).await?;
-                        return Ok(());
+                        "details" => {
+                            handler.handle_details_callback_query(&query).await?;
+                        }
+
+                        "labels" => {
+                            handler.handle_labels_callback_query(&query).await?;
+                        }
+                        _ => {},
                     }
                 }
 
