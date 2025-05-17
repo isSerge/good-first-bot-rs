@@ -82,6 +82,7 @@ pub trait MessagingService: Send + Sync {
     async fn answer_details_callback_query(
         &self,
         chait_id: ChatId,
+        message_id: MessageId,
         repo: &RepoEntity,
     ) -> Result<()>;
 
@@ -90,6 +91,7 @@ pub trait MessagingService: Send + Sync {
     async fn answer_labels_callback_query(
         &self,
         chat_id: ChatId,
+        message_id: MessageId,
         labels: &[LabelNormalized],
         repo_name_with_owner: &str,
     ) -> Result<()>;
@@ -242,25 +244,27 @@ impl MessagingService for TelegramMessagingService {
             .map_err(MessagingError::TeloxideRequest)
     }
 
-    // TODO: should edit the message to show the repo details
     async fn answer_details_callback_query(
         &self,
         chat_id: ChatId,
+        message_id: MessageId,
         repo: &RepoEntity,
     ) -> Result<()> {
         let keyboard = build_repo_item_keyboard(repo);
-        self.send_response_with_keyboard(
-            chat_id,
-            "📦 Repository details:".to_string(),
-            Some(keyboard),
-        )
-        .await
+        let text = "📦 Repository details:".to_string();
+
+        self.bot
+            .edit_message_text(chat_id, message_id, text)
+            .reply_markup(keyboard)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
     }
 
-    // TODO: should edit the message to show the labels
     async fn answer_labels_callback_query(
         &self,
         chat_id: ChatId,
+        message_id: MessageId,
         labels: &[LabelNormalized],
         repo_name_with_owner: &str,
     ) -> Result<()> {
@@ -271,7 +275,12 @@ impl MessagingService for TelegramMessagingService {
             .unwrap_or_else(|| "🏷️ Manage repository labels:")
             .to_string();
 
-        self.send_response_with_keyboard(chat_id, text, Some(keyboard)).await
+        self.bot
+            .edit_message_text(chat_id, message_id, text)
+            .reply_markup(keyboard)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn edit_list_msg(
@@ -405,8 +414,9 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
             ),
         ],
         vec![
+            // TODO: go back should be edit message, not new message
             // Back to list button
-            InlineKeyboardButton::callback("🔙 List".to_string(), "list".to_string()),
+            InlineKeyboardButton::callback("🔙 List".to_string(), "list-edit".to_string()),
             // Manage repo labels button
             InlineKeyboardButton::callback(
                 "⚙️ Labels".to_string(),
