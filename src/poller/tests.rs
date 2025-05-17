@@ -65,15 +65,20 @@ async fn test_poll_user_repo_new_issues() {
         ..Default::default()
     };
     let issues = vec![issue_new.clone(), issue_old.clone()];
+    let mut tracked_labels = HashSet::new();
+    tracked_labels.insert("label name".to_string());
 
     mock_github_client
         .expect_repo_issues_by_label()
-        .with(
-            eq(OWNER),
-            eq(REPO_NAME),
-            function(|labels: &Vec<String>| *labels == GOOD_FIRST_ISSUE_LABELS.to_vec()),
-        )
+        .with(eq(OWNER), eq(REPO_NAME), function(|labels: &HashSet<String>| *labels == *labels))
         .returning(move |_, _, _| Ok(issues.clone()));
+
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .withf(|chat_id_param, repo| {
+            *chat_id_param == CHAT_ID && repo.name_with_owner == REPO_NAME_WITH_OWNER
+        })
+        .returning(move |_, _| Ok(tracked_labels.clone()));
 
     mock_repo_storage
         .expect_get_last_poll_time()
@@ -131,13 +136,23 @@ async fn test_poll_user_repo_no_issues() {
     };
     // Create two issues: both are old (before the last poll)
     let issues = vec![issue_old.clone(), issue_old];
+    let mut tracked_labels = HashSet::new();
+    tracked_labels.insert("label name".to_string());
+    let labels_clone = tracked_labels.clone();
+
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .withf(|chat_id_param, repo| {
+            *chat_id_param == CHAT_ID && repo.name_with_owner == REPO_NAME_WITH_OWNER
+        })
+        .returning(move |_, _| Ok(tracked_labels.clone()));
 
     mock_github_client
         .expect_repo_issues_by_label()
         .with(
             eq(OWNER),
             eq(REPO_NAME),
-            function(|labels: &Vec<String>| *labels == GOOD_FIRST_ISSUE_LABELS.to_vec()),
+            function(move |labels: &HashSet<String>| *labels == labels_clone),
         )
         .returning(move |_, _, _| Ok(issues.clone()));
 
@@ -177,6 +192,18 @@ async fn test_poll_user_repo_github_error() {
     let mut mock_github_client = MockGithubClient::new();
     let mut mock_repo_storage = MockRepoStorage::new();
     let mock_messaging_service = MockMessagingService::new();
+
+    let mut tracked_labels = HashSet::new();
+    tracked_labels.insert("label name".to_string());
+
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .withf(|chat_id_param, repo| {
+            // Ensure parameters match
+            *chat_id_param == CHAT_ID && repo.name_with_owner == REPO_NAME_WITH_OWNER
+        })
+        .returning(move |_, _| Ok(tracked_labels.clone()))
+        .times(1);
 
     mock_github_client
         .expect_repo_issues_by_label()

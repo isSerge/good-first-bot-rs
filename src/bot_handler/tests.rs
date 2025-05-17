@@ -181,7 +181,7 @@ async fn test_process_add_error() {
 
     let repo_name_with_owner = "owner/gh-error";
     let repo_url = "https://github.com/owner/gh-error";
-    let error_msg = "Failed to check if repository exists";
+    let error_msg = "Github client error";
 
     mock_repository
         .expect_repo_exists()
@@ -224,7 +224,7 @@ async fn test_process_add_multiple_mixed_outcomes() {
     let url_invalid = "invalid-url";
     let url_gh_error = "https://github.com/owner/gh-error";
     let name_gh_error = "owner/gh-error";
-    let gh_error_msg = "Failed to check if repository exists";
+    let gh_error_msg = "Github client error";
     let url_add_error = "https://github.com/owner/add-error";
     let name_add_error = "owner/add-error";
     let db_failure_reason = "DB Add Failed";
