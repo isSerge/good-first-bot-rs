@@ -8,8 +8,11 @@ use chrono::Utc;
 use log::debug;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate, query};
 use teloxide::types::ChatId;
+use serde_json;
 
 use crate::storage::{RepoEntity, RepoStorage, StorageError, StorageResult};
+
+const INITIAL_DEFAULT_LABELS_JSON: &str = r#"["good first issue","beginner-friendly","help wanted"]"#;
 
 pub struct SqliteStorage {
     pool: Pool<Sqlite>,
@@ -39,12 +42,13 @@ impl RepoStorage for SqliteStorage {
         let chat_id = chat_id.0;
 
         query!(
-            "INSERT OR IGNORE INTO repositories (chat_id, owner, name, name_with_owner) VALUES \
-             (?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO repositories (chat_id, owner, name, name_with_owner, tracked_labels) VALUES \
+             (?, ?, ?, ?, ?)",
             chat_id,
             repository.owner,
             repository.name,
             repository.name_with_owner,
+            INITIAL_DEFAULT_LABELS_JSON,
         )
         .execute(&self.pool)
         .await
@@ -93,7 +97,7 @@ impl RepoStorage for SqliteStorage {
             .into_iter()
             .map(|r| {
                 RepoEntity::from_str(&r.name_with_owner)
-                    .map_err(|e| StorageError::DataIntegrityError(r.name_with_owner.clone(), e))
+                    .map_err(|e| StorageError::DataIntegrityError(r.name_with_owner.clone(), e.to_string()))
             })
             .collect::<Result<HashSet<_>, _>>()?;
 
@@ -185,5 +189,32 @@ impl RepoStorage for SqliteStorage {
         })?;
 
         Ok(())
+    }
+
+    async fn get_tracked_labels(
+        &self,
+        chat_id: ChatId,
+        repository: &RepoEntity,
+    ) -> StorageResult<HashSet<String>> {
+        debug!("Getting tracked labels for repository: {}", repository.name_with_owner);
+        let chat_id_i64 = chat_id.0;
+
+        let raw_result = query!(
+            "SELECT tracked_labels FROM repositories WHERE chat_id = ? AND name_with_owner = ?",
+            chat_id_i64,
+            repository.name_with_owner,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| {
+            StorageError::DbError(format!("Failed to get tracked labels from SQLite: {e}"))
+        })?;
+
+       let labels_str = raw_result.tracked_labels.unwrap_or("[]".to_string());
+        let labels: HashSet<String> = serde_json::from_str(&labels_str)
+            .map_err(|e| StorageError::DataIntegrityError(repository.name_with_owner.clone(), e.to_string()))?;
+        debug!("Tracked labels for repository {}: {:?}", repository.name_with_owner, labels);
+
+        Ok(labels)
     }
 }

@@ -8,7 +8,6 @@ use std::{
 };
 
 use chrono::DateTime;
-use lazy_static::lazy_static;
 use log::debug;
 use teloxide::prelude::*;
 use thiserror::Error;
@@ -31,7 +30,6 @@ pub enum PollerError {
 
 type Result<T> = std::result::Result<T, PollerError>;
 
-// TODO: consider replacing polling with webhooks
 /// A poller for polling issues from GitHub and sending messages to Telegram.
 pub struct GithubPoller {
     github_client: Arc<dyn GithubClient>,
@@ -39,14 +37,6 @@ pub struct GithubPoller {
     messaging_service: Arc<dyn MessagingService>,
     // The interval to poll GitHub for new issues.
     poll_interval: u64,
-}
-
-lazy_static! {
-    static ref GOOD_FIRST_ISSUE_LABELS: Vec<String> = vec![
-        "good first issue".to_string(),
-        "beginner-friendly".to_string(),
-        "help wanted".to_string(),
-    ];
 }
 
 impl GithubPoller {
@@ -93,6 +83,18 @@ impl GithubPoller {
     async fn poll_user_repo(&mut self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
         debug!("Polling issues for repository: {}", repo.name_with_owner);
 
+        let tracked_lables = self
+            .storage
+            .get_tracked_labels(chat_id, &repo)
+            .await
+            .map_err(PollerError::Storage)?;
+
+        // If there are no tracked labels, skip this repo
+        if tracked_lables.is_empty() {
+            debug!("No tracked labels for repository: {}", repo.name_with_owner);
+            return Ok(());
+        }
+
         // Get the last poll time for this repo
         let last_poll_time = self.storage.get_last_poll_time(chat_id, &repo).await?;
         let last_poll_time = last_poll_time
@@ -101,7 +103,7 @@ impl GithubPoller {
 
         let issues = self
             .github_client
-            .repo_issues_by_label(&repo.owner, &repo.name, GOOD_FIRST_ISSUE_LABELS.to_vec())
+            .repo_issues_by_label(&repo.owner, &repo.name, tracked_lables)
             .await
             .map_err(PollerError::Github);
 

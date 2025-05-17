@@ -9,12 +9,12 @@ pub use repo_entity::RepoEntity;
 use teloxide::types::ChatId;
 use thiserror::Error;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
 pub enum StorageError {
     #[error("Database error: {0}")]
     DbError(String),
     #[error("Data integrity error: Stored repository '{0}' is invalid: {1}")]
-    DataIntegrityError(String, #[source] repo_entity::RepoEntityError),
+    DataIntegrityError(String, String),
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
@@ -54,4 +54,11 @@ pub trait RepoStorage: Send + Sync {
         chat_id: ChatId,
         repository: &RepoEntity,
     ) -> StorageResult<()>;
+
+    /// Get tracked labels by for user and repository.
+    async fn get_tracked_labels(
+        &self,
+        chat_id: ChatId,
+        repository: &RepoEntity,
+    ) -> StorageResult<HashSet<String>>;
 }

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
@@ -55,7 +55,7 @@ pub trait GithubClient: Send + Sync {
         &self,
         owner: &str,
         name: &str,
-        labels: Vec<String>,
+        labels: HashSet<String>,
     ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>, GithubError>;
 
     /// Get repo labels
@@ -96,7 +96,6 @@ pub struct Issues;
 )]
 pub struct Labels;
 
-// TODO: consider adding color and map to colored emojis
 pub struct LabelNormalized {
     pub name: String,
     pub color: String,
@@ -262,7 +261,7 @@ impl GithubClient for DefaultGithubClient {
         &self,
         owner: &str,
         name: &str,
-        labels: Vec<String>,
+        labels: HashSet<String>,
     ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>, GithubError> {
         let data = self
             .execute_graphql::<Issues>(issues::Variables {
