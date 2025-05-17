@@ -71,7 +71,16 @@ pub trait MessagingService: Send + Sync {
     async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<RepoEntity>) -> Result<()>;
 
     /// Sends a callback query to the user.
-    async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()>;
+    async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()>;
+
+    /// Sends a callback query with repository details.
+    /// This includes a link to the repository, button for managing labels and remove button.
+    /// The callback query is sent to the user when they click on a repository in the list.
+    async fn answer_details_callback_query(
+        &self,
+        chait_id: ChatId,
+        repo: &RepoEntity,
+    ) -> Result<()>;
 
     /// Edits the list of repositories on the user's message after a repository
     /// has been removed.
@@ -206,7 +215,7 @@ impl MessagingService for TelegramMessagingService {
         .await
     }
 
-    async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()> {
+    async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()> {
         let removed_msg = if removed {
             "✅ Repository removed successfully."
         } else {
@@ -219,6 +228,20 @@ impl MessagingService for TelegramMessagingService {
             .await
             .map(|_| ())
             .map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn answer_details_callback_query(
+        &self,
+        chat_id: ChatId,
+        repo: &RepoEntity,
+    ) -> Result<()> {
+        let keyboard = build_repo_item_keyboard(&repo);
+        self.send_response_with_keyboard(
+            chat_id,
+            "📦 Repository details:".to_string(),
+            Some(keyboard),
+        )
+        .await
     }
 
     async fn edit_list_msg(
@@ -330,19 +353,45 @@ fn build_repo_list_keyboard(repos: &HashSet<RepoEntity>) -> InlineKeyboardMarkup
         .iter()
         .map(|repo| {
             vec![
-                // Left button: repository name (with a no-op or details callback)
-                InlineKeyboardButton::url(
-                    repo.name_with_owner.clone(),
-                    Url::parse(&repo.url()).expect("Failed to parse repository URL"),
-                ),
-                // Right button: remove action
+                // Repository name with link
                 InlineKeyboardButton::callback(
-                    "❌".to_string(),
-                    format!("remove:{}", repo.name_with_owner),
+                    repo.name_with_owner.clone(),
+                    format!("details:{}", repo.name_with_owner),
                 ),
             ]
         })
         .collect();
+
+    InlineKeyboardMarkup::new(buttons)
+}
+
+fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
+    let buttons = vec![
+        vec![
+            // Repository name with link
+            InlineKeyboardButton::url(
+                repo.name_with_owner.clone(),
+                Url::parse(&repo.url()).expect("Failed to parse repository URL"),
+            ),
+        ],
+        vec![
+            // Back to list button
+            InlineKeyboardButton::callback(
+                "🔙 List".to_string(),
+                "list".to_string(),
+            ),
+            // Manage repo labels button
+            InlineKeyboardButton::callback(
+                "⚙️ Labels".to_string(),
+                format!("labels:{}", repo.name_with_owner),
+            ),
+            // Remove repo action
+            InlineKeyboardButton::callback(
+                "❌ Remove".to_string(),
+                format!("remove:{}", repo.name_with_owner),
+            ),
+        ],
+    ];
 
     InlineKeyboardMarkup::new(buttons)
 }
