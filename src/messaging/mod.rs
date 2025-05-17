@@ -13,7 +13,7 @@ use url::Url;
 
 use crate::{
     bot_handler::{BotHandlerError, Command},
-    github::issues::IssuesRepositoryIssuesNodes,
+    github::{LabelNormalized, issues::IssuesRepositoryIssuesNodes},
     storage::RepoEntity,
 };
 
@@ -74,12 +74,21 @@ pub trait MessagingService: Send + Sync {
     async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()>;
 
     /// Sends a callback query with repository details.
-    /// This includes a link to the repository, button for managing labels and remove button.
-    /// The callback query is sent to the user when they click on a repository in the list.
+    /// This includes a link to the repository, button for managing labels and
+    /// remove button. The callback query is sent to the user when they
+    /// click on a repository in the list.
     async fn answer_details_callback_query(
         &self,
         chait_id: ChatId,
         repo: &RepoEntity,
+    ) -> Result<()>;
+
+    /// Sends a callback query with repository labels.
+    /// This includes a list of labels with buttons to toggle them.
+    async fn answer_labels_callback_query(
+        &self,
+        chat_id: ChatId,
+        labels: &[LabelNormalized],
     ) -> Result<()>;
 
     /// Edits the list of repositories on the user's message after a repository
@@ -230,15 +239,31 @@ impl MessagingService for TelegramMessagingService {
             .map_err(MessagingError::TeloxideRequest)
     }
 
+    // TODO: should edit the message to show the repo details
     async fn answer_details_callback_query(
         &self,
         chat_id: ChatId,
         repo: &RepoEntity,
     ) -> Result<()> {
-        let keyboard = build_repo_item_keyboard(&repo);
+        let keyboard = build_repo_item_keyboard(repo);
         self.send_response_with_keyboard(
             chat_id,
             "📦 Repository details:".to_string(),
+            Some(keyboard),
+        )
+        .await
+    }
+
+    // TODO: should edit the message to show the labels
+    async fn answer_labels_callback_query(
+        &self,
+        chat_id: ChatId,
+        labels: &[LabelNormalized],
+    ) -> Result<()> {
+        let keyboard = build_repo_labels_keyboard(labels);
+        self.send_response_with_keyboard(
+            chat_id,
+            "🏷️ Repository labels:".to_string(),
             Some(keyboard),
         )
         .await
@@ -376,10 +401,7 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
         ],
         vec![
             // Back to list button
-            InlineKeyboardButton::callback(
-                "🔙 List".to_string(),
-                "list".to_string(),
-            ),
+            InlineKeyboardButton::callback("🔙 List".to_string(), "list".to_string()),
             // Manage repo labels button
             InlineKeyboardButton::callback(
                 "⚙️ Labels".to_string(),
@@ -392,6 +414,22 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
             ),
         ],
     ];
+
+    InlineKeyboardMarkup::new(buttons)
+}
+
+fn build_repo_labels_keyboard(labels: &[LabelNormalized]) -> InlineKeyboardMarkup {
+    // TODO: add a button to go back to the repo details
+    // TODO: show if label is already selected
+    let buttons = labels
+        .iter()
+        .map(|label| {
+            vec![InlineKeyboardButton::callback(
+                format!("{}: {}", label.name, label.count),
+                format!("toggle_label:{}", label.name),
+            )]
+        })
+        .collect::<Vec<_>>();
 
     InlineKeyboardMarkup::new(buttons)
 }

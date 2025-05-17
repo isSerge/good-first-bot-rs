@@ -114,7 +114,10 @@ impl BotHandler {
 
     /// Handle a callback query to remove a repository when the user clicks the
     /// remove button on the inline keyboard.
-    pub async fn handle_remove_callback_query(&self, query: &CallbackQuery) -> BotHandlerResult<()> {
+    pub async fn handle_remove_callback_query(
+        &self,
+        query: &CallbackQuery,
+    ) -> BotHandlerResult<()> {
         if let Some(data) = &query.data {
             // Extract repository name with owner
             let repo_name_with_owner = data.trim_start_matches("remove:").to_string();
@@ -145,7 +148,10 @@ impl BotHandler {
         Ok(())
     }
 
-    pub async fn handle_details_callback_query(&self, query: &CallbackQuery) -> BotHandlerResult<()> {
+    pub async fn handle_details_callback_query(
+        &self,
+        query: &CallbackQuery,
+    ) -> BotHandlerResult<()> {
         if let Some(data) = &query.data {
             // Extract repository name with owner
             let repo_name_with_owner = data.trim_start_matches("details:").to_string();
@@ -157,6 +163,32 @@ impl BotHandler {
 
                 // Answer the callback query to clear the spinner.
                 self.messaging_service.answer_details_callback_query(chat_id, &repo).await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn handle_labels_callback_query(
+        &self,
+        query: &CallbackQuery,
+    ) -> BotHandlerResult<()> {
+        if let Some(data) = &query.data {
+            // Extract repository name with owner
+            let repo_name_with_owner = data.trim_start_matches("labels:").to_string();
+            let repo = RepoEntity::from_str(&repo_name_with_owner)
+                .map_err(|_| BotHandlerError::InvalidInput)?;
+
+            let labels = self
+                .repository_service
+                .get_repo_labels(&repo.owner, &repo.name)
+                .await
+                .map_err(BotHandlerError::InternalError)?;
+
+            if let Some(message) = &query.message {
+                let chat_id = message.chat().id;
+
+                // Answer the callback query to clear the spinner.
+                self.messaging_service.answer_labels_callback_query(chat_id, &labels).await?;
             }
         }
         Ok(())

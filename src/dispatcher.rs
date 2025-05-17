@@ -79,6 +79,11 @@ impl BotDispatcher {
                         handler.handle_details_callback_query(&query).await?;
                         return Ok(());
                     }
+
+                    if data.starts_with("labels:") {
+                        handler.handle_labels_callback_query(&query).await?;
+                        return Ok(());
+                    }
                 }
 
                 // Handle commands that are not prefixed with "remove:" or "details:"

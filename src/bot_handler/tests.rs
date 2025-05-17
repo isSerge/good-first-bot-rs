@@ -185,7 +185,7 @@ async fn test_process_add_error() {
 
     mock_repository
         .expect_repo_exists()
-        .returning(move |_, _| Err(RepositoryServiceError::RepoExistCheckFailed));
+        .returning(move |_, _| Err(RepositoryServiceError::GithubClientError));
 
     let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, error_msg)]);
     mock_messaging
@@ -261,7 +261,7 @@ async fn test_process_add_multiple_mixed_outcomes() {
     mock_repository
         .expect_repo_exists()
         .with(eq("owner"), eq("gh-error"))
-        .returning(move |_, _| Err(RepositoryServiceError::RepoExistCheckFailed));
+        .returning(move |_, _| Err(RepositoryServiceError::GithubClientError));
 
     // Mocking for 'add-error' repo
     mock_repository
@@ -393,3 +393,9 @@ async fn test_process_remove_parse_error() {
     // Ok(()).
     assert!(result.is_ok());
 }
+
+// TODO: add tests for:
+// handle_reply
+// handle_labels_callback_query
+// handle_details_callback_query
+// handle_remove_callback_query

@@ -9,14 +9,14 @@ use teloxide::types::ChatId;
 use thiserror::Error;
 
 use crate::{
-    github::GithubClient,
+    github::{GithubClient, LabelNormalized},
     storage::{RepoEntity, RepoStorage, StorageError},
 };
 
 #[derive(Debug, Error)]
 pub enum RepositoryServiceError {
-    #[error("Failed to check if repository exists")]
-    RepoExistCheckFailed,
+    #[error("Github client error")]
+    GithubClientError,
     #[error("Storage error: {0}")]
     StorageError(#[from] StorageError),
 }
@@ -31,6 +31,7 @@ pub trait RepositoryService: Send + Sync {
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
     async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>>;
+    async fn get_repo_labels(&self, owner: &str, name: &str) -> Result<Vec<LabelNormalized>>;
 }
 
 pub struct DefaultRepositoryService {
@@ -50,7 +51,7 @@ impl RepositoryService for DefaultRepositoryService {
         self.github_client
             .repo_exists(owner, name)
             .await
-            .map_err(|_| RepositoryServiceError::RepoExistCheckFailed)
+            .map_err(|_| RepositoryServiceError::GithubClientError)
     }
 
     async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool> {
@@ -70,5 +71,12 @@ impl RepositoryService for DefaultRepositoryService {
 
     async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>> {
         self.storage.get_repos_per_user(chat_id).await.map_err(RepositoryServiceError::from)
+    }
+
+    async fn get_repo_labels(&self, owner: &str, name: &str) -> Result<Vec<LabelNormalized>> {
+        self.github_client
+            .repo_labels(owner, name)
+            .await
+            .map_err(|_| RepositoryServiceError::GithubClientError)
     }
 }

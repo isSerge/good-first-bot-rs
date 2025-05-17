@@ -57,6 +57,13 @@ pub trait GithubClient: Send + Sync {
         name: &str,
         labels: Vec<String>,
     ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>, GithubError>;
+
+    /// Get repo labels
+    async fn repo_labels(
+        &self,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<LabelNormalized>, GithubError>;
 }
 
 // GraphQL DateTime scalar type.
@@ -79,6 +86,21 @@ pub struct Repository;
     variables_derives = "Debug, Clone"
 )]
 pub struct Issues;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "src/github/schema.graphql",
+    query_path = "src/github/github.graphql",
+    response_derives = "Debug, Default, serde::Serialize, Clone",
+    variables_derives = "Debug, Clone"
+)]
+pub struct Labels;
+
+// TODO: consider adding color and map to colored emojis
+pub struct LabelNormalized {
+    pub name: String,
+    pub count: i64,
+}
 
 #[derive(Clone)]
 pub struct DefaultGithubClient {
@@ -251,5 +273,43 @@ impl GithubClient for DefaultGithubClient {
             .await?;
 
         Ok(data.repository.and_then(|r| r.issues).and_then(|i| i.nodes).unwrap_or_default())
+    }
+
+    /// Get repo labels
+    async fn repo_labels(
+        &self,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<LabelNormalized>, GithubError> {
+        let data = self
+            .execute_graphql::<Labels>(labels::Variables {
+                owner: owner.to_string(),
+                name: name.to_string(),
+            })
+            .await?;
+
+        let mut labels =
+            data.repository.and_then(|r| r.labels).and_then(|l| l.nodes).unwrap_or_default();
+
+        // Sort labels by issue count
+        labels.sort_by(|a, b| {
+            let count_a = a.issues.as_ref().map_or(0, |issues| issues.total_count);
+            let count_b = b.issues.as_ref().map_or(0, |issues| issues.total_count);
+            count_b.cmp(&count_a)
+        });
+
+        // Take up to 10 labels with more than 0 issues
+        // and map them to LabelNormalized
+        let selected_labels: Vec<LabelNormalized> = labels
+            .into_iter()
+            .filter(|label| label.issues.as_ref().is_some_and(|issues| issues.total_count > 0))
+            .take(10)
+            .map(|label| LabelNormalized {
+                name: label.name,
+                count: label.issues.map_or(0, |issues| issues.total_count),
+            })
+            .collect();
+
+        Ok(selected_labels)
     }
 }

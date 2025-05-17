@@ -107,6 +107,30 @@ async fn test_get_user_repos() {
 }
 
 #[tokio::test]
+async fn test_get_repo_labels() {
+    // Arrange
+    let mut mock_github_client = MockGithubClient::new();
+    mock_github_client
+        .expect_repo_labels()
+        .returning(|_, _| Ok(vec![LabelNormalized { name: "bug".to_string(), count: 5 }]));
+
+    let repository_service = DefaultRepositoryService::new(
+        Arc::new(MockRepoStorage::new()),
+        Arc::new(mock_github_client),
+    );
+
+    // Act
+    let result = repository_service.get_repo_labels("owner", "repo").await;
+
+    // Assert
+    assert!(result.is_ok());
+    let labels = result.unwrap();
+    assert_eq!(labels.len(), 1);
+    assert_eq!(labels[0].name, "bug");
+    assert_eq!(labels[0].count, 5);
+}
+
+#[tokio::test]
 async fn test_repo_exists_error() {
     // Arrange
     let mut mock_github_client = MockGithubClient::new();
@@ -202,6 +226,26 @@ async fn test_get_user_repos_error() {
 
     // Act
     let result = repository_service.get_user_repos(ChatId(1)).await;
+
+    // Assert
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_get_repo_labels_error() {
+    // Arrange
+    let mut mock_github_client = MockGithubClient::new();
+    mock_github_client
+        .expect_repo_labels()
+        .returning(|_, _| Err(GithubError::Unauthorized));
+
+    let repository_service = DefaultRepositoryService::new(
+        Arc::new(MockRepoStorage::new()),
+        Arc::new(mock_github_client),
+    );
+
+    // Act
+    let result = repository_service.get_repo_labels("owner", "repo").await;
 
     // Assert
     assert!(result.is_err());
