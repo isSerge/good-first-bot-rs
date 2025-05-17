@@ -24,7 +24,8 @@ query Labels($owner: String!, $name: String!) {
     labels(first: 100, orderBy: { field: CREATED_AT, direction: ASC }) {
       nodes {
         name
-        issues(states: OPEN) {
+        color
+        issues {
           totalCount
         }
       }

@@ -99,6 +99,7 @@ pub struct Labels;
 // TODO: consider adding color and map to colored emojis
 pub struct LabelNormalized {
     pub name: String,
+    pub color: String,
     pub count: i64,
 }
 
@@ -303,9 +304,10 @@ impl GithubClient for DefaultGithubClient {
         let selected_labels: Vec<LabelNormalized> = labels
             .into_iter()
             .filter(|label| label.issues.as_ref().is_some_and(|issues| issues.total_count > 0))
-            .take(10)
+            .take(20)
             .map(|label| LabelNormalized {
                 name: label.name,
+                color: label.color,
                 count: label.issues.map_or(0, |issues| issues.total_count),
             })
             .collect();

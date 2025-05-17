@@ -112,7 +112,7 @@ async fn test_get_repo_labels() {
     let mut mock_github_client = MockGithubClient::new();
     mock_github_client
         .expect_repo_labels()
-        .returning(|_, _| Ok(vec![LabelNormalized { name: "bug".to_string(), count: 5 }]));
+        .returning(|_, _| Ok(vec![LabelNormalized { name: "bug".to_string(), count: 5, color: "#434343".to_string() }]));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(MockRepoStorage::new()),

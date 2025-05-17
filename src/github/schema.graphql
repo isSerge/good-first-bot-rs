@@ -23,6 +23,7 @@ type LabelConnection {
 type Label {
   id: ID!
   name: String!
+  color: String!
   issues(states: [IssueState!] = OPEN): IssueCount
 }
 

@@ -188,7 +188,9 @@ impl BotHandler {
                 let chat_id = message.chat().id;
 
                 // Answer the callback query to clear the spinner.
-                self.messaging_service.answer_labels_callback_query(chat_id, &labels).await?;
+                self.messaging_service
+                    .answer_labels_callback_query(chat_id, &labels, &repo_name_with_owner)
+                    .await?;
             }
         }
         Ok(())

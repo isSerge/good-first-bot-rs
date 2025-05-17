@@ -1,3 +1,5 @@
+mod utils;
+
 use std::collections::HashSet;
 
 use async_trait::async_trait;
@@ -89,6 +91,7 @@ pub trait MessagingService: Send + Sync {
         &self,
         chat_id: ChatId,
         labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
     ) -> Result<()>;
 
     /// Edits the list of repositories on the user's message after a repository
@@ -259,14 +262,16 @@ impl MessagingService for TelegramMessagingService {
         &self,
         chat_id: ChatId,
         labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
     ) -> Result<()> {
-        let keyboard = build_repo_labels_keyboard(labels);
-        self.send_response_with_keyboard(
-            chat_id,
-            "🏷️ Repository labels:".to_string(),
-            Some(keyboard),
-        )
-        .await
+        let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
+        let text = labels
+            .is_empty()
+            .then(|| "⚠️ No labels available for this repository.")
+            .unwrap_or_else(|| "🏷️ Manage repository labels:")
+            .to_string();
+
+        self.send_response_with_keyboard(chat_id, text, Some(keyboard)).await
     }
 
     async fn edit_list_msg(
@@ -418,18 +423,32 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(buttons)
 }
 
-fn build_repo_labels_keyboard(labels: &[LabelNormalized]) -> InlineKeyboardMarkup {
-    // TODO: add a button to go back to the repo details
+fn build_repo_labels_keyboard(
+    labels: &[LabelNormalized],
+    name_with_owner: &str,
+) -> InlineKeyboardMarkup {
     // TODO: show if label is already selected
-    let buttons = labels
+    let label_buttons = labels
         .iter()
         .map(|label| {
             vec![InlineKeyboardButton::callback(
-                format!("{}: {}", label.name, label.count),
+                format!(
+                    "{} {}({})",
+                    utils::github_color_to_emoji(&label.color),
+                    label.name,
+                    label.count
+                ),
                 format!("toggle_label:{}", label.name),
             )]
         })
         .collect::<Vec<_>>();
+
+    // Prepend the back button to the list of buttons
+    let mut buttons = vec![vec![InlineKeyboardButton::callback(
+        "🔙 Back".to_string(),
+        format!("details:{}", name_with_owner),
+    )]];
+    buttons.extend(label_buttons);
 
     InlineKeyboardMarkup::new(buttons)
 }
