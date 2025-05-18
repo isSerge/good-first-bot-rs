@@ -104,8 +104,7 @@ impl BotHandler {
                 // are only two possible states, but just in case
                 self.messaging_service
                     .send_error_msg(msg.chat.id, BotHandlerError::InvalidInput)
-                    .await
-                    .map_err(BotHandlerError::from)?;
+                    .await?;
             }
         }
         dialogue.exit().await?;
@@ -250,10 +249,7 @@ impl BotHandler {
         dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
         command: Command,
     ) -> BotHandlerResult<()> {
-        self.messaging_service
-            .prompt_for_repo_input(chat_id)
-            .await
-            .map_err(BotHandlerError::from)?;
+        self.messaging_service.prompt_for_repo_input(chat_id).await?;
         let state = match command {
             Command::Add => CommandState::AwaitingAddRepo,
             Command::Remove => CommandState::AwaitingRemoveRepo,

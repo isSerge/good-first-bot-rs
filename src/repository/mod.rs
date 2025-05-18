@@ -95,18 +95,10 @@ impl RepositoryService for DefaultRepositoryService {
         repo: &RepoEntity,
     ) -> Result<Vec<LabelNormalized>> {
         // Get tracked labels from storage
-        let tracked_labels = self
-            .storage
-            .get_tracked_labels(chat_id, repo)
-            .await
-            .map_err(RepositoryServiceError::from)?;
+        let tracked_labels = self.storage.get_tracked_labels(chat_id, repo).await?;
 
         // Get repo labels from GitHub
-        let mut repo_labels = self
-            .github_client
-            .repo_labels(&repo.owner, &repo.name)
-            .await
-            .map_err(RepositoryServiceError::from)?;
+        let mut repo_labels = self.github_client.repo_labels(&repo.owner, &repo.name).await?;
 
         // Sort repo labels by issue count
         repo_labels.sort_by(|a, b| {
@@ -143,11 +135,7 @@ impl RepositoryService for DefaultRepositoryService {
         repo: &RepoEntity,
         label_name: &str,
     ) -> Result<bool> {
-        let is_selected = self
-            .storage
-            .toggle_label(chat_id, repo, label_name)
-            .await
-            .map_err(RepositoryServiceError::from)?;
+        let is_selected = self.storage.toggle_label(chat_id, repo, label_name).await?;
 
         Ok(is_selected)
     }

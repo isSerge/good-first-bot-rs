@@ -105,7 +105,7 @@ impl GithubPoller {
             .map_err(PollerError::Github);
 
         match issues {
-            Result::Ok(issues) => {
+            Ok(issues) => {
                 let issues_to_notify = Self::filter_new_issues(issues, &last_poll_time);
 
                 if !issues_to_notify.is_empty() {
@@ -121,7 +121,7 @@ impl GithubPoller {
                     debug!("No new issues to notify for {}", repo.name_with_owner);
                 }
             }
-            Result::Err(e) => {
+            Err(e) => {
                 // just log the error and keep going for now
                 // TODO: handle specific errors
                 log::error!("Error polling issues: {e:?}");
