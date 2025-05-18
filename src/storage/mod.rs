@@ -14,7 +14,7 @@ pub enum StorageError {
     #[error("Database error: {0}")]
     DbError(String),
     #[error("Data integrity error: Stored repository '{0}' is invalid: {1}")]
-    DataIntegrityError(String, String),
+    DataIntegrityError(String, #[source] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
