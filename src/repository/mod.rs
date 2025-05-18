@@ -9,21 +9,22 @@ use teloxide::types::ChatId;
 use thiserror::Error;
 
 use crate::{
-    github::GithubClient,
+    github::{GithubClient, GithubError},
     storage::{RepoEntity, RepoStorage, StorageError},
 };
 
 #[derive(Debug, Error)]
 pub enum RepositoryServiceError {
     #[error("Github client error")]
-    GithubClientError,
+    GithubClientError(#[from] GithubError),
     #[error("Storage error: {0}")]
     StorageError(#[from] StorageError),
 }
 
 type Result<T> = std::result::Result<T, RepositoryServiceError>;
 
-/// Represents a normalized label with its name, color, count, and selection status.
+/// Represents a normalized label with its name, color, count, and selection
+/// status.
 pub struct LabelNormalized {
     pub name: String,
     pub color: String,
@@ -69,7 +70,7 @@ impl RepositoryService for DefaultRepositoryService {
         self.github_client
             .repo_exists(owner, name)
             .await
-            .map_err(|_| RepositoryServiceError::GithubClientError)
+            .map_err(RepositoryServiceError::from)
     }
 
     async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool> {
@@ -106,7 +107,7 @@ impl RepositoryService for DefaultRepositoryService {
             .github_client
             .repo_labels(&repo.owner, &repo.name)
             .await
-            .map_err(|_| RepositoryServiceError::GithubClientError)?;
+            .map_err(RepositoryServiceError::from)?;
 
         let normalized = repo_labels
             .into_iter()

@@ -5,6 +5,7 @@ use teloxide::types::ChatId;
 
 use crate::{
     bot_handler::BotHandler,
+    github::GithubError,
     messaging::MockMessagingService,
     repository::{MockRepositoryService, RepositoryServiceError},
     storage::{RepoEntity, StorageError},
@@ -183,9 +184,9 @@ async fn test_process_add_error() {
     let repo_url = "https://github.com/owner/gh-error";
     let error_msg = "Github client error";
 
-    mock_repository
-        .expect_repo_exists()
-        .returning(move |_, _| Err(RepositoryServiceError::GithubClientError));
+    mock_repository.expect_repo_exists().returning(move |_, _| {
+        Err(RepositoryServiceError::GithubClientError(GithubError::Unauthorized))
+    });
 
     let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, error_msg)]);
     mock_messaging
@@ -258,10 +259,9 @@ async fn test_process_add_multiple_mixed_outcomes() {
         .returning(|_, _| Ok(false));
 
     // Mocking for 'gh-error' repo
-    mock_repository
-        .expect_repo_exists()
-        .with(eq("owner"), eq("gh-error"))
-        .returning(move |_, _| Err(RepositoryServiceError::GithubClientError));
+    mock_repository.expect_repo_exists().with(eq("owner"), eq("gh-error")).returning(
+        move |_, _| Err(RepositoryServiceError::GithubClientError(GithubError::Unauthorized)),
+    );
 
     // Mocking for 'add-error' repo
     mock_repository
