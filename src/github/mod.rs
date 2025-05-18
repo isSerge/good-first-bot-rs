@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
@@ -55,8 +55,15 @@ pub trait GithubClient: Send + Sync {
         &self,
         owner: &str,
         name: &str,
-        labels: Vec<String>,
+        labels: HashSet<String>,
     ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>, GithubError>;
+
+    /// Get repo labels
+    async fn repo_labels(
+        &self,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<labels::LabelsRepositoryLabelsNodes>, GithubError>;
 }
 
 // GraphQL DateTime scalar type.
@@ -79,6 +86,15 @@ pub struct Repository;
     variables_derives = "Debug, Clone"
 )]
 pub struct Issues;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "src/github/schema.graphql",
+    query_path = "src/github/github.graphql",
+    response_derives = "Debug, Default, serde::Serialize, Clone",
+    variables_derives = "Debug, Clone"
+)]
+pub struct Labels;
 
 #[derive(Clone)]
 pub struct DefaultGithubClient {
@@ -239,7 +255,7 @@ impl GithubClient for DefaultGithubClient {
         &self,
         owner: &str,
         name: &str,
-        labels: Vec<String>,
+        labels: HashSet<String>,
     ) -> Result<Vec<issues::IssuesRepositoryIssuesNodes>, GithubError> {
         let data = self
             .execute_graphql::<Issues>(issues::Variables {
@@ -251,5 +267,21 @@ impl GithubClient for DefaultGithubClient {
             .await?;
 
         Ok(data.repository.and_then(|r| r.issues).and_then(|i| i.nodes).unwrap_or_default())
+    }
+
+    /// Get repo labels
+    async fn repo_labels(
+        &self,
+        owner: &str,
+        name: &str,
+    ) -> Result<Vec<labels::LabelsRepositoryLabelsNodes>, GithubError> {
+        let data = self
+            .execute_graphql::<Labels>(labels::Variables {
+                owner: owner.to_string(),
+                name: name.to_string(),
+            })
+            .await?;
+
+        Ok(data.repository.and_then(|r| r.labels).and_then(|l| l.nodes).unwrap_or_default())
     }
 }

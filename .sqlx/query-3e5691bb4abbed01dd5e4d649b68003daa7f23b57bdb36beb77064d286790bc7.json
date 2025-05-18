@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT tracked_labels FROM repositories WHERE chat_id = ? AND name_with_owner = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "tracked_labels",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "3e5691bb4abbed01dd5e4d649b68003daa7f23b57bdb36beb77064d286790bc7"
+}

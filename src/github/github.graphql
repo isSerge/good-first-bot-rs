@@ -18,3 +18,17 @@ query Issues($owner: String!, $name: String!, $labels: [String!], $first: Int = 
     }
   }
 }
+
+query Labels($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    labels(first: 100, orderBy: { field: CREATED_AT, direction: ASC }) {
+      nodes {
+        name
+        color
+        issues {
+          totalCount
+        }
+      }
+    }
+  }
+}

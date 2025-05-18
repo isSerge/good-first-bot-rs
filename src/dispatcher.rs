@@ -68,15 +68,30 @@ impl BotDispatcher {
             |query: CallbackQuery,
              dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
              handler: Arc<BotHandler>| async move {
-                // If the callback query is a remove query, handle it as a callback query.
+                // Handle the callback query based on its data.
                 if let Some(data) = query.data.as_deref() {
-                    if data.starts_with("remove:") {
-                        handler.handle_remove_callback_query(query).await?;
-                        return Ok(());
+                    let (prefix, _) = data.split_once(':').unwrap_or((data, ""));
+
+                    match prefix {
+                        "remove" => {
+                            handler.handle_remove_callback_query(&query).await?;
+                        }
+
+                        "details" => {
+                            handler.handle_details_callback_query(&query).await?;
+                        }
+
+                        "labels" => {
+                            handler.handle_labels_callback_query(&query).await?;
+                        }
+                        "toggle_label" => {
+                            handler.handle_toggle_label_callback_query(&query).await?;
+                        }
+                        _ => {}
                     }
                 }
 
-                // If the callback query is not a remove query, handle it as a command.
+                // Handle commands that are not prefixed with "remove:" or "details:"
                 let maybe_tuple =
                     query.message.as_ref().and_then(|m| m.regular_message().cloned()).and_then(
                         |msg| {

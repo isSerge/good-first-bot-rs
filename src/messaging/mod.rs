@@ -1,3 +1,5 @@
+mod utils;
+
 use std::collections::HashSet;
 
 use async_trait::async_trait;
@@ -14,6 +16,7 @@ use url::Url;
 use crate::{
     bot_handler::{BotHandlerError, Command},
     github::issues::IssuesRepositoryIssuesNodes,
+    repository::LabelNormalized,
     storage::RepoEntity,
 };
 
@@ -71,7 +74,36 @@ pub trait MessagingService: Send + Sync {
     async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<RepoEntity>) -> Result<()>;
 
     /// Sends a callback query to the user.
-    async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()>;
+    async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()>;
+
+    /// Sends a callback query with repository details.
+    /// This includes a link to the repository, button for managing labels and
+    /// remove button. The callback query is sent to the user when they
+    /// click on a repository in the list.
+    async fn answer_details_callback_query(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        repo: &RepoEntity,
+    ) -> Result<()>;
+
+    /// Sends a callback query with repository labels.
+    /// This includes a list of labels with buttons to toggle them.
+    async fn answer_labels_callback_query(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
+    ) -> Result<()>;
+
+    /// Sends a callback query to toggle the label.
+    async fn answer_toggle_label_callback_query(
+        &self,
+        query_id: &str,
+        label_name: &str,
+        is_selected: bool,
+    ) -> Result<()>;
 
     /// Edits the list of repositories on the user's message after a repository
     /// has been removed.
@@ -80,6 +112,16 @@ pub trait MessagingService: Send + Sync {
         chat_id: ChatId,
         message_id: MessageId,
         repos: HashSet<RepoEntity>,
+    ) -> Result<()>;
+
+    /// Edits the labels message on the user's message after a labels have been
+    /// updated.
+    async fn edit_labels_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
     ) -> Result<()>;
 
     /// Sends a message to the user that there are new issues.
@@ -206,7 +248,7 @@ impl MessagingService for TelegramMessagingService {
         .await
     }
 
-    async fn answer_remove_callback_query(&self, query_id: String, removed: bool) -> Result<()> {
+    async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()> {
         let removed_msg = if removed {
             "✅ Repository removed successfully."
         } else {
@@ -216,6 +258,65 @@ impl MessagingService for TelegramMessagingService {
         self.bot
             .answer_callback_query(query_id)
             .text(removed_msg)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn answer_details_callback_query(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        repo: &RepoEntity,
+    ) -> Result<()> {
+        let keyboard = build_repo_item_keyboard(repo);
+        let text = "📦 Repository details:".to_string();
+
+        self.bot
+            .edit_message_text(chat_id, message_id, text)
+            .reply_markup(keyboard)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn answer_toggle_label_callback_query(
+        &self,
+        query_id: &str,
+        label_name: &str,
+        is_selected: bool,
+    ) -> Result<()> {
+        let text = if is_selected {
+            format!("✅ Label {label_name} has been added.")
+        } else {
+            format!("❌ Label {label_name} has been removed.")
+        };
+
+        self.bot
+            .answer_callback_query(query_id)
+            .text(text)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn answer_labels_callback_query(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
+    ) -> Result<()> {
+        let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
+        let text = if labels.is_empty() {
+            "⚠️ No labels available for this repository."
+        } else {
+            "🏷️ Manage repository labels:"
+        };
+
+        self.bot
+            .edit_message_text(chat_id, message_id, text)
+            .reply_markup(keyboard)
             .await
             .map(|_| ())
             .map_err(MessagingError::TeloxideRequest)
@@ -234,6 +335,28 @@ impl MessagingService for TelegramMessagingService {
         self.bot
             .edit_message_reply_markup(chat_id, message_id)
             .reply_markup(new_keyboard)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn edit_labels_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
+    ) -> Result<()> {
+        let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
+        let text = if labels.is_empty() {
+            "⚠️ No labels available for this repository."
+        } else {
+            "🏷️ Manage repository labels:"
+        };
+
+        self.bot
+            .edit_message_text(chat_id, message_id, text)
+            .reply_markup(keyboard)
             .await
             .map(|_| ())
             .map_err(MessagingError::TeloxideRequest)
@@ -330,19 +453,74 @@ fn build_repo_list_keyboard(repos: &HashSet<RepoEntity>) -> InlineKeyboardMarkup
         .iter()
         .map(|repo| {
             vec![
-                // Left button: repository name (with a no-op or details callback)
-                InlineKeyboardButton::url(
-                    repo.name_with_owner.clone(),
-                    Url::parse(&repo.url()).expect("Failed to parse repository URL"),
-                ),
-                // Right button: remove action
+                // Repository name with link
                 InlineKeyboardButton::callback(
-                    "❌".to_string(),
-                    format!("remove:{}", repo.name_with_owner),
+                    repo.name_with_owner.clone(),
+                    format!("details:{}", repo.name_with_owner),
                 ),
             ]
         })
         .collect();
+
+    InlineKeyboardMarkup::new(buttons)
+}
+
+fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
+    let buttons = vec![
+        vec![
+            // Repository name with link
+            InlineKeyboardButton::url(
+                repo.name_with_owner.clone(),
+                Url::parse(&repo.url()).expect("Failed to parse repository URL"),
+            ),
+        ],
+        vec![
+            // TODO: go back should be edit message, not new message
+            // Back to list button
+            InlineKeyboardButton::callback("🔙 List".to_string(), "list-edit".to_string()),
+            // Manage repo labels button
+            InlineKeyboardButton::callback(
+                "⚙️ Labels".to_string(),
+                format!("labels:{}", repo.name_with_owner),
+            ),
+            // Remove repo action
+            InlineKeyboardButton::callback(
+                "❌ Remove".to_string(),
+                format!("remove:{}", repo.name_with_owner),
+            ),
+        ],
+    ];
+
+    InlineKeyboardMarkup::new(buttons)
+}
+
+fn build_repo_labels_keyboard(
+    labels: &[LabelNormalized],
+    name_with_owner: &str,
+) -> InlineKeyboardMarkup {
+    // TODO: show if label is already selected
+    let label_buttons = labels
+        .iter()
+        .map(|label| {
+            vec![InlineKeyboardButton::callback(
+                format!(
+                    "{} {} {}({})",
+                    if label.is_selected { "✅ " } else { "" },
+                    utils::github_color_to_emoji(&label.color),
+                    label.name,
+                    label.count,
+                ),
+                format!("toggle_label:{}:{}", label.name, name_with_owner),
+            )]
+        })
+        .collect::<Vec<_>>();
+
+    // Prepend the back button to the list of buttons
+    let mut buttons = vec![vec![InlineKeyboardButton::callback(
+        "🔙 Back".to_string(),
+        format!("details:{name_with_owner}"),
+    )]];
+    buttons.extend(label_buttons);
 
     InlineKeyboardMarkup::new(buttons)
 }
