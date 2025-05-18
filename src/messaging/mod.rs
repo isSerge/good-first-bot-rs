@@ -15,7 +15,8 @@ use url::Url;
 
 use crate::{
     bot_handler::{BotHandlerError, Command},
-    github::{LabelNormalized, issues::IssuesRepositoryIssuesNodes},
+    github::issues::IssuesRepositoryIssuesNodes,
+    repository::LabelNormalized,
     storage::RepoEntity,
 };
 
@@ -443,10 +444,11 @@ fn build_repo_labels_keyboard(
         .map(|label| {
             vec![InlineKeyboardButton::callback(
                 format!(
-                    "{} {}({})",
+                    "{} {} {}({})",
+                    label.is_selected.then(|| "✅").unwrap_or_else(|| ""),
                     utils::github_color_to_emoji(&label.color),
                     label.name,
-                    label.count
+                    label.count,
                 ),
                 format!("toggle_label:{}", label.name),
             )]

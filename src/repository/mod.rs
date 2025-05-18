@@ -9,7 +9,7 @@ use teloxide::types::ChatId;
 use thiserror::Error;
 
 use crate::{
-    github::{GithubClient, LabelNormalized},
+    github::GithubClient,
     storage::{RepoEntity, RepoStorage, StorageError},
 };
 
@@ -23,6 +23,14 @@ pub enum RepositoryServiceError {
 
 type Result<T> = std::result::Result<T, RepositoryServiceError>;
 
+/// Represents a normalized label with its name, color, count, and selection status.
+pub struct LabelNormalized {
+    pub name: String,
+    pub color: String,
+    pub count: i64,
+    pub is_selected: bool,
+}
+
 #[automock]
 #[async_trait]
 pub trait RepositoryService: Send + Sync {
@@ -31,7 +39,11 @@ pub trait RepositoryService: Send + Sync {
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
     async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>>;
-    async fn get_repo_labels(&self, owner: &str, name: &str) -> Result<Vec<LabelNormalized>>;
+    async fn get_repo_labels(
+        &self,
+        chat_id: ChatId,
+        repo: &RepoEntity,
+    ) -> Result<Vec<LabelNormalized>>;
 }
 
 pub struct DefaultRepositoryService {
@@ -73,10 +85,34 @@ impl RepositoryService for DefaultRepositoryService {
         self.storage.get_repos_per_user(chat_id).await.map_err(RepositoryServiceError::from)
     }
 
-    async fn get_repo_labels(&self, owner: &str, name: &str) -> Result<Vec<LabelNormalized>> {
-        self.github_client
-            .repo_labels(owner, name)
+    async fn get_repo_labels(
+        &self,
+        chat_id: ChatId,
+        repo: &RepoEntity,
+    ) -> Result<Vec<LabelNormalized>> {
+        let tracked_labels = self
+            .storage
+            .get_tracked_labels(chat_id, repo)
             .await
-            .map_err(|_| RepositoryServiceError::GithubClientError)
+            .map_err(RepositoryServiceError::from)?;
+
+        let repo_labels = self
+            .github_client
+            .repo_labels(&repo.owner, &repo.name)
+            .await
+            .map_err(|_| RepositoryServiceError::GithubClientError)?;
+
+        let normalized = repo_labels
+            .into_iter()
+            .map(|label| {
+                let name = label.name.clone();
+                let color = label.color.clone();
+                let count = label.issues.map_or(0, |issues| issues.total_count);
+                let is_selected = tracked_labels.contains(&label.name);
+                LabelNormalized { name, color, count, is_selected }
+            })
+            .collect();
+
+        Ok(normalized)
     }
 }

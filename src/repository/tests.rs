@@ -109,10 +109,21 @@ async fn test_get_user_repos() {
 #[tokio::test]
 async fn test_get_repo_labels() {
     // Arrange
+    let chat_id = ChatId(1);
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
     let mut mock_github_client = MockGithubClient::new();
-    mock_github_client
-        .expect_repo_labels()
-        .returning(|_, _| Ok(vec![LabelNormalized { name: "bug".to_string(), count: 5, color: "#434343".to_string() }]));
+    let mut mock_repo_storage = MockRepoStorage::new();
+
+    mock_github_client.expect_repo_labels().returning(|_, _| {
+        Ok(vec![])
+    });
+    let mut tracked_labels = HashSet::new();
+    tracked_labels.insert("bug".to_string());
+
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .returning(move |_, _| Ok(tracked_labels.clone()));
+
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(MockRepoStorage::new()),
@@ -120,7 +131,7 @@ async fn test_get_repo_labels() {
     );
 
     // Act
-    let result = repository_service.get_repo_labels("owner", "repo").await;
+    let result = repository_service.get_repo_labels(chat_id, &repo).await;
 
     // Assert
     assert!(result.is_ok());
@@ -235,17 +246,18 @@ async fn test_get_user_repos_error() {
 async fn test_get_repo_labels_error() {
     // Arrange
     let mut mock_github_client = MockGithubClient::new();
-    mock_github_client
-        .expect_repo_labels()
-        .returning(|_, _| Err(GithubError::Unauthorized));
+    mock_github_client.expect_repo_labels().returning(|_, _| Err(GithubError::Unauthorized));
 
     let repository_service = DefaultRepositoryService::new(
         Arc::new(MockRepoStorage::new()),
         Arc::new(mock_github_client),
     );
 
+    let chat_id = ChatId(1);
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
+
     // Act
-    let result = repository_service.get_repo_labels("owner", "repo").await;
+    let result = repository_service.get_repo_labels(chat_id, &repo).await;
 
     // Assert
     assert!(result.is_err());

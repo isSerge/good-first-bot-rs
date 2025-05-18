@@ -175,19 +175,18 @@ impl BotHandler {
         query: &CallbackQuery,
     ) -> BotHandlerResult<()> {
         if let Some(data) = &query.data {
-            // Extract repository name with owner
-            let repo_name_with_owner = data.trim_start_matches("labels:").to_string();
-            let repo = RepoEntity::from_str(&repo_name_with_owner)
-                .map_err(|_| BotHandlerError::InvalidInput)?;
-
-            let labels = self
-                .repository_service
-                .get_repo_labels(&repo.owner, &repo.name)
-                .await
-                .map_err(BotHandlerError::InternalError)?;
-
             if let Some(message) = &query.message {
                 let chat_id = message.chat().id;
+                
+                let repo_name_with_owner = data.trim_start_matches("labels:").to_string();
+                let repo = RepoEntity::from_str(&repo_name_with_owner)
+                    .map_err(|_| BotHandlerError::InvalidInput)?;
+    
+                let labels = self
+                    .repository_service
+                    .get_repo_labels(chat_id, &repo)
+                    .await
+                    .map_err(BotHandlerError::InternalError)?;
 
                 // Answer the callback query to clear the spinner.
                 self.messaging_service

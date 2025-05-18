@@ -63,7 +63,7 @@ pub trait GithubClient: Send + Sync {
         &self,
         owner: &str,
         name: &str,
-    ) -> Result<Vec<LabelNormalized>, GithubError>;
+    ) -> Result<Vec<labels::LabelsRepositoryLabelsNodes>, GithubError>;
 }
 
 // GraphQL DateTime scalar type.
@@ -95,12 +95,6 @@ pub struct Issues;
     variables_derives = "Debug, Clone"
 )]
 pub struct Labels;
-
-pub struct LabelNormalized {
-    pub name: String,
-    pub color: String,
-    pub count: i64,
-}
 
 #[derive(Clone)]
 pub struct DefaultGithubClient {
@@ -280,7 +274,7 @@ impl GithubClient for DefaultGithubClient {
         &self,
         owner: &str,
         name: &str,
-    ) -> Result<Vec<LabelNormalized>, GithubError> {
+    ) -> Result<Vec<labels::LabelsRepositoryLabelsNodes>, GithubError> {
         let data = self
             .execute_graphql::<Labels>(labels::Variables {
                 owner: owner.to_string(),
@@ -299,16 +293,10 @@ impl GithubClient for DefaultGithubClient {
         });
 
         // Take up to 10 labels with more than 0 issues
-        // and map them to LabelNormalized
-        let selected_labels: Vec<LabelNormalized> = labels
+        let selected_labels: Vec<_> = labels
             .into_iter()
             .filter(|label| label.issues.as_ref().is_some_and(|issues| issues.total_count > 0))
             .take(20)
-            .map(|label| LabelNormalized {
-                name: label.name,
-                color: label.color,
-                count: label.issues.map_or(0, |issues| issues.total_count),
-            })
             .collect();
 
         Ok(selected_labels)
