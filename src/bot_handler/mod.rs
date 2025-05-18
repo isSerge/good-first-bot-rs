@@ -177,11 +177,11 @@ impl BotHandler {
         if let Some(data) = &query.data {
             if let Some(message) = &query.message {
                 let chat_id = message.chat().id;
-                
+
                 let repo_name_with_owner = data.trim_start_matches("labels:").to_string();
                 let repo = RepoEntity::from_str(&repo_name_with_owner)
                     .map_err(|_| BotHandlerError::InvalidInput)?;
-    
+
                 let labels = self
                     .repository_service
                     .get_repo_labels(chat_id, &repo)
@@ -196,6 +196,46 @@ impl BotHandler {
                         &labels,
                         &repo_name_with_owner,
                     )
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn handle_toggle_label_callback_query(
+        &self,
+        query: &CallbackQuery,
+    ) -> BotHandlerResult<()> {
+        if let Some(data) = &query.data {
+            if let Some(message) = &query.message {
+                let chat_id = message.chat().id;
+                let (label, repo_name_with_owner) =
+                    data.trim_start_matches("toggle_label:").split_once(":").unwrap_or_default();
+                let repo = RepoEntity::from_str(&repo_name_with_owner)
+                    .map_err(|_| BotHandlerError::InvalidInput)?;
+
+                // update the label in the database
+                let is_selected = self
+                    .repository_service
+                    .toggle_label(chat_id, &repo, label)
+                    .await
+                    .map_err(BotHandlerError::InternalError)?;
+
+                // Answer the callback query to clear the spinner.
+                self.messaging_service
+                    .answer_toggle_label_callback_query(&query.id, label, is_selected)
+                    .await?;
+
+                // Get updated user repo labels
+                let labels = self
+                    .repository_service
+                    .get_repo_labels(chat_id, &repo)
+                    .await
+                    .map_err(BotHandlerError::InternalError)?;
+
+                // Edit labels message to show the updated labels
+                self.messaging_service
+                    .edit_labels_msg(chat_id, message.id(), &labels, repo_name_with_owner)
                     .await?;
             }
         }

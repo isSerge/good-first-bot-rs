@@ -97,6 +97,14 @@ pub trait MessagingService: Send + Sync {
         repo_name_with_owner: &str,
     ) -> Result<()>;
 
+    /// Sends a callback query to toggle the label.
+    async fn answer_toggle_label_callback_query(
+        &self,
+        query_id: &str,
+        label_name: &str,
+        is_selected: bool,
+    ) -> Result<()>;
+
     /// Edits the list of repositories on the user's message after a repository
     /// has been removed.
     async fn edit_list_msg(
@@ -104,6 +112,16 @@ pub trait MessagingService: Send + Sync {
         chat_id: ChatId,
         message_id: MessageId,
         repos: HashSet<RepoEntity>,
+    ) -> Result<()>;
+
+    /// Edits the labels message on the user's message after a labels have been
+    /// updated.
+    async fn edit_labels_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
     ) -> Result<()>;
 
     /// Sends a message to the user that there are new issues.
@@ -262,6 +280,26 @@ impl MessagingService for TelegramMessagingService {
             .map_err(MessagingError::TeloxideRequest)
     }
 
+    async fn answer_toggle_label_callback_query(
+        &self,
+        query_id: &str,
+        label_name: &str,
+        is_selected: bool,
+    ) -> Result<()> {
+        let text = if is_selected {
+            format!("✅ Label {} has been added.", label_name)
+        } else {
+            format!("❌ Label {} has been removed.", label_name)
+        };
+
+        self.bot
+            .answer_callback_query(query_id)
+            .text(text)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
+    }
+
     async fn answer_labels_callback_query(
         &self,
         chat_id: ChatId,
@@ -297,6 +335,28 @@ impl MessagingService for TelegramMessagingService {
         self.bot
             .edit_message_reply_markup(chat_id, message_id)
             .reply_markup(new_keyboard)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn edit_labels_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        labels: &[LabelNormalized],
+        repo_name_with_owner: &str,
+    ) -> Result<()> {
+        let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
+        let text = labels
+            .is_empty()
+            .then(|| "⚠️ No labels available for this repository.")
+            .unwrap_or_else(|| "🏷️ Manage repository labels:")
+            .to_string();
+
+        self.bot
+            .edit_message_text(chat_id, message_id, text)
+            .reply_markup(keyboard)
             .await
             .map(|_| ())
             .map_err(MessagingError::TeloxideRequest)
@@ -450,7 +510,7 @@ fn build_repo_labels_keyboard(
                     label.name,
                     label.count,
                 ),
-                format!("toggle_label:{}", label.name),
+                format!("toggle_label:{}:{}", label.name, name_with_owner),
             )]
         })
         .collect::<Vec<_>>();

@@ -217,4 +217,39 @@ impl RepoStorage for SqliteStorage {
 
         Ok(labels)
     }
+
+    async fn toggle_label(
+        &self,
+        chat_id: ChatId,
+        repository: &RepoEntity,
+        label_name: &str,
+    ) -> StorageResult<bool> {
+        debug!("Toggling label for repository: {}", repository.name_with_owner);
+        let chat_id_i64 = chat_id.0;
+
+        let mut tracked_labels = self.get_tracked_labels(chat_id, repository).await?;
+
+        if tracked_labels.contains(label_name) {
+            tracked_labels.remove(label_name);
+        } else {
+            tracked_labels.insert(label_name.to_string());
+        }
+
+        let labels_str = serde_json::to_string(&tracked_labels)
+            .map_err(|e| StorageError::DataIntegrityError(repository.name_with_owner.clone(), e.to_string()))?;
+
+        query!(
+            "UPDATE repositories SET tracked_labels = ? WHERE chat_id = ? AND name_with_owner = ?",
+            labels_str,
+            chat_id_i64,
+            repository.name_with_owner,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| {
+            StorageError::DbError(format!("Failed to toggle label in SQLite: {e}"))
+        })?;
+
+        Ok(tracked_labels.contains(label_name))
+    }
 }

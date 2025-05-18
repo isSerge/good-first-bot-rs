@@ -84,7 +84,10 @@ impl BotDispatcher {
                         "labels" => {
                             handler.handle_labels_callback_query(&query).await?;
                         }
-                        _ => {},
+                        "toggle_label" => {
+                            handler.handle_toggle_label_callback_query(&query).await?;
+                        }
+                        _ => {}
                     }
                 }
 

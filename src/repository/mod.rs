@@ -44,6 +44,12 @@ pub trait RepositoryService: Send + Sync {
         chat_id: ChatId,
         repo: &RepoEntity,
     ) -> Result<Vec<LabelNormalized>>;
+    async fn toggle_label(
+        &self,
+        chat_id: ChatId,
+        repo: &RepoEntity,
+        label_name: &str,
+    ) -> Result<bool>;
 }
 
 pub struct DefaultRepositoryService {
@@ -114,5 +120,20 @@ impl RepositoryService for DefaultRepositoryService {
             .collect();
 
         Ok(normalized)
+    }
+
+    async fn toggle_label(
+        &self,
+        chat_id: ChatId,
+        repo: &RepoEntity,
+        label_name: &str,
+    ) -> Result<bool> {
+        let is_selected = self
+            .storage
+            .toggle_label(chat_id, repo, label_name)
+            .await
+            .map_err(RepositoryServiceError::from)?;
+
+        Ok(is_selected)
     }
 }

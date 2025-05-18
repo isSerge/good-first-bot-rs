@@ -61,4 +61,12 @@ pub trait RepoStorage: Send + Sync {
         chat_id: ChatId,
         repository: &RepoEntity,
     ) -> StorageResult<HashSet<String>>;
+
+    /// Add or remove a label from the user tracked repository labels.
+    async fn toggle_label(
+        &self,
+        chat_id: ChatId,
+        repository: &RepoEntity,
+        label_name: &str,
+    ) -> StorageResult<bool>;
 }
