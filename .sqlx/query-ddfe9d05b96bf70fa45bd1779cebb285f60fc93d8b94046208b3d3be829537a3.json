@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE repositories SET tracked_labels = ? WHERE chat_id = ? AND name_with_owner = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "ddfe9d05b96bf70fa45bd1779cebb285f60fc93d8b94046208b3d3be829537a3"
+}

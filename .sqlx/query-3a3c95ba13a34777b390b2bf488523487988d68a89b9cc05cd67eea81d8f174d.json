@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO repositories (chat_id, owner, name, name_with_owner, tracked_labels) VALUES (?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "3a3c95ba13a34777b390b2bf488523487988d68a89b9cc05cd67eea81d8f174d"
+}
