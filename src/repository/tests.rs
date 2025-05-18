@@ -133,10 +133,8 @@ async fn test_get_repo_labels() {
         }])
     });
 
-    let repository_service = DefaultRepositoryService::new(
-        Arc::new(mock_repo_storage),
-        Arc::new(mock_github_client),
-    );
+    let repository_service =
+        DefaultRepositoryService::new(Arc::new(mock_repo_storage), Arc::new(mock_github_client));
 
     // Act
     let result = repository_service.get_repo_labels(chat_id, &repo).await;
@@ -263,10 +261,8 @@ async fn test_get_repo_labels_error() {
         .returning(|_, _| Ok(HashSet::new()));
     mock_github_client.expect_repo_labels().returning(|_, _| Err(GithubError::Unauthorized));
 
-    let repository_service = DefaultRepositoryService::new(
-        Arc::new(mock_repo_storage),
-        Arc::new(mock_github_client),
-    );
+    let repository_service =
+        DefaultRepositoryService::new(Arc::new(mock_repo_storage), Arc::new(mock_github_client));
 
     // Act
     let result = repository_service.get_repo_labels(chat_id, &repo).await;

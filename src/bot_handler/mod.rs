@@ -211,7 +211,7 @@ impl BotHandler {
                 let chat_id = message.chat().id;
                 let (label, repo_name_with_owner) =
                     data.trim_start_matches("toggle_label:").split_once(":").unwrap_or_default();
-                let repo = RepoEntity::from_str(&repo_name_with_owner)
+                let repo = RepoEntity::from_str(repo_name_with_owner)
                     .map_err(|_| BotHandlerError::InvalidInput)?;
 
                 // update the label in the database

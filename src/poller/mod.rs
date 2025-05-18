@@ -83,11 +83,8 @@ impl GithubPoller {
     async fn poll_user_repo(&mut self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
         debug!("Polling issues for repository: {}", repo.name_with_owner);
 
-        let tracked_lables = self
-            .storage
-            .get_tracked_labels(chat_id, &repo)
-            .await
-            .map_err(PollerError::Storage)?;
+        let tracked_lables =
+            self.storage.get_tracked_labels(chat_id, &repo).await.map_err(PollerError::Storage)?;
 
         // If there are no tracked labels, skip this repo
         if tracked_lables.is_empty() {

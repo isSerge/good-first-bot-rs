@@ -11,20 +11,20 @@ pub fn github_color_to_emoji(hex_color: &str) -> &str {
 
         // Greens
         "0e8a16" | "006b75" | "5ab302" | "a2eeef" | "008672" | "c2e0c6" | "1aa34a" | "4caf50" =>
-            "🟢", 
+            "🟢",
 
         // Blues / Teals
-        "0052cc" | "c5def5" | "0075ca" | "1d76db" | "89d2fc" | "00bcd4" | "b3f4f4" => "🔵", 
+        "0052cc" | "c5def5" | "0075ca" | "1d76db" | "89d2fc" | "00bcd4" | "b3f4f4" => "🔵",
 
         // Purples / Violets / Magentas
-        "5319e7" | "d4c5f9" | "612d6d" | "7057ff" | "d876e3" | "8e44ad" | "bf55ec" => "🟣", 
+        "5319e7" | "d4c5f9" | "612d6d" | "7057ff" | "d876e3" | "8e44ad" | "bf55ec" => "🟣",
 
         // Browns
         "8b572a" | "c4a661" | "bf8c60" => "🟤",
 
         // Greys / Blacks
-        "24292e" | "000000" | "1c1e21" | "333333" | "444444" => "⚫️", 
-        
+        "24292e" | "000000" | "1c1e21" | "333333" | "444444" => "⚫️",
+
         // Default / Fallback for unknown colors
         _ => "⚪️",
     }

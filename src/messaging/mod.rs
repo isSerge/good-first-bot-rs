@@ -287,9 +287,9 @@ impl MessagingService for TelegramMessagingService {
         is_selected: bool,
     ) -> Result<()> {
         let text = if is_selected {
-            format!("✅ Label {} has been added.", label_name)
+            format!("✅ Label {label_name} has been added.")
         } else {
-            format!("❌ Label {} has been removed.", label_name)
+            format!("❌ Label {label_name} has been removed.")
         };
 
         self.bot
@@ -308,11 +308,11 @@ impl MessagingService for TelegramMessagingService {
         repo_name_with_owner: &str,
     ) -> Result<()> {
         let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
-        let text = labels
-            .is_empty()
-            .then(|| "⚠️ No labels available for this repository.")
-            .unwrap_or_else(|| "🏷️ Manage repository labels:")
-            .to_string();
+        let text = if labels.is_empty() {
+            "⚠️ No labels available for this repository."
+        } else {
+            "🏷️ Manage repository labels:"
+        };
 
         self.bot
             .edit_message_text(chat_id, message_id, text)
@@ -348,11 +348,11 @@ impl MessagingService for TelegramMessagingService {
         repo_name_with_owner: &str,
     ) -> Result<()> {
         let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
-        let text = labels
-            .is_empty()
-            .then(|| "⚠️ No labels available for this repository.")
-            .unwrap_or_else(|| "🏷️ Manage repository labels:")
-            .to_string();
+        let text = if labels.is_empty() {
+            "⚠️ No labels available for this repository."
+        } else {
+            "🏷️ Manage repository labels:"
+        };
 
         self.bot
             .edit_message_text(chat_id, message_id, text)
@@ -505,7 +505,7 @@ fn build_repo_labels_keyboard(
             vec![InlineKeyboardButton::callback(
                 format!(
                     "{} {} {}({})",
-                    label.is_selected.then(|| "✅").unwrap_or_else(|| ""),
+                    if label.is_selected { "✅ " } else { "" },
                     utils::github_color_to_emoji(&label.color),
                     label.name,
                     label.count,
@@ -518,7 +518,7 @@ fn build_repo_labels_keyboard(
     // Prepend the back button to the list of buttons
     let mut buttons = vec![vec![InlineKeyboardButton::callback(
         "🔙 Back".to_string(),
-        format!("details:{}", name_with_owner),
+        format!("details:{name_with_owner}"),
     )]];
     buttons.extend(label_buttons);
 
