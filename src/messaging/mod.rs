@@ -82,7 +82,7 @@ pub trait MessagingService: Send + Sync {
     /// click on a repository in the list.
     async fn answer_details_callback_query(
         &self,
-        chait_id: ChatId,
+        chat_id: ChatId,
         message_id: MessageId,
         repo: &RepoEntity,
     ) -> Result<()>;
