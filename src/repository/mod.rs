@@ -67,10 +67,7 @@ impl DefaultRepositoryService {
 #[async_trait]
 impl RepositoryService for DefaultRepositoryService {
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool> {
-        self.github_client
-            .repo_exists(owner, name)
-            .await
-            .map_err(RepositoryServiceError::from)
+        self.github_client.repo_exists(owner, name).await.map_err(RepositoryServiceError::from)
     }
 
     async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool> {
@@ -97,19 +94,36 @@ impl RepositoryService for DefaultRepositoryService {
         chat_id: ChatId,
         repo: &RepoEntity,
     ) -> Result<Vec<LabelNormalized>> {
+        // Get tracked labels from storage
         let tracked_labels = self
             .storage
             .get_tracked_labels(chat_id, repo)
             .await
             .map_err(RepositoryServiceError::from)?;
 
-        let repo_labels = self
+        // Get repo labels from GitHub
+        let mut repo_labels = self
             .github_client
             .repo_labels(&repo.owner, &repo.name)
             .await
             .map_err(RepositoryServiceError::from)?;
 
-        let normalized = repo_labels
+        // Sort repo labels by issue count
+        repo_labels.sort_by(|a, b| {
+            let count_a = a.issues.as_ref().map_or(0, |issues| issues.total_count);
+            let count_b = b.issues.as_ref().map_or(0, |issues| issues.total_count);
+            count_b.cmp(&count_a)
+        });
+
+        // TODO: consider using pagination to get all labels with issues
+        // Take up to 20 labels with more than 0 issues
+        let selected_labels: Vec<_> = repo_labels
+            .into_iter()
+            .filter(|label| label.issues.as_ref().is_some_and(|issues| issues.total_count > 0))
+            .take(20)
+            .collect();
+
+        let normalized = selected_labels
             .into_iter()
             .map(|label| {
                 let name = label.name.clone();

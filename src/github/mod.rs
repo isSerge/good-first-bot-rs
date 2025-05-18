@@ -282,23 +282,6 @@ impl GithubClient for DefaultGithubClient {
             })
             .await?;
 
-        let mut labels =
-            data.repository.and_then(|r| r.labels).and_then(|l| l.nodes).unwrap_or_default();
-
-        // Sort labels by issue count
-        labels.sort_by(|a, b| {
-            let count_a = a.issues.as_ref().map_or(0, |issues| issues.total_count);
-            let count_b = b.issues.as_ref().map_or(0, |issues| issues.total_count);
-            count_b.cmp(&count_a)
-        });
-
-        // Take up to 10 labels with more than 0 issues
-        let selected_labels: Vec<_> = labels
-            .into_iter()
-            .filter(|label| label.issues.as_ref().is_some_and(|issues| issues.total_count > 0))
-            .take(20)
-            .collect();
-
-        Ok(selected_labels)
+        Ok(data.repository.and_then(|r| r.labels).and_then(|l| l.nodes).unwrap_or_default())
     }
 }
