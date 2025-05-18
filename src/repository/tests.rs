@@ -1,8 +1,10 @@
 use std::{str::FromStr, sync::Arc};
 
+use mockall::predicate::eq;
+
 use super::*;
 use crate::{
-    github::{GithubError, MockGithubClient},
+    github::{GithubError, MockGithubClient, labels},
     storage::{MockRepoStorage, RepoEntity},
 };
 
@@ -111,22 +113,28 @@ async fn test_get_repo_labels() {
     // Arrange
     let chat_id = ChatId(1);
     let repo = RepoEntity::from_str("owner/repo").unwrap();
-    let mut mock_github_client = MockGithubClient::new();
     let mut mock_repo_storage = MockRepoStorage::new();
+    let mut mock_github_client = MockGithubClient::new();
 
-    mock_github_client.expect_repo_labels().returning(|_, _| {
-        Ok(vec![])
-    });
     let mut tracked_labels = HashSet::new();
     tracked_labels.insert("bug".to_string());
 
     mock_repo_storage
         .expect_get_tracked_labels()
+        .with(eq(chat_id), eq(repo.clone()))
+        .times(1)
         .returning(move |_, _| Ok(tracked_labels.clone()));
 
+    mock_github_client.expect_repo_labels().returning(|_, _| {
+        Ok(vec![labels::LabelsRepositoryLabelsNodes {
+            name: "bug".to_string(),
+            color: "44b3e2".to_string(),
+            issues: Some(labels::LabelsRepositoryLabelsNodesIssues { total_count: 5 }),
+        }])
+    });
 
     let repository_service = DefaultRepositoryService::new(
-        Arc::new(MockRepoStorage::new()),
+        Arc::new(mock_repo_storage),
         Arc::new(mock_github_client),
     );
 
@@ -245,16 +253,20 @@ async fn test_get_user_repos_error() {
 #[tokio::test]
 async fn test_get_repo_labels_error() {
     // Arrange
+    let chat_id = ChatId(1);
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
     let mut mock_github_client = MockGithubClient::new();
+    let mut mock_repo_storage = MockRepoStorage::new();
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .with(eq(chat_id), eq(repo.clone()))
+        .returning(|_, _| Ok(HashSet::new()));
     mock_github_client.expect_repo_labels().returning(|_, _| Err(GithubError::Unauthorized));
 
     let repository_service = DefaultRepositoryService::new(
-        Arc::new(MockRepoStorage::new()),
+        Arc::new(mock_repo_storage),
         Arc::new(mock_github_client),
     );
-
-    let chat_id = ChatId(1);
-    let repo = RepoEntity::from_str("owner/repo").unwrap();
 
     // Act
     let result = repository_service.get_repo_labels(chat_id, &repo).await;
