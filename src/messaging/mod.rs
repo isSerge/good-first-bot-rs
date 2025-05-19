@@ -516,10 +516,7 @@ fn build_repo_labels_keyboard(
         .iter()
         .map(|label| {
             // define callback action
-            let toggle_action =
-                utils::serialize_action(&CallbackAction::TL(id, &label.name));
-
-            println!("Label action {toggle_action}");
+            let toggle_action = utils::serialize_action(&CallbackAction::TL(id, &label.name));
 
             vec![InlineKeyboardButton::callback(
                 format!(

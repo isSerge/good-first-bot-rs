@@ -1,5 +1,3 @@
-use serde_json;
-
 use crate::bot_handler::CallbackAction;
 
 /// Converts a GitHub color hex code to an emoji representation.

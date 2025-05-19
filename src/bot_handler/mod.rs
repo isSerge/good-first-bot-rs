@@ -121,7 +121,6 @@ impl BotHandler {
         let query_id = query.id.clone();
 
         if let Some(data_str) = &query.data.as_deref() {
-            println!("Data: {data_str}");
             let action = serde_json::from_str::<CallbackAction>(data_str)
                 .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
@@ -146,7 +145,6 @@ impl BotHandler {
                     self.action_toggle_label(query, repo_id, label).await?;
                 }
                 CallbackAction::BackToRepoList => {
-                    println!("Back to repo list");
                     self.action_back_to_repo_list(query).await?;
                 }
             }
@@ -173,7 +171,7 @@ impl BotHandler {
         // Attempt to remove the repository.
         let removed = self
             .repository_service
-            .remove_repo(chat_id, &repo_id)
+            .remove_repo(chat_id, repo_id)
             .await
             .map_err(BotHandlerError::InternalError)?;
 
@@ -206,7 +204,7 @@ impl BotHandler {
             .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
         let chat_id = message.chat().id;
         // Extract repository name with owner
-        let repo = RepoEntity::from_str(&repo_id)
+        let repo = RepoEntity::from_str(repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
         // Answer the callback query to clear the spinner.
@@ -226,7 +224,7 @@ impl BotHandler {
             .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
         let chat_id = message.chat().id;
 
-        let repo = RepoEntity::from_str(&repo_id)
+        let repo = RepoEntity::from_str(repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
         let labels = self
@@ -237,7 +235,7 @@ impl BotHandler {
 
         // Answer the callback query to clear the spinner.
         self.messaging_service
-            .answer_labels_callback_query(chat_id, message.id(), &labels, &repo_id)
+            .answer_labels_callback_query(chat_id, message.id(), &labels, repo_id)
             .await?;
         Ok(())
     }
@@ -281,12 +279,10 @@ impl BotHandler {
     }
 
     async fn action_back_to_repo_list(&self, query: &CallbackQuery) -> BotHandlerResult<()> {
-        println!("Back to repo list");
         let message = query
             .message
             .as_ref()
             .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
-        println!("Message: {:?}", message);
         let chat_id = message.chat().id;
         // Get the updated repository list.
         let user_repos = self.repository_service.get_user_repos(chat_id).await?;
@@ -320,7 +316,10 @@ impl BotHandler {
         // Check if the user provided any URLs
         if urls.is_empty() {
             self.messaging_service
-                .send_error_msg(chat_id, BotHandlerError::InvalidInput("Invalid repository URL".to_string()))
+                .send_error_msg(
+                    chat_id,
+                    BotHandlerError::InvalidInput("Invalid repository URL".to_string()),
+                )
                 .await?;
             return Ok(());
         }
@@ -409,7 +408,10 @@ impl BotHandler {
             Ok(repo) => repo,
             Err(_) => {
                 self.messaging_service
-                    .send_error_msg(chat_id, BotHandlerError::InvalidInput("Invalid repository URL".to_string()))
+                    .send_error_msg(
+                        chat_id,
+                        BotHandlerError::InvalidInput("Invalid repository URL".to_string()),
+                    )
                     .await?;
                 return Ok(());
             }
