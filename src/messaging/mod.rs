@@ -14,7 +14,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::{
-    bot_handler::{BotHandlerError, Command},
+    bot_handler::{BotHandlerError, CallbackAction, Command},
     github::issues::IssuesRepositoryIssuesNodes,
     repository::LabelNormalized,
     storage::RepoEntity,
@@ -72,6 +72,11 @@ pub trait MessagingService: Send + Sync {
 
     /// Sends a message with repo list keyboard.
     async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<RepoEntity>) -> Result<()>;
+
+    /// Sends a callback query to the user when they click on a button.
+    /// The `query_id` is the ID of the callback query, and the `text` is the
+    /// text of the message to be sent.
+    async fn answer_callback_query(&self, query_id: &str, text: &str) -> Result<()>;
 
     /// Sends a callback query to the user.
     async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()>;
@@ -246,6 +251,15 @@ impl MessagingService for TelegramMessagingService {
             Some(keyboard),
         )
         .await
+    }
+
+    async fn answer_callback_query(&self, query_id: &str, text: &str) -> Result<()> {
+        self.bot
+            .answer_callback_query(query_id)
+            .text(text)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()> {
@@ -452,13 +466,12 @@ fn build_repo_list_keyboard(repos: &HashSet<RepoEntity>) -> InlineKeyboardMarkup
     let buttons: Vec<Vec<InlineKeyboardButton>> = repos
         .iter()
         .map(|repo| {
-            vec![
-                // Repository name with link
-                InlineKeyboardButton::callback(
-                    repo.name_with_owner.clone(),
-                    format!("details:{}", repo.name_with_owner),
-                ),
-            ]
+            // define callback action
+            let action =
+                utils::serialize_action(&CallbackAction::ViewRepoDetails(&repo.name_with_owner));
+
+            // Repository name with link
+            vec![InlineKeyboardButton::callback(repo.name_with_owner.clone(), action)]
         })
         .collect();
 
@@ -466,6 +479,13 @@ fn build_repo_list_keyboard(repos: &HashSet<RepoEntity>) -> InlineKeyboardMarkup
 }
 
 fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
+    let id = &repo.name_with_owner;
+    // actions
+    let back_to_list = utils::serialize_action(&CallbackAction::BackToRepoList);
+    let repo_labels = utils::serialize_action(&CallbackAction::ViewRepoLabels(id));
+    let remove_repo = utils::serialize_action(&CallbackAction::RemoveRepoPrompt(id));
+
+    // buttons
     let buttons = vec![
         vec![
             // Repository name with link
@@ -477,17 +497,11 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
         vec![
             // TODO: go back should be edit message, not new message
             // Back to list button
-            InlineKeyboardButton::callback("🔙 List".to_string(), "list-edit".to_string()),
+            InlineKeyboardButton::callback("🔙 List".to_string(), back_to_list),
             // Manage repo labels button
-            InlineKeyboardButton::callback(
-                "⚙️ Labels".to_string(),
-                format!("labels:{}", repo.name_with_owner),
-            ),
+            InlineKeyboardButton::callback("⚙️ Labels".to_string(), repo_labels),
             // Remove repo action
-            InlineKeyboardButton::callback(
-                "❌ Remove".to_string(),
-                format!("remove:{}", repo.name_with_owner),
-            ),
+            InlineKeyboardButton::callback("❌ Remove".to_string(), remove_repo),
         ],
     ];
 
@@ -496,12 +510,17 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
 
 fn build_repo_labels_keyboard(
     labels: &[LabelNormalized],
-    name_with_owner: &str,
+    id: &str, // repo name with owner
 ) -> InlineKeyboardMarkup {
-    // TODO: show if label is already selected
     let label_buttons = labels
         .iter()
         .map(|label| {
+            // define callback action
+            let toggle_action =
+                utils::serialize_action(&CallbackAction::TL(id, &label.name));
+
+            println!("Label action {toggle_action}");
+
             vec![InlineKeyboardButton::callback(
                 format!(
                     "{} {} {}({})",
@@ -510,16 +529,14 @@ fn build_repo_labels_keyboard(
                     label.name,
                     label.count,
                 ),
-                format!("toggle_label:{}:{}", label.name, name_with_owner),
+                toggle_action,
             )]
         })
         .collect::<Vec<_>>();
 
     // Prepend the back button to the list of buttons
-    let mut buttons = vec![vec![InlineKeyboardButton::callback(
-        "🔙 Back".to_string(),
-        format!("details:{name_with_owner}"),
-    )]];
+    let go_back = utils::serialize_action(&CallbackAction::BackToRepoDetails(id));
+    let mut buttons = vec![vec![InlineKeyboardButton::callback("🔙 Back".to_string(), go_back)]];
     buttons.extend(label_buttons);
 
     InlineKeyboardMarkup::new(buttons)

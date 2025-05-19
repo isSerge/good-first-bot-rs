@@ -1,9 +1,12 @@
+mod callback_actions;
 mod commands;
 #[cfg(test)]
 mod tests;
 
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
+pub use callback_actions::CallbackAction;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
@@ -22,8 +25,8 @@ use crate::{
 
 #[derive(Error, Debug)]
 pub enum BotHandlerError {
-    #[error("Invalid input")]
-    InvalidInput,
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
     #[error("Failed to get or update dialogue: {0}")]
     DialogueError(#[from] InMemStorageError),
     #[error("Failed to send message: {0}")]
@@ -103,7 +106,10 @@ impl BotHandler {
                 // Should not happen, because force reply does not accept empty input and there
                 // are only two possible states, but just in case
                 self.messaging_service
-                    .send_error_msg(msg.chat.id, BotHandlerError::InvalidInput)
+                    .send_error_msg(
+                        msg.chat.id,
+                        BotHandlerError::InvalidInput("Invalid state".to_string()),
+                    )
                     .await?;
             }
         }
@@ -111,133 +117,180 @@ impl BotHandler {
         Ok(())
     }
 
-    /// Handle a callback query to remove a repository when the user clicks the
-    /// remove button on the inline keyboard.
-    pub async fn handle_remove_callback_query(
-        &self,
-        query: &CallbackQuery,
-    ) -> BotHandlerResult<()> {
-        if let Some(data) = &query.data {
-            // Extract repository name with owner
-            let repo_name_with_owner = data.trim_start_matches("remove:").to_string();
+    pub async fn handle_callback_query(&self, query: &CallbackQuery) -> BotHandlerResult<()> {
+        let query_id = query.id.clone();
 
-            if let Some(message) = &query.message {
-                let chat_id = message.chat().id;
+        if let Some(data_str) = &query.data.as_deref() {
+            println!("Data: {data_str}");
+            let action = serde_json::from_str::<CallbackAction>(data_str)
+                .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-                // Attempt to remove the repository.
-                let removed = self
-                    .repository_service
-                    .remove_repo(chat_id, &repo_name_with_owner)
-                    .await
-                    .map_err(BotHandlerError::InternalError)?;
+            // TODO: consider using Option instead of empty str here
+            // Answer the callback query to clear the spinner.
+            self.messaging_service.answer_callback_query(&query_id, "").await?;
 
-                // Answer the callback query to clear the spinner.
-                self.messaging_service.answer_remove_callback_query(&query.id, removed).await?;
-
-                // If removal was successful, update the inline keyboard on the original
-                // message.
-                if removed {
-                    // Get the updated repository list.
-                    let user_repos = self.repository_service.get_user_repos(chat_id).await?;
-
-                    self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
+            match action {
+                CallbackAction::ViewRepoDetails(repo_id) => {
+                    self.action_view_repo_details(query, repo_id).await?;
+                }
+                CallbackAction::BackToRepoDetails(repo_id) => {
+                    self.action_view_repo_details(query, repo_id).await?;
+                }
+                CallbackAction::ViewRepoLabels(repo_id) => {
+                    self.action_view_labels(query, repo_id).await?;
+                }
+                CallbackAction::RemoveRepoPrompt(repo_id) => {
+                    self.action_remove_repo(query, repo_id).await?;
+                }
+                CallbackAction::TL(repo_id, label) => {
+                    self.action_toggle_label(query, repo_id, label).await?;
+                }
+                CallbackAction::BackToRepoList => {
+                    println!("Back to repo list");
+                    self.action_back_to_repo_list(query).await?;
                 }
             }
+        } else {
+            // TODO: consider sending error message to user
+            warn!("Callback query has no data");
         }
         Ok(())
     }
 
-    pub async fn handle_details_callback_query(
+    /// Handle a callback query to remove a repository when the user clicks the
+    /// remove button on the inline keyboard.
+    pub async fn action_remove_repo(
         &self,
         query: &CallbackQuery,
+        repo_id: &str,
     ) -> BotHandlerResult<()> {
-        if let Some(data) = &query.data {
-            // Extract repository name with owner
-            let repo_name_with_owner = data.trim_start_matches("details:").to_string();
-            let repo = RepoEntity::from_str(&repo_name_with_owner)
-                .map_err(|_| BotHandlerError::InvalidInput)?;
+        let message = query
+            .message
+            .as_ref()
+            .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+        let chat_id = message.chat().id;
 
-            if let Some(message) = &query.message {
-                let chat_id = message.chat().id;
+        // Attempt to remove the repository.
+        let removed = self
+            .repository_service
+            .remove_repo(chat_id, &repo_id)
+            .await
+            .map_err(BotHandlerError::InternalError)?;
 
-                // Answer the callback query to clear the spinner.
-                self.messaging_service
-                    .answer_details_callback_query(chat_id, message.id(), &repo)
-                    .await?;
+        // Answer the callback query to clear the spinner.
+        self.messaging_service.answer_remove_callback_query(&query.id, removed).await?;
+
+        // If removal was successful, update the inline keyboard on the original
+        // message.
+        if removed {
+            // Get the updated repository list.
+            let user_repos = self.repository_service.get_user_repos(chat_id).await?;
+
+            if user_repos.is_empty() {
+                self.messaging_service.send_list_empty_msg(chat_id).await?;
             }
+
+            self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
         }
         Ok(())
     }
 
-    pub async fn handle_labels_callback_query(
+    pub async fn action_view_repo_details(
         &self,
         query: &CallbackQuery,
+        repo_id: &str,
     ) -> BotHandlerResult<()> {
-        if let Some(data) = &query.data {
-            if let Some(message) = &query.message {
-                let chat_id = message.chat().id;
+        let message = query
+            .message
+            .as_ref()
+            .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+        let chat_id = message.chat().id;
+        // Extract repository name with owner
+        let repo = RepoEntity::from_str(&repo_id)
+            .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-                let repo_name_with_owner = data.trim_start_matches("labels:").to_string();
-                let repo = RepoEntity::from_str(&repo_name_with_owner)
-                    .map_err(|_| BotHandlerError::InvalidInput)?;
+        // Answer the callback query to clear the spinner.
+        self.messaging_service.answer_details_callback_query(chat_id, message.id(), &repo).await?;
 
-                let labels = self
-                    .repository_service
-                    .get_repo_labels(chat_id, &repo)
-                    .await
-                    .map_err(BotHandlerError::InternalError)?;
-
-                // Answer the callback query to clear the spinner.
-                self.messaging_service
-                    .answer_labels_callback_query(
-                        chat_id,
-                        message.id(),
-                        &labels,
-                        &repo_name_with_owner,
-                    )
-                    .await?;
-            }
-        }
         Ok(())
     }
 
-    pub async fn handle_toggle_label_callback_query(
+    pub async fn action_view_labels(
         &self,
         query: &CallbackQuery,
+        repo_id: &str,
     ) -> BotHandlerResult<()> {
-        if let Some(data) = &query.data {
-            if let Some(message) = &query.message {
-                let chat_id = message.chat().id;
-                let (label, repo_name_with_owner) =
-                    data.trim_start_matches("toggle_label:").split_once(":").unwrap_or_default();
-                let repo = RepoEntity::from_str(repo_name_with_owner)
-                    .map_err(|_| BotHandlerError::InvalidInput)?;
+        let message = query
+            .message
+            .as_ref()
+            .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+        let chat_id = message.chat().id;
 
-                // update the label in the database
-                let is_selected = self
-                    .repository_service
-                    .toggle_label(chat_id, &repo, label)
-                    .await
-                    .map_err(BotHandlerError::InternalError)?;
+        let repo = RepoEntity::from_str(&repo_id)
+            .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-                // Answer the callback query to clear the spinner.
-                self.messaging_service
-                    .answer_toggle_label_callback_query(&query.id, label, is_selected)
-                    .await?;
+        let labels = self
+            .repository_service
+            .get_repo_labels(chat_id, &repo)
+            .await
+            .map_err(BotHandlerError::InternalError)?;
 
-                // Get updated user repo labels
-                let labels = self
-                    .repository_service
-                    .get_repo_labels(chat_id, &repo)
-                    .await
-                    .map_err(BotHandlerError::InternalError)?;
+        // Answer the callback query to clear the spinner.
+        self.messaging_service
+            .answer_labels_callback_query(chat_id, message.id(), &labels, &repo_id)
+            .await?;
+        Ok(())
+    }
 
-                // Edit labels message to show the updated labels
-                self.messaging_service
-                    .edit_labels_msg(chat_id, message.id(), &labels, repo_name_with_owner)
-                    .await?;
-            }
-        }
+    pub async fn action_toggle_label(
+        &self,
+        query: &CallbackQuery,
+        repo_id: &str,
+        label_name: &str,
+    ) -> BotHandlerResult<()> {
+        let message = query
+            .message
+            .as_ref()
+            .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+        let chat_id = message.chat().id;
+        let repo = RepoEntity::from_str(repo_id)
+            .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
+
+        // update the label in the database
+        let is_selected = self
+            .repository_service
+            .toggle_label(chat_id, &repo, label_name)
+            .await
+            .map_err(BotHandlerError::InternalError)?;
+
+        // Answer the callback query to clear the spinner.
+        self.messaging_service
+            .answer_toggle_label_callback_query(&query.id, label_name, is_selected)
+            .await?;
+
+        // Get updated user repo labels
+        let labels = self
+            .repository_service
+            .get_repo_labels(chat_id, &repo)
+            .await
+            .map_err(BotHandlerError::InternalError)?;
+
+        // Edit labels message to show the updated labels
+        self.messaging_service.edit_labels_msg(chat_id, message.id(), &labels, repo_id).await?;
+        Ok(())
+    }
+
+    async fn action_back_to_repo_list(&self, query: &CallbackQuery) -> BotHandlerResult<()> {
+        println!("Back to repo list");
+        let message = query
+            .message
+            .as_ref()
+            .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+        println!("Message: {:?}", message);
+        let chat_id = message.chat().id;
+        // Get the updated repository list.
+        let user_repos = self.repository_service.get_user_repos(chat_id).await?;
+        self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
         Ok(())
     }
 
@@ -266,7 +319,9 @@ impl BotHandler {
 
         // Check if the user provided any URLs
         if urls.is_empty() {
-            self.messaging_service.send_error_msg(chat_id, BotHandlerError::InvalidInput).await?;
+            self.messaging_service
+                .send_error_msg(chat_id, BotHandlerError::InvalidInput("Invalid repository URL".to_string()))
+                .await?;
             return Ok(());
         }
 
@@ -354,7 +409,7 @@ impl BotHandler {
             Ok(repo) => repo,
             Err(_) => {
                 self.messaging_service
-                    .send_error_msg(chat_id, BotHandlerError::InvalidInput)
+                    .send_error_msg(chat_id, BotHandlerError::InvalidInput("Invalid repository URL".to_string()))
                     .await?;
                 return Ok(());
             }
