@@ -6,7 +6,7 @@ pub enum CallbackAction<'a> {
     ViewRepoLabels(&'a str),
     RemoveRepoPrompt(&'a str),
     /// TL(&'a str, &'a str) means "Toggle Label" with the first string being
-    /// the label name and the second string being the repo name with owner.
+    /// the repo name with owner and the second being the label name.
     TL(&'a str, &'a str),
     BackToRepoDetails(&'a str),
     BackToRepoList,
