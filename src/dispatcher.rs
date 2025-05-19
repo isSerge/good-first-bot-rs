@@ -8,7 +8,6 @@ use teloxide::{
     dptree::{deps, filter_map},
     prelude::*,
     types::Update,
-    utils::command::BotCommands,
 };
 
 use crate::bot_handler::{BotHandler, BotHandlerError, BotHandlerResult, Command, CommandState};
@@ -66,46 +65,9 @@ impl BotDispatcher {
     fn build_callback_queries_branch(&self) -> DispatchHandler {
         Update::filter_callback_query().chain(filter_map(extract_dialogue)).endpoint(
             |query: CallbackQuery,
-             dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+             _dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
              handler: Arc<BotHandler>| async move {
-                // Handle the callback query based on its data.
-                if let Some(data) = query.data.as_deref() {
-                    let (prefix, _) = data.split_once(':').unwrap_or((data, ""));
-
-                    match prefix {
-                        "remove" => {
-                            handler.handle_remove_callback_query(&query).await?;
-                        }
-
-                        "details" => {
-                            handler.handle_details_callback_query(&query).await?;
-                        }
-
-                        "labels" => {
-                            handler.handle_labels_callback_query(&query).await?;
-                        }
-                        "toggle_label" => {
-                            handler.handle_toggle_label_callback_query(&query).await?;
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Handle commands that are not prefixed with "remove:" or "details:"
-                let maybe_tuple =
-                    query.message.as_ref().and_then(|m| m.regular_message().cloned()).and_then(
-                        |msg| {
-                            query.data.as_deref().and_then(|data| {
-                                let cmd_str = format!("/{data}");
-                                Command::parse(&cmd_str, "botname").ok().map(|cmd| (msg, cmd))
-                            })
-                        },
-                    );
-
-                if let Some((msg, command)) = maybe_tuple {
-                    handler.handle_commands(&msg, command, dialogue).await?;
-                }
-                Ok(())
+                handler.handle_callback_query(&query).await
             },
         )
     }

@@ -1,3 +1,6 @@
+use crate::bot_handler::CallbackAction;
+
+/// Converts a GitHub color hex code to an emoji representation.
 pub fn github_color_to_emoji(hex_color: &str) -> &str {
     match hex_color.to_lowercase().as_str() {
         // Reds / Pinks
@@ -28,4 +31,9 @@ pub fn github_color_to_emoji(hex_color: &str) -> &str {
         // Default / Fallback for unknown colors
         _ => "⚪️",
     }
+}
+
+/// Serializes a `CallbackAction` to a JSON string. Used for keyboard buttons.
+pub fn serialize_action(action: &CallbackAction) -> String {
+    serde_json::to_string(action).expect("Failed to serialize action")
 }
