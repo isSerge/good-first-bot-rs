@@ -1,20 +1,23 @@
+mod keyboards;
 mod utils;
 
 use std::collections::HashSet;
 
 use async_trait::async_trait;
-use lazy_static::lazy_static;
+use keyboards::{
+    COMMAND_KEYBOARD, build_repo_item_keyboard, build_repo_labels_keyboard,
+    build_repo_list_keyboard,
+};
 use mockall::automock;
 use teloxide::{
     prelude::*,
-    types::{ChatId, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, MessageId, ParseMode},
+    types::{ChatId, ForceReply, InlineKeyboardMarkup, MessageId, ParseMode},
     utils::{command::BotCommands, html},
 };
 use thiserror::Error;
-use url::Url;
 
 use crate::{
-    bot_handler::{BotHandlerError, CallbackAction, Command},
+    bot_handler::{BotHandlerError, Command},
     github::issues::IssuesRepositoryIssuesNodes,
     repository::LabelNormalized,
     storage::RepoEntity,
@@ -76,6 +79,7 @@ pub trait MessagingService: Send + Sync {
         chat_id: ChatId,
         message_id: MessageId,
         repo: &RepoEntity,
+        labels: &[LabelNormalized],
     ) -> Result<()>;
 
     /// Sends a callback query with repository labels.
@@ -242,12 +246,36 @@ impl MessagingService for TelegramMessagingService {
         chat_id: ChatId,
         message_id: MessageId,
         repo: &RepoEntity,
+        labels: &[LabelNormalized],
     ) -> Result<()> {
+        let repo_link = html::link(&repo.url(), &html::escape(&repo.name_with_owner));
         let keyboard = build_repo_item_keyboard(repo);
-        let text = "📦 Repository details:".to_string();
+
+        let mut message_parts = vec![
+            format!("📦 Repository: {}", repo_link),
+            "".to_string(), // Empty line for spacing
+        ];
+
+        if labels.is_empty() {
+            message_parts.push("⚠️ No labels are being tracked in this repository.".to_string());
+        } else {
+            message_parts.push("🏷️ Tracked labels:".to_string());
+            for label in labels {
+                message_parts.push(format!(
+                    "- {} {}",
+                    utils::github_color_to_emoji(&label.color),
+                    html::escape(&label.name)
+                ));
+            }
+        }
+
+        message_parts.push("".to_string()); // Empty line for spacing
+
+        let text = message_parts.join("\n");
 
         self.bot
             .edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
             .await
             .map(|_| ())
@@ -420,97 +448,4 @@ impl MessagingService for TelegramMessagingService {
 
         self.send_response_with_keyboard(chat_id, summary.join("\n\n"), None).await
     }
-}
-
-fn build_repo_list_keyboard(repos: &[RepoEntity]) -> InlineKeyboardMarkup {
-    let buttons: Vec<Vec<InlineKeyboardButton>> = repos
-        .iter()
-        .map(|repo| {
-            // define callback action
-            let action =
-                utils::serialize_action(&CallbackAction::ViewRepoDetails(&repo.name_with_owner));
-
-            // Repository name with link
-            vec![InlineKeyboardButton::callback(repo.name_with_owner.clone(), action)]
-        })
-        .collect();
-
-    InlineKeyboardMarkup::new(buttons)
-}
-
-fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
-    let id = &repo.name_with_owner;
-    // actions
-    let back_to_list = utils::serialize_action(&CallbackAction::BackToRepoList);
-    let repo_labels = utils::serialize_action(&CallbackAction::ViewRepoLabels(id));
-    let remove_repo = utils::serialize_action(&CallbackAction::RemoveRepoPrompt(id));
-
-    // buttons
-    let buttons = vec![
-        vec![
-            // Repository name with link
-            InlineKeyboardButton::url(
-                repo.name_with_owner.clone(),
-                Url::parse(&repo.url()).expect("Failed to parse repository URL"),
-            ),
-        ],
-        vec![
-            // Back to list button
-            InlineKeyboardButton::callback("🔙 List".to_string(), back_to_list),
-            // Manage repo labels button
-            InlineKeyboardButton::callback("⚙️ Labels".to_string(), repo_labels),
-            // Remove repo action
-            InlineKeyboardButton::callback("❌ Remove".to_string(), remove_repo),
-        ],
-    ];
-
-    InlineKeyboardMarkup::new(buttons)
-}
-
-fn build_repo_labels_keyboard(
-    labels: &[LabelNormalized],
-    id: &str, // repo name with owner
-) -> InlineKeyboardMarkup {
-    let label_buttons = labels
-        .iter()
-        .map(|label| {
-            // define callback action
-            let toggle_action = utils::serialize_action(&CallbackAction::TL(id, &label.name));
-
-            vec![InlineKeyboardButton::callback(
-                format!(
-                    "{} {} {}({})",
-                    if label.is_selected { "✅ " } else { "" },
-                    utils::github_color_to_emoji(&label.color),
-                    label.name,
-                    label.count,
-                ),
-                toggle_action,
-            )]
-        })
-        .collect::<Vec<_>>();
-
-    // Prepend the back button to the list of buttons
-    let go_back = utils::serialize_action(&CallbackAction::BackToRepoDetails(id));
-    let mut buttons = vec![vec![InlineKeyboardButton::callback("🔙 Back".to_string(), go_back)]];
-    buttons.extend(label_buttons);
-
-    InlineKeyboardMarkup::new(buttons)
-}
-
-lazy_static! {
-    static ref COMMAND_KEYBOARD: InlineKeyboardMarkup = InlineKeyboardMarkup::new(vec![
-        vec![InlineKeyboardButton::callback(
-            "ℹ️ Help",
-            utils::serialize_action(&CallbackAction::Help)
-        ),],
-        vec![InlineKeyboardButton::callback(
-            "📜 Tracked repositories",
-            utils::serialize_action(&CallbackAction::List)
-        ),],
-        vec![InlineKeyboardButton::callback(
-            "➕ Add repository",
-            utils::serialize_action(&CallbackAction::Add)
-        ),],
-    ]);
 }
