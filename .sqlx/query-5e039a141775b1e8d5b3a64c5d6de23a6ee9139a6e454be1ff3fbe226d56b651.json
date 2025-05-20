@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT owner, name, name_with_owner FROM repositories WHERE chat_id = ?",
+  "query": "SELECT owner, name, name_with_owner \n            FROM repositories \n            WHERE chat_id = ?\n            ORDER BY LOWER(name_with_owner) ASC",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       false
     ]
   },
-  "hash": "14abf02b47adec20769d0c13f416f6685bbfe0beadfb61874c47d5553542380b"
+  "hash": "5e039a141775b1e8d5b3a64c5d6de23a6ee9139a6e454be1ff3fbe226d56b651"
 }
