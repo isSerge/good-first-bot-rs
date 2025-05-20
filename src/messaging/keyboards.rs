@@ -1,6 +1,5 @@
 use lazy_static::lazy_static;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
-use url::Url;
 
 use super::utils;
 use crate::{bot_handler::CallbackAction, repository::LabelNormalized, storage::RepoEntity};
@@ -30,21 +29,12 @@ pub fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
 
     // buttons
     let buttons = vec![
-        vec![
-            // Repository name with link
-            InlineKeyboardButton::url(
-                repo.name_with_owner.clone(),
-                Url::parse(&repo.url()).expect("Failed to parse repository URL"),
-            ),
-        ],
-        vec![
-            // Back to list button
-            InlineKeyboardButton::callback("🔙 List".to_string(), back_to_list),
-            // Manage repo labels button
-            InlineKeyboardButton::callback("⚙️ Labels".to_string(), repo_labels),
-            // Remove repo action
-            InlineKeyboardButton::callback("❌ Remove".to_string(), remove_repo),
-        ],
+        // Back to list button
+        vec![InlineKeyboardButton::callback("🔙 List".to_string(), back_to_list)],
+        // Manage repo labels button
+        vec![InlineKeyboardButton::callback("⚙️ Labels".to_string(), repo_labels)],
+        // Remove repo action
+        vec![InlineKeyboardButton::callback("❌ Remove".to_string(), remove_repo)],
     ];
 
     InlineKeyboardMarkup::new(buttons)

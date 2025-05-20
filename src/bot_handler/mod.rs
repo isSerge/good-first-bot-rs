@@ -222,8 +222,20 @@ impl BotHandler {
         let repo = RepoEntity::from_str(repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
+        // Get selected repo labels
+        let repo_labels = self
+            .repository_service
+            .get_repo_labels(chat_id, &repo)
+            .await
+            .map_err(BotHandlerError::InternalError)?
+            .into_iter()
+            .filter(|l| l.is_selected)
+            .collect::<Vec<_>>();
+
         // Answer the callback query to clear the spinner.
-        self.messaging_service.answer_details_callback_query(chat_id, message.id(), &repo).await?;
+        self.messaging_service
+            .answer_details_callback_query(chat_id, message.id(), &repo, &repo_labels)
+            .await?;
 
         Ok(())
     }

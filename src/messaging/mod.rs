@@ -79,6 +79,7 @@ pub trait MessagingService: Send + Sync {
         chat_id: ChatId,
         message_id: MessageId,
         repo: &RepoEntity,
+        labels: &[LabelNormalized],
     ) -> Result<()>;
 
     /// Sends a callback query with repository labels.
@@ -245,12 +246,36 @@ impl MessagingService for TelegramMessagingService {
         chat_id: ChatId,
         message_id: MessageId,
         repo: &RepoEntity,
+        labels: &[LabelNormalized],
     ) -> Result<()> {
+        let repo_link = html::link(&repo.url(), &html::escape(&repo.name_with_owner));
         let keyboard = build_repo_item_keyboard(repo);
-        let text = "📦 Repository details:".to_string();
+
+        let mut message_parts = vec![
+            format!("📦 Repository: {}", repo_link),
+            "".to_string(), // Empty line for spacing
+        ];
+
+        if labels.is_empty() {
+            message_parts.push("⚠️ No labels are being tracked in this repository.".to_string());
+        } else {
+            message_parts.push("🏷️ Tracked labels:".to_string());
+            for label in labels {
+                message_parts.push(format!(
+                    "- {} {}",
+                    utils::github_color_to_emoji(&label.color),
+                    html::escape(&label.name)
+                ));
+            }
+        }
+
+        message_parts.push("".to_string()); // Empty line for spacing
+
+        let text = message_parts.join("\n");
 
         self.bot
             .edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
             .await
             .map(|_| ())
