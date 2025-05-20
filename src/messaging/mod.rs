@@ -495,7 +495,6 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
             ),
         ],
         vec![
-            // TODO: go back should be edit message, not new message
             // Back to list button
             InlineKeyboardButton::callback("🔙 List".to_string(), back_to_list),
             // Manage repo labels button
