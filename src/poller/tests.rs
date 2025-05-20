@@ -67,10 +67,15 @@ async fn test_poll_user_repo_new_issues() {
     let issues = vec![issue_new.clone(), issue_old.clone()];
     let mut tracked_labels = HashSet::new();
     tracked_labels.insert("label name".to_string());
+    let tracked_labels_clone = tracked_labels.clone();
 
     mock_github_client
         .expect_repo_issues_by_label()
-        .with(eq(OWNER), eq(REPO_NAME), function(|labels: &HashSet<String>| *labels == *labels))
+        .with(
+            eq(OWNER),
+            eq(REPO_NAME),
+            function(move |labels: &HashSet<String>| *labels == tracked_labels_clone),
+        )
         .returning(move |_, _, _| Ok(issues.clone()));
 
     mock_repo_storage
