@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc, collections::HashSet};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use mockall::predicate::eq;
 
