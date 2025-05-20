@@ -65,9 +65,9 @@ impl BotDispatcher {
     fn build_callback_queries_branch(&self) -> DispatchHandler {
         Update::filter_callback_query().chain(filter_map(extract_dialogue)).endpoint(
             |query: CallbackQuery,
-             _dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+             dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
              handler: Arc<BotHandler>| async move {
-                handler.handle_callback_query(&query).await
+                handler.handle_callback_query(&query, dialogue).await
             },
         )
     }

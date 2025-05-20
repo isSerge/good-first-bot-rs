@@ -34,6 +34,7 @@ pub fn github_color_to_emoji(hex_color: &str) -> &str {
 }
 
 /// Serializes a `CallbackAction` to a JSON string. Used for keyboard buttons.
+/// expect is ok because inputs are simple and controlled.
 pub fn serialize_action(action: &CallbackAction) -> String {
     serde_json::to_string(action).expect("Failed to serialize action")
 }

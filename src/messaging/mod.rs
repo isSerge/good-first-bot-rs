@@ -495,7 +495,6 @@ fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
             ),
         ],
         vec![
-            // TODO: go back should be edit message, not new message
             // Back to list button
             InlineKeyboardButton::callback("🔙 List".to_string(), back_to_list),
             // Manage repo labels button
@@ -542,12 +541,15 @@ fn build_repo_labels_keyboard(
 lazy_static! {
     static ref COMMAND_KEYBOARD: InlineKeyboardMarkup = InlineKeyboardMarkup::new(vec![
         vec![
-            InlineKeyboardButton::callback("Help", "help"),
-            InlineKeyboardButton::callback("List", "list"),
+            InlineKeyboardButton::callback("Help", utils::serialize_action(&CallbackAction::Help)),
+            InlineKeyboardButton::callback("List", utils::serialize_action(&CallbackAction::List)),
         ],
         vec![
-            InlineKeyboardButton::callback("Add", "add"),
-            InlineKeyboardButton::callback("Remove", "remove"),
+            InlineKeyboardButton::callback("Add", utils::serialize_action(&CallbackAction::Add)),
+            InlineKeyboardButton::callback(
+                "Remove",
+                utils::serialize_action(&CallbackAction::Remove)
+            ),
         ],
     ]);
 }
