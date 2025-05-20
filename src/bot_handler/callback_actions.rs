@@ -14,5 +14,4 @@ pub enum CallbackAction<'a> {
     Help,
     List,
     Add,
-    Remove,
 }

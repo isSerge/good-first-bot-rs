@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use mockall::automock;
@@ -39,7 +39,7 @@ pub trait RepositoryService: Send + Sync {
     async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool>;
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
-    async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>>;
+    async fn get_user_repos(&self, chat_id: ChatId) -> Result<Vec<RepoEntity>>;
     async fn get_repo_labels(
         &self,
         chat_id: ChatId,
@@ -85,7 +85,7 @@ impl RepositoryService for DefaultRepositoryService {
             .map_err(RepositoryServiceError::from)
     }
 
-    async fn get_user_repos(&self, chat_id: ChatId) -> Result<HashSet<RepoEntity>> {
+    async fn get_user_repos(&self, chat_id: ChatId) -> Result<Vec<RepoEntity>> {
         self.storage.get_repos_per_user(chat_id).await.map_err(RepositoryServiceError::from)
     }
 

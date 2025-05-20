@@ -33,7 +33,7 @@ pub trait RepoStorage: Send + Sync {
     ) -> StorageResult<bool>;
 
     /// Get all repositories for a user.
-    async fn get_repos_per_user(&self, chat_id: ChatId) -> StorageResult<HashSet<RepoEntity>>;
+    async fn get_repos_per_user(&self, chat_id: ChatId) -> StorageResult<Vec<RepoEntity>>;
 
     /// Check if a repository exists in the storage.
     async fn contains(&self, chat_id: ChatId, repository: &RepoEntity) -> StorageResult<bool>;
