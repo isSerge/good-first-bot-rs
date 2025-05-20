@@ -541,12 +541,12 @@ fn build_repo_labels_keyboard(
 lazy_static! {
     static ref COMMAND_KEYBOARD: InlineKeyboardMarkup = InlineKeyboardMarkup::new(vec![
         vec![
-            InlineKeyboardButton::callback("Help", "help"),
-            InlineKeyboardButton::callback("List", "list"),
+            InlineKeyboardButton::callback("Help", utils::serialize_action(&CallbackAction::Help)),
+            InlineKeyboardButton::callback("List", utils::serialize_action(&CallbackAction::List)),
         ],
         vec![
-            InlineKeyboardButton::callback("Add", "add"),
-            InlineKeyboardButton::callback("Remove", "remove"),
+            InlineKeyboardButton::callback("Add", utils::serialize_action(&CallbackAction::Add)),
+            InlineKeyboardButton::callback("Remove", utils::serialize_action(&CallbackAction::Remove)),
         ],
     ]);
 }

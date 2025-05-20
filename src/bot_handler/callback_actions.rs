@@ -10,4 +10,9 @@ pub enum CallbackAction<'a> {
     TL(&'a str, &'a str),
     BackToRepoDetails(&'a str),
     BackToRepoList,
+    // Command keyboard actions, should be handled as commands:
+    Help,
+    List,
+    Add,
+    Remove,
 }
