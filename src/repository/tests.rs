@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use mockall::predicate::eq;
 
@@ -86,9 +86,9 @@ async fn test_get_user_repos() {
     // Arrange
     let repo1 = RepoEntity::from_str("owner/repo").unwrap();
     let repo2 = RepoEntity::from_str("owner/repo2").unwrap();
-    let mut repos = HashSet::new();
-    repos.insert(repo1);
-    repos.insert(repo2);
+    let mut repos = vec![];
+    repos.push(repo1);
+    repos.push(repo2);
 
     let repos_clone = repos.clone();
 

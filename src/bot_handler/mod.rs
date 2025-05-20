@@ -46,8 +46,6 @@ pub enum Command {
     Help,
     #[command(description = "Add a repository by replying with the repository url.")]
     Add,
-    #[command(description = "Remove a repository by replying with the repository url.")]
-    Remove,
     #[command(description = "List tracked repositories.")]
     List,
 }
@@ -100,8 +98,6 @@ impl BotHandler {
         match (dialogue_state, text) {
             (Some(CommandState::AwaitingAddRepo), Some(text)) =>
                 self.process_add(text, msg.chat.id).await?,
-            (Some(CommandState::AwaitingRemoveRepo), Some(text)) =>
-                self.process_remove(text, msg.chat.id).await?,
             _ => {
                 // Should not happen, because force reply does not accept empty input and there
                 // are only two possible states, but just in case
@@ -161,7 +157,6 @@ impl BotHandler {
                         CallbackAction::Help => Command::Help,
                         CallbackAction::List => Command::List,
                         CallbackAction::Add => Command::Add,
-                        CallbackAction::Remove => Command::Remove,
                         _ => unreachable!(),
                     };
 
@@ -321,7 +316,6 @@ impl BotHandler {
         self.messaging_service.prompt_for_repo_input(chat_id).await?;
         let state = match command {
             Command::Add => CommandState::AwaitingAddRepo,
-            Command::Remove => CommandState::AwaitingRemoveRepo,
             _ => unreachable!(),
         };
         dialogue.update(state).await.map_err(BotHandlerError::DialogueError)?;
@@ -418,33 +412,6 @@ impl BotHandler {
             )
             .await?;
 
-        Ok(())
-    }
-
-    /// Remove a repository from the user's list.
-    async fn process_remove(&self, text: &str, chat_id: ChatId) -> BotHandlerResult<()> {
-        // Parse the repository from the text.
-        let repo = match RepoEntity::from_url(text) {
-            Ok(repo) => repo,
-            Err(_) => {
-                self.messaging_service
-                    .send_error_msg(
-                        chat_id,
-                        BotHandlerError::InvalidInput("Invalid repository URL".to_string()),
-                    )
-                    .await?;
-                return Ok(());
-            }
-        };
-
-        let repo_removed =
-            self.repository_service.remove_repo(chat_id, &repo.name_with_owner).await?;
-
-        if repo_removed {
-            self.messaging_service.send_repo_removed_msg(chat_id, repo.name_with_owner).await?;
-        } else {
-            self.messaging_service.send_repo_not_tracked_msg(chat_id, repo.name_with_owner).await?;
-        }
         Ok(())
     }
 }

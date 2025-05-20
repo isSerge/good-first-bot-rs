@@ -47,20 +47,6 @@ pub trait MessagingService: Send + Sync {
     /// Sends an error message to the provided chat.
     async fn send_error_msg(&self, chat_id: ChatId, error: BotHandlerError) -> Result<()>;
 
-    /// Sends a message to the user that the repository has been removed.
-    async fn send_repo_removed_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()>;
-
-    /// Sends a message to the user that the repository is not tracked.
-    async fn send_repo_not_tracked_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()>;
-
     /// Sends a help message to the user.
     async fn send_help_msg(&self, chat_id: ChatId) -> Result<()>;
 
@@ -71,7 +57,7 @@ pub trait MessagingService: Send + Sync {
     async fn send_list_empty_msg(&self, chat_id: ChatId) -> Result<()>;
 
     /// Sends a message with repo list keyboard.
-    async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<RepoEntity>) -> Result<()>;
+    async fn send_list_msg(&self, chat_id: ChatId, repos: Vec<RepoEntity>) -> Result<()>;
 
     /// Sends a callback query to the user when they click on a button.
     /// The `query_id` is the ID of the callback query, and the `text` is the
@@ -116,7 +102,7 @@ pub trait MessagingService: Send + Sync {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        repos: HashSet<RepoEntity>,
+        repos: Vec<RepoEntity>,
     ) -> Result<()>;
 
     /// Edits the labels message on the user's message after a labels have been
@@ -196,32 +182,6 @@ impl MessagingService for TelegramMessagingService {
         self.send_response_with_keyboard(chat_id, html::escape(&error.to_string()), None).await
     }
 
-    async fn send_repo_removed_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()> {
-        self.send_response_with_keyboard(
-            chat_id,
-            format!("✅ Repository {repo_name_with_owner} removed from your list"),
-            None,
-        )
-        .await
-    }
-
-    async fn send_repo_not_tracked_msg(
-        &self,
-        chat_id: ChatId,
-        repo_name_with_owner: String,
-    ) -> Result<()> {
-        self.send_response_with_keyboard(
-            chat_id,
-            format!("❌ Repository {repo_name_with_owner} is not tracked"),
-            None,
-        )
-        .await
-    }
-
     async fn send_help_msg(&self, chat_id: ChatId) -> Result<()> {
         let help_text = Command::descriptions();
         self.send_response_with_keyboard(
@@ -233,8 +193,8 @@ impl MessagingService for TelegramMessagingService {
     }
 
     async fn send_start_msg(&self, chat_id: ChatId) -> Result<()> {
-        let start_text =
-            "👋 Welcome! Use the buttons below to track repositories with good first issues.";
+        let start_text = "👋 Welcome! Use buttons below to track repository issues (i.e. 'good \
+                          first issue', 'bug', 'enhancement', etc.";
         self.send_response_with_keyboard(chat_id, start_text.to_string(), None).await
     }
 
@@ -243,7 +203,7 @@ impl MessagingService for TelegramMessagingService {
             .await
     }
 
-    async fn send_list_msg(&self, chat_id: ChatId, repos: HashSet<RepoEntity>) -> Result<()> {
+    async fn send_list_msg(&self, chat_id: ChatId, repos: Vec<RepoEntity>) -> Result<()> {
         let keyboard = build_repo_list_keyboard(&repos);
         self.send_response_with_keyboard(
             chat_id,
@@ -340,7 +300,7 @@ impl MessagingService for TelegramMessagingService {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        repos: HashSet<RepoEntity>,
+        repos: Vec<RepoEntity>,
     ) -> Result<()> {
         // Rebuild the inline keyboard (each row has a repo link and a remove button).
         let new_keyboard = build_repo_list_keyboard(&repos);
@@ -462,7 +422,7 @@ impl MessagingService for TelegramMessagingService {
     }
 }
 
-fn build_repo_list_keyboard(repos: &HashSet<RepoEntity>) -> InlineKeyboardMarkup {
+fn build_repo_list_keyboard(repos: &[RepoEntity]) -> InlineKeyboardMarkup {
     let buttons: Vec<Vec<InlineKeyboardButton>> = repos
         .iter()
         .map(|repo| {
@@ -540,16 +500,17 @@ fn build_repo_labels_keyboard(
 
 lazy_static! {
     static ref COMMAND_KEYBOARD: InlineKeyboardMarkup = InlineKeyboardMarkup::new(vec![
-        vec![
-            InlineKeyboardButton::callback("Help", utils::serialize_action(&CallbackAction::Help)),
-            InlineKeyboardButton::callback("List", utils::serialize_action(&CallbackAction::List)),
-        ],
-        vec![
-            InlineKeyboardButton::callback("Add", utils::serialize_action(&CallbackAction::Add)),
-            InlineKeyboardButton::callback(
-                "Remove",
-                utils::serialize_action(&CallbackAction::Remove)
-            ),
-        ],
+        vec![InlineKeyboardButton::callback(
+            "ℹ️ Help",
+            utils::serialize_action(&CallbackAction::Help)
+        ),],
+        vec![InlineKeyboardButton::callback(
+            "📜 Tracked repositories",
+            utils::serialize_action(&CallbackAction::List)
+        ),],
+        vec![InlineKeyboardButton::callback(
+            "➕ Add repository",
+            utils::serialize_action(&CallbackAction::Add)
+        ),],
     ]);
 }

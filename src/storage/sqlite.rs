@@ -81,11 +81,14 @@ impl RepoStorage for SqliteStorage {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn get_repos_per_user(&self, chat_id: ChatId) -> StorageResult<HashSet<RepoEntity>> {
+    async fn get_repos_per_user(&self, chat_id: ChatId) -> StorageResult<Vec<RepoEntity>> {
         debug!("Getting repositories for user: {}", chat_id);
 
         let repos = query!(
-            "SELECT owner, name, name_with_owner FROM repositories WHERE chat_id = ?",
+            "SELECT owner, name, name_with_owner 
+            FROM repositories 
+            WHERE chat_id = ?
+            ORDER BY LOWER(name_with_owner) ASC",
             chat_id.0,
         )
         .fetch_all(&self.pool)
@@ -101,7 +104,7 @@ impl RepoStorage for SqliteStorage {
                     StorageError::DataIntegrityError(r.name_with_owner.clone(), e.into())
                 })
             })
-            .collect::<Result<HashSet<_>, _>>()?;
+            .collect::<Result<Vec<RepoEntity>, _>>()?;
 
         Ok(repos)
     }
