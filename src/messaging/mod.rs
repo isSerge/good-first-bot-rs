@@ -546,7 +546,10 @@ lazy_static! {
         ],
         vec![
             InlineKeyboardButton::callback("Add", utils::serialize_action(&CallbackAction::Add)),
-            InlineKeyboardButton::callback("Remove", utils::serialize_action(&CallbackAction::Remove)),
+            InlineKeyboardButton::callback(
+                "Remove",
+                utils::serialize_action(&CallbackAction::Remove)
+            ),
         ],
     ]);
 }

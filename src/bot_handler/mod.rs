@@ -117,7 +117,11 @@ impl BotHandler {
         Ok(())
     }
 
-    pub async fn handle_callback_query(&self, query: &CallbackQuery, dialogue: Dialogue<CommandState, InMemStorage<CommandState>>) -> BotHandlerResult<()> {
+    pub async fn handle_callback_query(
+        &self,
+        query: &CallbackQuery,
+        dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+    ) -> BotHandlerResult<()> {
         let query_id = query.id.clone();
 
         if let Some(data_str) = &query.data.as_deref() {
@@ -149,11 +153,9 @@ impl BotHandler {
                 }
                 // Handle commands like Help, List, Add, Remove
                 command_action => {
-                    let msg = query
-                        .message
-                        .as_ref()
-                        .and_then(|m| m.regular_message())
-                        .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+                    let msg = query.message.as_ref().and_then(|m| m.regular_message()).ok_or(
+                        BotHandlerError::InvalidInput("Callback query has no message".to_string()),
+                    )?;
 
                     let cmd = match command_action {
                         CallbackAction::Help => Command::Help,
