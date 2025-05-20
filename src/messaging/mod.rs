@@ -335,7 +335,7 @@ impl MessagingService for TelegramMessagingService {
 
         // Edit the original message to update the inline keyboard.
         self.bot
-            .edit_message_reply_markup(chat_id, message_id)
+            .edit_message_text(chat_id, message_id, "🔍 Your tracked repositories:".to_string())
             .reply_markup(new_keyboard)
             .await
             .map(|_| ())
