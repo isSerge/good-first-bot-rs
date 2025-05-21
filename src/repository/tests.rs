@@ -101,11 +101,12 @@ async fn test_get_user_repos() {
     );
 
     // Act
-    let result = repository_service.get_user_repos(ChatId(1)).await;
+    let page = 1;
+    let result = repository_service.get_user_repos(ChatId(1), page).await;
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), repos_clone);
+    assert_eq!(result.unwrap(), Paginated::new(repos_clone, page));
 }
 
 #[tokio::test]
@@ -137,14 +138,14 @@ async fn test_get_repo_labels() {
         DefaultRepositoryService::new(Arc::new(mock_repo_storage), Arc::new(mock_github_client));
 
     // Act
-    let result = repository_service.get_repo_labels(chat_id, &repo).await;
+    let result = repository_service.get_repo_labels(chat_id, &repo, 1).await;
 
     // Assert
     assert!(result.is_ok());
     let labels = result.unwrap();
-    assert_eq!(labels.len(), 1);
-    assert_eq!(labels[0].name, "bug");
-    assert_eq!(labels[0].count, 5);
+    assert_eq!(labels.items.len(), 1);
+    assert_eq!(labels.items[0].name, "bug");
+    assert_eq!(labels.items[0].count, 5);
 }
 
 #[tokio::test]
@@ -242,7 +243,7 @@ async fn test_get_user_repos_error() {
     );
 
     // Act
-    let result = repository_service.get_user_repos(ChatId(1)).await;
+    let result = repository_service.get_user_repos(ChatId(1), 1).await;
 
     // Assert
     assert!(result.is_err());
@@ -265,7 +266,7 @@ async fn test_get_repo_labels_error() {
         DefaultRepositoryService::new(Arc::new(mock_repo_storage), Arc::new(mock_github_client));
 
     // Act
-    let result = repository_service.get_repo_labels(chat_id, &repo).await;
+    let result = repository_service.get_repo_labels(chat_id, &repo, 1).await;
 
     // Assert
     assert!(result.is_err());

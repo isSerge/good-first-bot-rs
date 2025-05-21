@@ -10,6 +10,7 @@ use thiserror::Error;
 
 use crate::{
     github::{GithubClient, GithubError},
+    pagination::Paginated,
     storage::{RepoEntity, RepoStorage, StorageError},
 };
 
@@ -39,12 +40,13 @@ pub trait RepositoryService: Send + Sync {
     async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool>;
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
-    async fn get_user_repos(&self, chat_id: ChatId) -> Result<Vec<RepoEntity>>;
+    async fn get_user_repos(&self, chat_id: ChatId, page: usize) -> Result<Paginated<RepoEntity>>;
     async fn get_repo_labels(
         &self,
         chat_id: ChatId,
         repo: &RepoEntity,
-    ) -> Result<Vec<LabelNormalized>>;
+        page: usize,
+    ) -> Result<Paginated<LabelNormalized>>;
     async fn toggle_label(
         &self,
         chat_id: ChatId,
@@ -85,15 +87,18 @@ impl RepositoryService for DefaultRepositoryService {
             .map_err(RepositoryServiceError::from)
     }
 
-    async fn get_user_repos(&self, chat_id: ChatId) -> Result<Vec<RepoEntity>> {
-        self.storage.get_repos_per_user(chat_id).await.map_err(RepositoryServiceError::from)
+    async fn get_user_repos(&self, chat_id: ChatId, page: usize) -> Result<Paginated<RepoEntity>> {
+        let repos =
+            self.storage.get_repos_per_user(chat_id).await.map_err(RepositoryServiceError::from);
+        Ok(Paginated::new(repos?, page))
     }
 
     async fn get_repo_labels(
         &self,
         chat_id: ChatId,
         repo: &RepoEntity,
-    ) -> Result<Vec<LabelNormalized>> {
+        page: usize,
+    ) -> Result<Paginated<LabelNormalized>> {
         // Get tracked labels from storage
         let tracked_labels = self.storage.get_tracked_labels(chat_id, repo).await?;
 
@@ -106,13 +111,11 @@ impl RepositoryService for DefaultRepositoryService {
             let count_b = b.issues.as_ref().map_or(0, |issues| issues.total_count);
             count_b.cmp(&count_a)
         });
-
-        // TODO: consider using pagination to get all labels with issues
-        // Take up to 20 labels with more than 0 issues
+        
+        // Filter out labels with no issues
         let selected_labels: Vec<_> = repo_labels
             .into_iter()
             .filter(|label| label.issues.as_ref().is_some_and(|issues| issues.total_count > 0))
-            .take(20)
             .collect();
 
         let normalized = selected_labels
@@ -126,7 +129,7 @@ impl RepositoryService for DefaultRepositoryService {
             })
             .collect();
 
-        Ok(normalized)
+        Ok(Paginated::new(normalized, page))
     }
 
     async fn toggle_label(
