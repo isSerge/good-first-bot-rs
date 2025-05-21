@@ -135,18 +135,34 @@ impl BotHandler {
                 CallbackAction::BackToRepoDetails(repo_id) => {
                     self.action_view_repo_details(query, repo_id).await?;
                 }
-                CallbackAction::ViewRepoLabels(repo_id) => {
-                    self.action_view_labels(query, repo_id).await?;
+                CallbackAction::ViewRepoLabels(repo_id, page) => {
+                    self.action_view_labels(query, repo_id, page).await?;
                 }
                 CallbackAction::RemoveRepoPrompt(repo_id) => {
                     self.action_remove_repo(query, repo_id).await?;
                 }
-                CallbackAction::TL(repo_id, label) => {
-                    self.action_toggle_label(query, repo_id, label).await?;
+                CallbackAction::TL(repo_id, label, page) => {
+                    self.action_toggle_label(query, repo_id, label, page).await?;
                 }
                 CallbackAction::BackToRepoList => {
                     self.action_back_to_repo_list(query).await?;
                 }
+                CallbackAction::ListReposPage(page) => {
+                    let message = query
+                        .message
+                        .as_ref()
+                        .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+                    let chat_id = message.chat().id;
+                    // Get the updated repository list.
+                    let user_repos = self.repository_service.get_user_repos(chat_id, page).await?;
+
+                    if user_repos.items.is_empty() {
+                        self.messaging_service.send_list_empty_msg(chat_id).await?;
+                    }
+
+                    self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
+                }
+
                 // Handle commands like Help, List, Add, Remove
                 command_action => {
                     let msg = query.message.as_ref().and_then(|m| m.regular_message()).ok_or(
@@ -197,9 +213,9 @@ impl BotHandler {
         // message.
         if removed {
             // Get the updated repository list.
-            let user_repos = self.repository_service.get_user_repos(chat_id).await?;
+            let user_repos = self.repository_service.get_user_repos(chat_id, 1).await?;
 
-            if user_repos.is_empty() {
+            if user_repos.items.is_empty() {
                 self.messaging_service.send_list_empty_msg(chat_id).await?;
             }
 
@@ -225,9 +241,10 @@ impl BotHandler {
         // Get selected repo labels
         let repo_labels = self
             .repository_service
-            .get_repo_labels(chat_id, &repo)
+            .get_repo_labels(chat_id, &repo, 1)
             .await
             .map_err(BotHandlerError::InternalError)?
+            .items
             .into_iter()
             .filter(|l| l.is_selected)
             .collect::<Vec<_>>();
@@ -244,6 +261,7 @@ impl BotHandler {
         &self,
         query: &CallbackQuery,
         repo_id: &str,
+        page: usize,
     ) -> BotHandlerResult<()> {
         let message = query
             .message
@@ -254,15 +272,15 @@ impl BotHandler {
         let repo = RepoEntity::from_str(repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-        let labels = self
+        let paginated_labels = self
             .repository_service
-            .get_repo_labels(chat_id, &repo)
+            .get_repo_labels(chat_id, &repo, page)
             .await
             .map_err(BotHandlerError::InternalError)?;
 
         // Answer the callback query to clear the spinner.
         self.messaging_service
-            .answer_labels_callback_query(chat_id, message.id(), &labels, repo_id)
+            .answer_labels_callback_query(chat_id, message.id(), &paginated_labels, repo_id)
             .await?;
         Ok(())
     }
@@ -272,6 +290,7 @@ impl BotHandler {
         query: &CallbackQuery,
         repo_id: &str,
         label_name: &str,
+        page: usize,
     ) -> BotHandlerResult<()> {
         let message = query
             .message
@@ -296,7 +315,7 @@ impl BotHandler {
         // Get updated user repo labels
         let labels = self
             .repository_service
-            .get_repo_labels(chat_id, &repo)
+            .get_repo_labels(chat_id, &repo, page)
             .await
             .map_err(BotHandlerError::InternalError)?;
 
@@ -312,7 +331,7 @@ impl BotHandler {
             .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
         let chat_id = message.chat().id;
         // Get the updated repository list.
-        let user_repos = self.repository_service.get_user_repos(chat_id).await?;
+        let user_repos = self.repository_service.get_user_repos(chat_id, 1).await?;
         self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
         Ok(())
     }

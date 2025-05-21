@@ -1,9 +1,9 @@
 use crate::bot_handler::{BotHandlerResult, commands::CommandContext};
 
 pub async fn handle(ctx: CommandContext<'_>) -> BotHandlerResult<()> {
-    let user_repos = ctx.handler.repository_service.get_user_repos(ctx.message.chat.id).await?;
+    let user_repos = ctx.handler.repository_service.get_user_repos(ctx.message.chat.id, 1).await?;
 
-    if user_repos.is_empty() {
+    if user_repos.items.is_empty() {
         ctx.handler.messaging_service.send_list_empty_msg(ctx.message.chat.id).await?;
         return Ok(());
     }

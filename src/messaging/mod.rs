@@ -19,6 +19,7 @@ use thiserror::Error;
 use crate::{
     bot_handler::{BotHandlerError, Command},
     github::issues::IssuesRepositoryIssuesNodes,
+    pagination::Paginated,
     repository::LabelNormalized,
     storage::RepoEntity,
 };
@@ -60,7 +61,11 @@ pub trait MessagingService: Send + Sync {
     async fn send_list_empty_msg(&self, chat_id: ChatId) -> Result<()>;
 
     /// Sends a message with repo list keyboard.
-    async fn send_list_msg(&self, chat_id: ChatId, repos: Vec<RepoEntity>) -> Result<()>;
+    async fn send_list_msg(
+        &self,
+        chat_id: ChatId,
+        paginated_repos: Paginated<RepoEntity>,
+    ) -> Result<()>;
 
     /// Sends a callback query to the user when they click on a button.
     /// The `query_id` is the ID of the callback query, and the `text` is the
@@ -88,7 +93,7 @@ pub trait MessagingService: Send + Sync {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        labels: &[LabelNormalized],
+        paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
     ) -> Result<()>;
 
@@ -106,7 +111,7 @@ pub trait MessagingService: Send + Sync {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        repos: Vec<RepoEntity>,
+        paginated_repos: Paginated<RepoEntity>,
     ) -> Result<()>;
 
     /// Edits the labels message on the user's message after a labels have been
@@ -115,7 +120,7 @@ pub trait MessagingService: Send + Sync {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        labels: &[LabelNormalized],
+        paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
     ) -> Result<()>;
 
@@ -207,8 +212,12 @@ impl MessagingService for TelegramMessagingService {
             .await
     }
 
-    async fn send_list_msg(&self, chat_id: ChatId, repos: Vec<RepoEntity>) -> Result<()> {
-        let keyboard = build_repo_list_keyboard(&repos);
+    async fn send_list_msg(
+        &self,
+        chat_id: ChatId,
+        paginated_repos: Paginated<RepoEntity>,
+    ) -> Result<()> {
+        let keyboard = build_repo_list_keyboard(&paginated_repos);
         self.send_response_with_keyboard(
             chat_id,
             "🔍 Your tracked repositories:".to_string(),
@@ -306,11 +315,11 @@ impl MessagingService for TelegramMessagingService {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        labels: &[LabelNormalized],
+        paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
     ) -> Result<()> {
-        let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
-        let text = if labels.is_empty() {
+        let keyboard = build_repo_labels_keyboard(paginated_labels, repo_name_with_owner);
+        let text = if paginated_labels.items.is_empty() {
             "⚠️ No labels available for this repository."
         } else {
             "🏷️ Manage repository labels:"
@@ -328,10 +337,10 @@ impl MessagingService for TelegramMessagingService {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        repos: Vec<RepoEntity>,
+        paginated_repos: Paginated<RepoEntity>,
     ) -> Result<()> {
         // Rebuild the inline keyboard (each row has a repo link and a remove button).
-        let new_keyboard = build_repo_list_keyboard(&repos);
+        let new_keyboard = build_repo_list_keyboard(&paginated_repos);
 
         // Edit the original message to update the inline keyboard.
         self.bot
@@ -346,11 +355,11 @@ impl MessagingService for TelegramMessagingService {
         &self,
         chat_id: ChatId,
         message_id: MessageId,
-        labels: &[LabelNormalized],
+        paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
     ) -> Result<()> {
-        let keyboard = build_repo_labels_keyboard(labels, repo_name_with_owner);
-        let text = if labels.is_empty() {
+        let keyboard = build_repo_labels_keyboard(paginated_labels, repo_name_with_owner);
+        let text = if paginated_labels.items.is_empty() {
             "⚠️ No labels available for this repository."
         } else {
             "🏷️ Manage repository labels:"
