@@ -13,6 +13,7 @@ mod messaging;
 mod poller;
 mod repository;
 mod storage;
+mod pagination;
 
 use std::sync::Arc;
 
