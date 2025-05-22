@@ -141,7 +141,7 @@ impl BotHandler {
                 CallbackAction::RemoveRepoPrompt(repo_id) => {
                     self.action_remove_repo(query, repo_id).await?;
                 }
-                CallbackAction::TL(repo_id, label, page) => {
+                CallbackAction::ToggleLabel(repo_id, label, page) => {
                     self.action_toggle_label(query, repo_id, label, page).await?;
                 }
                 CallbackAction::BackToRepoList => {

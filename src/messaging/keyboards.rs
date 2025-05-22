@@ -71,7 +71,7 @@ pub fn build_repo_labels_keyboard(
         .iter()
         .map(|label| {
             // define callback action
-            let toggle_action = utils::serialize_action(&CallbackAction::TL(
+            let toggle_action = utils::serialize_action(&&CallbackAction::ToggleLabel(
                 id,
                 &label.name,
                 paginated_labels.page,
@@ -102,13 +102,13 @@ pub fn build_repo_labels_keyboard(
 
     if paginated_labels.has_prev() {
         let prev_action =
-            utils::serialize_action(&CallbackAction::TL(id, "", paginated_labels.page - 1));
+            utils::serialize_action(&&CallbackAction::ToggleLabel(id, "", paginated_labels.page - 1));
         nav_buttons.push(InlineKeyboardButton::callback("◀️ Previous".to_string(), prev_action));
     }
 
     if paginated_labels.has_next() {
         let next_action =
-            utils::serialize_action(&CallbackAction::TL(id, "", paginated_labels.page + 1));
+            utils::serialize_action(&CallbackAction::ToggleLabel(id, "", paginated_labels.page + 1));
         nav_buttons.push(InlineKeyboardButton::callback("Next ▶️".to_string(), next_action));
     }
 
