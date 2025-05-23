@@ -111,7 +111,7 @@ impl RepositoryService for DefaultRepositoryService {
             let count_b = b.issues.as_ref().map_or(0, |issues| issues.total_count);
             count_b.cmp(&count_a)
         });
-        
+
         // Filter out labels with no issues
         let selected_labels: Vec<_> = repo_labels
             .into_iter()

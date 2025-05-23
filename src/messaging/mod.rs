@@ -163,7 +163,7 @@ impl TelegramMessagingService {
         item_name_plural: &str,
     ) -> String {
         if paginated_data.total_items == 0 {
-            return format!("{}\n\nNo {} found.", title, item_name_plural);
+            return format!("{title}\n\nNo {item_name_plural} found.");
         }
         format!(
             "{} (Page {} of {})\nTotal {}: {}",

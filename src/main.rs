@@ -10,10 +10,10 @@ mod config;
 mod dispatcher;
 mod github;
 mod messaging;
+mod pagination;
 mod poller;
 mod repository;
 mod storage;
-mod pagination;
 
 use std::sync::Arc;
 

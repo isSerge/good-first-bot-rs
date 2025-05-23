@@ -71,7 +71,7 @@ pub fn build_repo_labels_keyboard(
         .iter()
         .map(|label| {
             // define callback action
-            let toggle_action = utils::serialize_action(&&CallbackAction::ToggleLabel(
+            let toggle_action = utils::serialize_action(&CallbackAction::ToggleLabel(
                 &label.name,
                 paginated_labels.page,
             ));
@@ -91,7 +91,8 @@ pub fn build_repo_labels_keyboard(
 
     // Prepend the back button to the list of buttons
     let go_back = utils::serialize_action(&CallbackAction::BackToRepoDetails(id));
-    let mut buttons = vec![vec![InlineKeyboardButton::callback("🔙 Back to repository".to_string(), go_back)]];
+    let mut buttons =
+        vec![vec![InlineKeyboardButton::callback("🔙 Back to repository".to_string(), go_back)]];
 
     // Add the label buttons to the main buttons
     buttons.extend(label_buttons);
