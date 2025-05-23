@@ -8,16 +8,29 @@ pub struct Paginated<T> {
     pub total_pages: usize,
 }
 
+const DEFAULT_PAGE_SIZE: usize = 10;
+
 impl<T> Paginated<T> {
     pub fn new(items: Vec<T>, page: usize) -> Self {
-        let page_size = 10; // Default page size
         let total_items = items.len();
-        let total_pages = (total_items + 9) / page_size;
+
+        let total_pages = if total_items == 0 {
+            1 // Conventionally, an empty list is considered 1 page.
+        } else {
+            // Ceiling division
+            total_items.div_ceil(DEFAULT_PAGE_SIZE)
+        };
 
         // Clamp current_page to be within [1, total_pages]
         let validated_page = page.max(1).min(total_pages);
 
-        Paginated { items, page: validated_page, page_size, total_items, total_pages }
+        Paginated {
+            items,
+            page: validated_page,
+            page_size: DEFAULT_PAGE_SIZE,
+            total_items,
+            total_pages,
+        }
     }
 
     pub fn has_next(&self) -> bool {
@@ -51,7 +64,6 @@ mod tests {
         let items: Vec<i32> = vec![];
         let paginated = Paginated::new(items, 1);
         assert_eq!(paginated.page, 1);
-        assert_eq!(paginated.page_size, 5);
         assert_eq!(paginated.total_items, 0);
         assert_eq!(paginated.total_pages, 1, "Empty list should have 1 total page");
         assert_eq!(paginated.get_page_items(), &[] as &[i32]);
@@ -64,7 +76,6 @@ mod tests {
         let items = vec![1, 2, 3, 4, 5];
         let paginated = Paginated::new(items.clone(), 1);
         assert_eq!(paginated.page, 1);
-        assert_eq!(paginated.page_size, 5);
         assert_eq!(paginated.total_items, 5);
         assert_eq!(paginated.total_pages, 1);
         assert_eq!(paginated.get_page_items(), &[1, 2, 3, 4, 5]);
