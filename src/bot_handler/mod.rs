@@ -62,7 +62,9 @@ pub enum CommandState {
     #[default]
     None,
     AwaitingAddRepo,
-    AwaitingRemoveRepo,
+    ViewingRepoLabels {
+        repo_id: String,
+    },
 }
 
 impl BotHandler {
@@ -130,28 +132,27 @@ impl BotHandler {
 
             match action {
                 CallbackAction::ViewRepoDetails(repo_id) => {
-                    self.action_view_repo_details(query, repo_id).await?;
+                    self.action_view_repo_details(&dialogue, query, repo_id).await?;
                 }
                 CallbackAction::BackToRepoDetails(repo_id) => {
-                    self.action_view_repo_details(query, repo_id).await?;
+                    self.action_view_repo_details(&dialogue, query, repo_id).await?;
                 }
                 CallbackAction::ViewRepoLabels(repo_id, page) => {
-                    self.action_view_labels(query, repo_id, page).await?;
+                    self.action_view_labels(&dialogue, query, repo_id, page).await?;
                 }
                 CallbackAction::RemoveRepoPrompt(repo_id) => {
                     self.action_remove_repo(query, repo_id).await?;
                 }
-                CallbackAction::ToggleLabel(repo_id, label, page) => {
-                    self.action_toggle_label(query, repo_id, label, page).await?;
+                CallbackAction::ToggleLabel(label, page) => {
+                    self.action_toggle_label(&dialogue, query, label, page).await?;
                 }
                 CallbackAction::BackToRepoList => {
                     self.action_back_to_repo_list(query).await?;
                 }
                 CallbackAction::ListReposPage(page) => {
-                    let message = query
-                        .message
-                        .as_ref()
-                        .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
+                    let message = query.message.as_ref().ok_or(BotHandlerError::InvalidInput(
+                        "Callback query has no message".to_string(),
+                    ))?;
                     let chat_id = message.chat().id;
                     // Get the updated repository list.
                     let user_repos = self.repository_service.get_user_repos(chat_id, page).await?;
@@ -170,9 +171,9 @@ impl BotHandler {
                     )?;
 
                     let cmd = match command_action {
-                        CallbackAction::Help => Command::Help,
-                        CallbackAction::List => Command::List,
-                        CallbackAction::Add => Command::Add,
+                        CallbackAction::CmdHelp => Command::Help,
+                        CallbackAction::CmdList => Command::List,
+                        CallbackAction::CmdAdd => Command::Add,
                         _ => unreachable!(),
                     };
 
@@ -226,6 +227,7 @@ impl BotHandler {
 
     pub async fn action_view_repo_details(
         &self,
+        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
         query: &CallbackQuery,
         repo_id: &str,
     ) -> BotHandlerResult<()> {
@@ -254,11 +256,15 @@ impl BotHandler {
             .answer_details_callback_query(chat_id, message.id(), &repo, &repo_labels)
             .await?;
 
+        // Reset the dialogue state
+        dialogue.update(CommandState::None).await?;
+
         Ok(())
     }
 
     pub async fn action_view_labels(
         &self,
+        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
         query: &CallbackQuery,
         repo_id: &str,
         page: usize,
@@ -282,13 +288,20 @@ impl BotHandler {
         self.messaging_service
             .answer_labels_callback_query(chat_id, message.id(), &paginated_labels, repo_id)
             .await?;
+
+        // Update the dialogue state to ViewingRepoLabels
+        dialogue
+            .update(CommandState::ViewingRepoLabels { repo_id: repo.name_with_owner })
+            .await
+            .map_err(BotHandlerError::DialogueError)?;
+
         Ok(())
     }
 
     pub async fn action_toggle_label(
         &self,
+        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
         query: &CallbackQuery,
-        repo_id: &str,
         label_name: &str,
         page: usize,
     ) -> BotHandlerResult<()> {
@@ -297,7 +310,19 @@ impl BotHandler {
             .as_ref()
             .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
         let chat_id = message.chat().id;
-        let repo = RepoEntity::from_str(repo_id)
+
+        // Extract repository name with owner from the dialogue state
+        let dialogue_state = dialogue.get().await.map_err(BotHandlerError::DialogueError)?;
+
+        let repo_id = match dialogue_state {
+            Some(CommandState::ViewingRepoLabels { repo_id }) => repo_id,
+            _ =>
+                return Err(BotHandlerError::InvalidInput(
+                    "Invalid state: expected ViewingRepoLabels".to_string(),
+                )),
+        };
+
+        let repo = RepoEntity::from_str(&repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
         // update the label in the database
@@ -320,7 +345,7 @@ impl BotHandler {
             .map_err(BotHandlerError::InternalError)?;
 
         // Edit labels message to show the updated labels
-        self.messaging_service.edit_labels_msg(chat_id, message.id(), &labels, repo_id).await?;
+        self.messaging_service.edit_labels_msg(chat_id, message.id(), &labels, &repo_id).await?;
         Ok(())
     }
 

@@ -52,7 +52,7 @@ pub fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
     // buttons
     let buttons = vec![
         // Back to list button
-        vec![InlineKeyboardButton::callback("🔙 List".to_string(), back_to_list)],
+        vec![InlineKeyboardButton::callback("🔙 Repository list".to_string(), back_to_list)],
         // Manage repo labels button
         vec![InlineKeyboardButton::callback("⚙️ Labels".to_string(), repo_labels)],
         // Remove repo action
@@ -72,7 +72,6 @@ pub fn build_repo_labels_keyboard(
         .map(|label| {
             // define callback action
             let toggle_action = utils::serialize_action(&&CallbackAction::ToggleLabel(
-                id,
                 &label.name,
                 paginated_labels.page,
             ));
@@ -92,7 +91,7 @@ pub fn build_repo_labels_keyboard(
 
     // Prepend the back button to the list of buttons
     let go_back = utils::serialize_action(&CallbackAction::BackToRepoDetails(id));
-    let mut buttons = vec![vec![InlineKeyboardButton::callback("🔙 Back".to_string(), go_back)]];
+    let mut buttons = vec![vec![InlineKeyboardButton::callback("🔙 Back to repository".to_string(), go_back)]];
 
     // Add the label buttons to the main buttons
     buttons.extend(label_buttons);
@@ -102,13 +101,13 @@ pub fn build_repo_labels_keyboard(
 
     if paginated_labels.has_prev() {
         let prev_action =
-            utils::serialize_action(&&CallbackAction::ToggleLabel(id, "", paginated_labels.page - 1));
+            utils::serialize_action(&CallbackAction::ViewRepoLabels(id, paginated_labels.page - 1));
         nav_buttons.push(InlineKeyboardButton::callback("◀️ Previous".to_string(), prev_action));
     }
 
     if paginated_labels.has_next() {
         let next_action =
-            utils::serialize_action(&CallbackAction::ToggleLabel(id, "", paginated_labels.page + 1));
+            utils::serialize_action(&CallbackAction::ViewRepoLabels(id, paginated_labels.page + 1));
         nav_buttons.push(InlineKeyboardButton::callback("Next ▶️".to_string(), next_action));
     }
 
@@ -123,15 +122,15 @@ lazy_static! {
     pub static ref COMMAND_KEYBOARD: InlineKeyboardMarkup = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::callback(
             "ℹ️ Help",
-            utils::serialize_action(&CallbackAction::Help)
+            utils::serialize_action(&CallbackAction::CmdHelp)
         ),],
         vec![InlineKeyboardButton::callback(
             "📜 Tracked repositories",
-            utils::serialize_action(&CallbackAction::List)
+            utils::serialize_action(&CallbackAction::CmdList)
         ),],
         vec![InlineKeyboardButton::callback(
             "➕ Add repository",
-            utils::serialize_action(&CallbackAction::Add)
+            utils::serialize_action(&CallbackAction::CmdAdd)
         ),],
     ]);
 }
