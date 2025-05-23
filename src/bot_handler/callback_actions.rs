@@ -1,17 +1,24 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum CallbackAction<'a> {
+    #[serde(rename = "vrd")]
     ViewRepoDetails(&'a str),
-    ViewRepoLabels(&'a str),
+    #[serde(rename = "vrl")]
+    ViewRepoLabels(&'a str, usize), // ViewRepoLabels("owner/repo", page)
+    #[serde(rename = "rrp")]
     RemoveRepoPrompt(&'a str),
-    /// TL(&'a str, &'a str) means "Toggle Label" with the first string being
-    /// the repo name with owner and the second being the label name.
-    TL(&'a str, &'a str),
+    #[serde(rename = "tl")]
+    ToggleLabel(&'a str, usize), // ("label", page)
+    #[serde(rename = "brd")]
     BackToRepoDetails(&'a str),
-    BackToRepoList,
+    #[serde(rename = "lrp")]
+    ListReposPage(usize), // ListReposPage(page)
+    #[serde(rename = "brl")]
+    BackToRepoList, // default page 1
     // Command keyboard actions, should be handled as commands:
-    Help,
-    List,
-    Add,
+    CmdHelp,
+    CmdList, // List all repos, default page 1
+    CmdAdd,
 }
