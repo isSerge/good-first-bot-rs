@@ -17,8 +17,8 @@ mod storage;
 
 use std::sync::Arc;
 
-use log::debug;
 use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
+use tracing_subscriber::EnvFilter;
 
 use crate::{
     bot_handler::{BotHandler, CommandState},
@@ -30,14 +30,23 @@ use crate::{
 };
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
-    env_logger::init();
+    // Initialize the tracing subscriber
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new(format!("{}={}", module_path!(), "info")))
+                .add_directive(format!("dlq_log={}", "error").parse()?),
+        )
+        .init();
 
     if let Err(err) = run().await {
-        log::error!("Error: {err}");
+        tracing::error!("Error: {err}");
         std::process::exit(1);
     }
+
+    Ok(())
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -61,7 +70,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::spawn(async move {
         if let Err(e) = github_poller.run().await {
-            log::error!("Error in poller: {e}");
+            tracing::error!("Error in poller: {e}");
         }
     });
 
@@ -70,7 +79,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(DefaultRepositoryService::new(storage.clone(), github_client.clone()));
     let handler = Arc::new(BotHandler::new(messaging_service, repo_manager_service));
     let mut dispatcher = dispatcher::BotDispatcher::new(handler, dialogue_storage).build(bot);
-    debug!("Dispatcher built successfully.");
+    tracing::debug!("Dispatcher built successfully.");
 
     dispatcher.dispatch().await;
 
