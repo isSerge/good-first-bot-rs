@@ -3,7 +3,6 @@ use std::{collections::HashSet, time::Duration};
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
 use graphql_client::{GraphQLQuery, Response};
-use log::{debug, error, warn};
 use mockall::automock;
 use reqwest::{
     Client,
@@ -112,7 +111,7 @@ impl DefaultGithubClient {
 
         let client = reqwest::Client::builder().default_headers(headers).build()?;
 
-        debug!("HTTP client built successfully.");
+        tracing::debug!("HTTP client built successfully.");
 
         Ok(Self { client, graphql_url: graphql_url.to_string() })
     }
@@ -147,7 +146,7 @@ impl DefaultGithubClient {
             let resp =
                 self.client.post(&self.graphql_url).json(&request_body).send().await.map_err(
                     |e| {
-                        warn!("Network error sending GraphQL request: {e}. Retrying...");
+                        tracing::warn!("Network error sending GraphQL request: {e}. Retrying...");
                         BackoffError::transient(GithubError::RequestError { source: e })
                     },
                 )?;
@@ -156,13 +155,13 @@ impl DefaultGithubClient {
             if !resp.status().is_success() {
                 let status = resp.status();
                 let text = resp.text().await.unwrap_or_else(|e| {
-                    warn!(
+                    tracing::warn!(
                         "Failed to read response text for HTTP error {status}: {e}. Using empty \
                          fallback."
                     );
                     format!("Status: {status}, No response body available.")
                 });
-                warn!(
+                tracing::warn!(
                     "Non-success HTTP {status}: {}. Retrying if transient...",
                     text.chars().take(200).collect::<String>()
                 );
@@ -198,7 +197,7 @@ impl DefaultGithubClient {
 
             // 4. Parse JSON
             let body: Response<Q::ResponseData> = resp.json().await.map_err(|e| {
-                warn!("Failed to parse JSON: {e}. Retrying...");
+                tracing::warn!("Failed to parse JSON: {e}. Retrying...");
                 BackoffError::transient(GithubError::GraphQLApiError(format!(
                     "JSON parse error: {e}"
                 )))
@@ -213,17 +212,17 @@ impl DefaultGithubClient {
                 let msg = format!("GraphQL API reported errors: {errors:?}");
 
                 if is_rate_limit_error {
-                    warn!("Retryable GraphQL API error: {msg}. Retrying...");
+                    tracing::warn!("Retryable GraphQL API error: {msg}. Retrying...");
                     return Err(BackoffError::transient(GithubError::RateLimited));
                 } else {
-                    error!("Permanent GraphQL API error: {msg}");
+                    tracing::error!("Permanent GraphQL API error: {msg}");
                     return Err(BackoffError::permanent(GithubError::GraphQLApiError(msg)));
                 }
             }
 
             // 6. Unwrap the data or permanent-fail
             body.data.ok_or_else(|| {
-                error!("GraphQL response had no data field; permanent failure");
+                tracing::error!("GraphQL response had no data field; permanent failure");
                 BackoffError::permanent(GithubError::GraphQLApiError(
                     "GraphQL response had no data field and no errors reported".to_string(),
                 ))
@@ -239,7 +238,7 @@ impl DefaultGithubClient {
 impl GithubClient for DefaultGithubClient {
     /// Check if a repository exists.
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool, GithubError> {
-        debug!("Checking if repository {}/{} exists", owner, name);
+        tracing::debug!("Checking if repository {}/{} exists", owner, name);
         let data = self
             .execute_graphql::<Repository>(repository::Variables {
                 owner: owner.to_string(),

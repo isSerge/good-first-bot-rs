@@ -5,7 +5,6 @@ use std::{
 
 use async_trait::async_trait;
 use chrono::Utc;
-use log::debug;
 use serde_json;
 use sqlx::{Pool, Sqlite, SqlitePool, migrate, query};
 use teloxide::types::ChatId;
@@ -21,7 +20,7 @@ pub struct SqliteStorage {
 
 impl SqliteStorage {
     pub async fn new(database_url: &str) -> StorageResult<Self> {
-        debug!("Connecting to SQLite database: {database_url}");
+        tracing::debug!("Connecting to SQLite database: {database_url}");
         let pool = SqlitePool::connect(database_url)
             .await
             .map_err(|e| StorageError::DbError(format!("Failed to connect to SQLite: {e}")))?;
@@ -29,7 +28,7 @@ impl SqliteStorage {
         migrate!("./migrations").run(&pool).await.map_err(|e| {
             StorageError::DbError(format!("Failed to migrate SQLite database: {e}"))
         })?;
-        debug!("SQLite database migrated");
+        tracing::debug!("SQLite database migrated");
 
         Ok(Self { pool })
     }
@@ -38,7 +37,7 @@ impl SqliteStorage {
 #[async_trait]
 impl RepoStorage for SqliteStorage {
     async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> StorageResult<()> {
-        debug!("Adding repository to SQLite: {:?}", repository);
+        tracing::debug!("Adding repository to SQLite: {:?}", repository);
 
         let chat_id = chat_id.0;
 
@@ -63,7 +62,7 @@ impl RepoStorage for SqliteStorage {
         chat_id: ChatId,
         name_with_owner: &str,
     ) -> StorageResult<bool> {
-        debug!("Removing repository from SQLite: {}", name_with_owner);
+        tracing::debug!("Removing repository from SQLite: {}", name_with_owner);
 
         let chat_id = chat_id.0;
 
@@ -82,7 +81,7 @@ impl RepoStorage for SqliteStorage {
     }
 
     async fn get_repos_per_user(&self, chat_id: ChatId) -> StorageResult<Vec<RepoEntity>> {
-        debug!("Getting repositories for user: {}", chat_id);
+        tracing::debug!("Getting repositories for user: {}", chat_id);
 
         let repos = query!(
             "SELECT owner, name, name_with_owner 
@@ -110,7 +109,7 @@ impl RepoStorage for SqliteStorage {
     }
 
     async fn contains(&self, chat_id: ChatId, repository: &RepoEntity) -> StorageResult<bool> {
-        debug!("Checking if repository exists in SQLite: {:?}", repository);
+        tracing::debug!("Checking if repository exists in SQLite: {:?}", repository);
         let chat_id = chat_id.0;
 
         let result = query!(
@@ -126,7 +125,7 @@ impl RepoStorage for SqliteStorage {
     }
 
     async fn get_all_repos(&self) -> StorageResult<HashMap<ChatId, HashSet<RepoEntity>>> {
-        debug!("Getting all repositories from SQLite");
+        tracing::debug!("Getting all repositories from SQLite");
 
         let repos = query!("SELECT chat_id, owner, name, name_with_owner FROM repositories",)
             .fetch_all(&self.pool)
@@ -151,7 +150,7 @@ impl RepoStorage for SqliteStorage {
         chat_id: ChatId,
         repository: &RepoEntity,
     ) -> StorageResult<Option<i64>> {
-        debug!("Getting last poll time for repository: {:?}", repository);
+        tracing::debug!("Getting last poll time for repository: {:?}", repository);
         let chat_id = chat_id.0;
 
         let result = query!(
@@ -175,7 +174,7 @@ impl RepoStorage for SqliteStorage {
         chat_id: ChatId,
         repository: &RepoEntity,
     ) -> StorageResult<()> {
-        debug!("Setting last poll time for repository: {:?}", repository);
+        tracing::debug!("Setting last poll time for repository: {:?}", repository);
         let chat_id = chat_id.0;
 
         let current_time = Utc::now().timestamp();
@@ -201,7 +200,7 @@ impl RepoStorage for SqliteStorage {
         chat_id: ChatId,
         repository: &RepoEntity,
     ) -> StorageResult<HashSet<String>> {
-        debug!("Getting tracked labels for repository: {}", repository.name_with_owner);
+        tracing::debug!("Getting tracked labels for repository: {}", repository.name_with_owner);
         let chat_id_i64 = chat_id.0;
 
         let raw_result = query!(
@@ -219,7 +218,11 @@ impl RepoStorage for SqliteStorage {
         let labels: HashSet<String> = serde_json::from_str(&labels_str).map_err(|e| {
             StorageError::DataIntegrityError(repository.name_with_owner.clone(), e.into())
         })?;
-        debug!("Tracked labels for repository {}: {:?}", repository.name_with_owner, labels);
+        tracing::debug!(
+            "Tracked labels for repository {}: {:?}",
+            repository.name_with_owner,
+            labels
+        );
 
         Ok(labels)
     }
@@ -230,7 +233,7 @@ impl RepoStorage for SqliteStorage {
         repository: &RepoEntity,
         label_name: &str,
     ) -> StorageResult<bool> {
-        debug!("Toggling label for repository: {}", repository.name_with_owner);
+        tracing::debug!("Toggling label for repository: {}", repository.name_with_owner);
         let chat_id_i64 = chat_id.0;
 
         let mut tracked_labels = self.get_tracked_labels(chat_id, repository).await?;

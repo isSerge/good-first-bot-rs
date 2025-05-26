@@ -6,7 +6,6 @@ mod tests;
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 pub use callback_actions::CallbackAction;
-use log::warn;
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
@@ -182,7 +181,7 @@ impl BotHandler {
             }
         } else {
             // TODO: consider sending error message to user
-            warn!("Callback query has no data");
+            tracing::warn!("Callback query has no data");
         }
         Ok(())
     }
