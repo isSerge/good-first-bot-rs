@@ -108,7 +108,7 @@ impl GithubPoller {
                 let issues_to_notify = Self::filter_new_issues(issues, &last_poll_time);
 
                 if !issues_to_notify.is_empty() {
-                    tracing::debug!("Sending new issuesmessage to chat: {chat_id}");
+                    tracing::debug!("Sending new issues message to chat: {chat_id}");
 
                     self.messaging_service
                         .send_new_issues_msg(chat_id, &repo.name_with_owner, issues_to_notify)
