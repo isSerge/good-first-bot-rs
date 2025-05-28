@@ -222,7 +222,7 @@ impl MessagingService for TelegramMessagingService {
 
     async fn send_start_msg(&self, chat_id: ChatId) -> Result<()> {
         let start_text = "👋 Welcome! Use buttons below to track repository issues (i.e. 'good \
-                          first issue', 'bug', 'enhancement', etc.";
+                          first issue', 'bug', 'enhancement', etc.)";
         self.send_response_with_keyboard(chat_id, start_text.to_string(), None).await
     }
 

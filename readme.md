@@ -1,24 +1,25 @@
 # Good First Bot
 
-A Telegram bot for tracking beginner-friendly GitHub issues. The bot allows
-users to easily add, remove, and list repositories they want to track, and it
-periodically polls GitHub to notify users of new issues labeled as “good first
-issue”, “beginner-friendly”, or “help wanted.”
+A Telegram bot for tracking GitHub issues. The bot allows
+users to easily add, remove, and list repositories they want to track, select specific labels like “good first
+issue”, "enhancement", "bug", etc. It periodically polls GitHub and notifies users of new issues.
 
 ![Good First Bot](good-first-bot.png)
 
 ## Features
 
 - **Track GitHub Repositories:**  
-  Add or remove repositories to receive notifications for new beginner-friendly
-  issues.
+  Add or remove repositories to receive notifications
+
+- **Select specific issue labels:**  
+  Users can select specific labels for each added repository
 
 - **GitHub Integration:**  
   Uses the GitHub GraphQL API to verify repository existence and fetch issues
   with specific labels.
 
 - **Telegram Bot Commands:**  
-  Supports commands like `/start`, `/help`, `/add`, `/remove`, and `/list` to
+  Supports commands like `/start`, `/help`, `/add`, and `/list` to
   interact with the bot.
 
 - **Polling Mechanism:**  
