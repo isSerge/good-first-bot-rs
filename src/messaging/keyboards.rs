@@ -76,16 +76,32 @@ pub fn build_repo_labels_keyboard(
                 paginated_labels.page,
             ));
 
-            vec![InlineKeyboardButton::callback(
+            let is_selected_str = if label.is_selected { "✅ " } else { "" };
+            let name = if label.name == "NO_LABEL" {
+                "Track issues without labels".to_string()
+            } else {
+                label.name.clone()
+            };
+
+            let text = if label.count > 0 {
                 format!(
                     "{} {} {}({})",
-                    if label.is_selected { "✅ " } else { "" },
+                    is_selected_str,
                     utils::github_color_to_emoji(&label.color),
-                    label.name,
+                    name,
                     label.count,
-                ),
-                toggle_action,
-            )]
+                )
+            } else {
+                // For issues without labels
+                format!(
+                    "{} {} {}",
+                    is_selected_str,
+                    utils::github_color_to_emoji(&label.color),
+                    name,
+                )
+            };
+
+            vec![InlineKeyboardButton::callback(text, toggle_action)]
         })
         .collect::<Vec<_>>();
 

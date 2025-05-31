@@ -97,6 +97,8 @@ impl GithubPoller {
             .map(|t| SystemTime::UNIX_EPOCH + Duration::from_secs(t as u64))
             .unwrap_or(SystemTime::UNIX_EPOCH);
 
+        // TODO: check if tracked labels have NO_LABEL and if so, fetch issues without labels
+
         let issues = self
             .github_client
             .repo_issues_by_label(&repo.owner, &repo.name, tracked_labels)

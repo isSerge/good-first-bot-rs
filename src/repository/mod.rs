@@ -118,7 +118,7 @@ impl RepositoryService for DefaultRepositoryService {
             .filter(|label| label.issues.as_ref().is_some_and(|issues| issues.total_count > 0))
             .collect();
 
-        let normalized = selected_labels
+        let normalized: Vec<LabelNormalized> = selected_labels
             .into_iter()
             .map(|label| {
                 let name = label.name.clone();
@@ -129,7 +129,17 @@ impl RepositoryService for DefaultRepositoryService {
             })
             .collect();
 
-        Ok(Paginated::new(normalized, page))
+        // Add "Issues without labels" entry
+        let mut labels = vec![LabelNormalized {
+            name: "NO_LABEL".to_string(),
+            color: "ffffff".to_string(),
+            count: 0,
+            is_selected: tracked_labels.contains("NO_LABEL"),
+        }];
+
+        labels.extend(normalized);
+
+        Ok(Paginated::new(labels, page))
     }
 
     async fn toggle_label(
