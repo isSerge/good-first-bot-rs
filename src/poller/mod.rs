@@ -110,21 +110,90 @@ impl GithubPoller {
                 if !issues_to_notify.is_empty() {
                     tracing::debug!("Sending new issues message to chat: {chat_id}");
 
-                    self.messaging_service
+                    let msg_result = self
+                        .messaging_service
                         .send_new_issues_msg(chat_id, &repo.name_with_owner, issues_to_notify)
-                        .await?;
+                        .await;
 
-                    // Update the last poll time for this chat/repo pair to now.
-                    self.storage.set_last_poll_time(chat_id, &repo).await?;
+                    // If sending the message fails, log the error and return without updating the
+                    // last poll time
+                    if let Err(e) = msg_result {
+                        tracing::error!(
+                            "Failed to send new issues message for repo {}: {e:?}. Will be \
+                             retried next cycle",
+                            repo.name_with_owner
+                        );
+                        return Ok(());
+                    }
+
+                    // If the message was sent successfully, update the last poll time
+                    let set_last_poll_result =
+                        self.storage.set_last_poll_time(chat_id, &repo).await;
+
+                    if let Err(e) = set_last_poll_result {
+                        tracing::error!(
+                            "Failed to update last poll time for repo {}: {e:?}",
+                            repo.name_with_owner
+                        );
+                    } else {
+                        tracing::debug!(
+                            "Sent notifications and updated last poll time for repo {} in chat {}",
+                            repo.name_with_owner,
+                            chat_id
+                        );
+                    }
                 } else {
                     tracing::debug!("No new issues to notify for {}", repo.name_with_owner);
                 }
             }
-            Err(e) => {
-                // just log the error and keep going for now
-                // TODO: handle specific errors
-                tracing::error!("Error polling issues: {e:?}");
-            }
+            Err(e) => match e {
+                PollerError::Github(github_error) => match github_error {
+                    GithubError::GraphQLApiError(msg) => {
+                        tracing::error!(
+                            "A GraphQL API error occurred while polling repo {} (chat {}): {}. \
+                             Skipping this repo for this cycle.",
+                            repo.name_with_owner,
+                            chat_id,
+                            msg
+                        );
+                    }
+                    GithubError::RateLimited => {
+                        tracing::warn!(
+                            "Rate limit exceeded while polling issues for repository {}. Will \
+                             retry later.",
+                            repo.name_with_owner
+                        );
+                    }
+                    GithubError::RequestError { source } => {
+                        tracing::warn!(
+                            "A network/HTTP request error occurred for repo {} (chat {}): {}. \
+                             Skipping this repo for this cycle.",
+                            repo.name_with_owner,
+                            chat_id,
+                            source
+                        );
+                    }
+                    GithubError::Unauthorized
+                    | GithubError::InvalidHeader(_)
+                    | GithubError::SerializationError { .. } => {
+                        tracing::error!(
+                            "Fatal error while polling issues for repository {}: {github_error:?}",
+                            repo.name_with_owner
+                        );
+                        return Err(PollerError::Github(github_error));
+                    }
+                },
+                unexpected_error => {
+                    tracing::error!(
+                        "Unexpected error type {:?} at GitHub fetch stage for repo {} (chat {}). \
+                         Propagating.",
+                        unexpected_error,
+                        repo.name_with_owner,
+                        chat_id
+                    );
+                    return Err(unexpected_error);
+                }
+            },
         }
 
         Ok(())
