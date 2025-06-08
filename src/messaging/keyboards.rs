@@ -90,9 +90,12 @@ pub fn build_repo_labels_keyboard(
         .collect::<Vec<_>>();
 
     // Prepend the back button to the list of buttons
-    let go_back = utils::serialize_action(&CallbackAction::BackToRepoDetails(id));
-    let mut buttons =
-        vec![vec![InlineKeyboardButton::callback("🔙 Back to repository".to_string(), go_back)]];
+    let go_back_repo = utils::serialize_action(&CallbackAction::BackToRepoDetails(id));
+    let go_back_list = utils::serialize_action(&CallbackAction::BackToRepoList);
+    let mut buttons = vec![vec![
+        InlineKeyboardButton::callback("🔙 Back to repository".to_string(), go_back_repo),
+        InlineKeyboardButton::callback("🔙 Back to list".to_string(), go_back_list),
+    ]];
 
     // Add the label buttons to the main buttons
     buttons.extend(label_buttons);
