@@ -11,6 +11,7 @@ use keyboards::{
 use mockall::automock;
 use teloxide::{
     prelude::*,
+    sugar::request::RequestLinkPreviewExt,
     types::{ChatId, ForceReply, InlineKeyboardMarkup, MessageId, ParseMode},
     utils::{command::BotCommands, html},
 };
@@ -144,6 +145,15 @@ pub trait MessagingService: Send + Sync {
         invalid_urls: HashSet<String>,
         errors: HashSet<(String, String)>,
     ) -> Result<()>;
+
+    /// Sends an overview message with tracked repositories and their labels.
+    /// The overview is a vector of tuples, where each tuple contains a
+    /// `RepoEntity` and a vector of label names.
+    async fn send_overview_msg(
+        &self,
+        chat_id: ChatId,
+        overview: Vec<(RepoEntity, Vec<String>)>,
+    ) -> Result<()>;
 }
 
 /// Telegram messaging service.
@@ -191,6 +201,7 @@ impl MessagingService for TelegramMessagingService {
             .send_message(chat_id, text)
             .parse_mode(ParseMode::Html)
             .reply_markup(keyboard)
+            .disable_link_preview(true)
             .await
             .map(|_| ())
             .map_err(MessagingError::TeloxideRequest)
@@ -227,8 +238,12 @@ impl MessagingService for TelegramMessagingService {
     }
 
     async fn send_list_empty_msg(&self, chat_id: ChatId) -> Result<()> {
-        self.send_response_with_keyboard(chat_id, "No repositories tracked.".to_string(), None)
-            .await
+        self.send_response_with_keyboard(
+            chat_id,
+            "Currently no repositories tracked".to_string(),
+            None,
+        )
+        .await
     }
 
     async fn send_list_msg(
@@ -477,5 +492,44 @@ impl MessagingService for TelegramMessagingService {
         }
 
         self.send_response_with_keyboard(chat_id, summary.join("\n\n"), None).await
+    }
+
+    async fn send_overview_msg(
+        &self,
+        chat_id: ChatId,
+        overview: Vec<(RepoEntity, Vec<String>)>,
+    ) -> Result<()> {
+        tracing::debug!(
+            "Sending overview message to chat {chat_id} with {} repositories.",
+            overview.len()
+        );
+        // It should not be empty since we check in command handler, log warning just in
+        // case.
+        if overview.is_empty() {
+            tracing::warn!("No repositories found for overview.");
+        }
+
+        let mut message_parts =
+            vec!["📊 Overview of your tracked repositories and labels:".to_string()];
+        message_parts.push("".to_string()); // Empty line for spacing
+
+        for (repo, labels) in overview {
+            let repo_link = html::link(&repo.url(), &html::escape(&repo.name_with_owner));
+            message_parts.push(format!("📦 <b>Repository:</b> {repo_link}"));
+
+            if labels.is_empty() {
+                message_parts
+                    .push("⚠️ No labels are being tracked in this repository.".to_string());
+            } else {
+                message_parts.push("🏷️ <b>Tracked labels:</b>".to_string());
+                for label in labels {
+                    message_parts.push(format!("- {}", html::escape(&label)));
+                }
+            }
+            message_parts.push("".to_string()); // Empty line for spacing
+        }
+
+        let text = message_parts.join("\n");
+        self.send_response_with_keyboard(chat_id, text, None).await
     }
 }

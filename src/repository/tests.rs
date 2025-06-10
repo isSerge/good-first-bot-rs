@@ -138,7 +138,7 @@ async fn test_get_repo_labels() {
         DefaultRepositoryService::new(Arc::new(mock_repo_storage), Arc::new(mock_github_client));
 
     // Act
-    let result = repository_service.get_repo_labels(chat_id, &repo, 1).await;
+    let result = repository_service.get_repo_github_labels(chat_id, &repo, 1).await;
 
     // Assert
     assert!(result.is_ok());
@@ -266,7 +266,7 @@ async fn test_get_repo_labels_error() {
         DefaultRepositoryService::new(Arc::new(mock_repo_storage), Arc::new(mock_github_client));
 
     // Act
-    let result = repository_service.get_repo_labels(chat_id, &repo, 1).await;
+    let result = repository_service.get_repo_github_labels(chat_id, &repo, 1).await;
 
     // Assert
     assert!(result.is_err());

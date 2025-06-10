@@ -129,7 +129,11 @@ lazy_static! {
             utils::serialize_action(&CallbackAction::CmdHelp)
         ),],
         vec![InlineKeyboardButton::callback(
-            "📜 Tracked repositories",
+            "📋 Overview",
+            utils::serialize_action(&CallbackAction::CmdOverview)
+        ),],
+        vec![InlineKeyboardButton::callback(
+            "⚙️ Manage repositories",
             utils::serialize_action(&CallbackAction::CmdList)
         ),],
         vec![InlineKeyboardButton::callback(

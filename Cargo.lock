@@ -723,6 +723,7 @@ dependencies = [
  "backoff",
  "chrono",
  "dotenv",
+ "futures",
  "graphql_client",
  "lazy_static",
  "mockall",
