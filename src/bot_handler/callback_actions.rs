@@ -21,4 +21,5 @@ pub enum CallbackAction<'a> {
     CmdHelp,
     CmdList, // List all repos, default page 1
     CmdAdd,
+    CmdOverview,
 }

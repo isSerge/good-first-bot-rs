@@ -1,6 +1,7 @@
 mod add;
 mod help;
 mod list;
+mod overview;
 mod start;
 
 use async_trait::async_trait;
@@ -29,6 +30,7 @@ impl CommandHandler for super::Command {
             super::Command::List => list::handle(ctx).await,
             super::Command::Add => add::handle(ctx).await,
             super::Command::Start => start::handle(ctx).await,
+            super::Command::Overview => overview::handle(ctx).await,
         }
     }
 }

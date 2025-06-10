@@ -47,6 +47,8 @@ pub enum Command {
     Add,
     #[command(description = "List tracked repositories.")]
     List,
+    #[command(description = "Show an overview of tracked repositories.")]
+    Overview,
 }
 
 /// Encapsulates the bot, storage and GitHub client.
@@ -173,6 +175,7 @@ impl BotHandler {
                         CallbackAction::CmdHelp => Command::Help,
                         CallbackAction::CmdList => Command::List,
                         CallbackAction::CmdAdd => Command::Add,
+                        CallbackAction::CmdOverview => Command::Overview,
                         _ => unreachable!(),
                     };
 
@@ -239,10 +242,10 @@ impl BotHandler {
         let repo = RepoEntity::from_str(repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-        // Get selected repo labels
+        // Get all repo labels
         let repo_labels = self
             .repository_service
-            .get_repo_labels(chat_id, &repo, 1)
+            .get_repo_github_labels(chat_id, &repo, 1)
             .await
             .map_err(BotHandlerError::InternalError)?
             .items
@@ -279,7 +282,7 @@ impl BotHandler {
 
         let paginated_labels = self
             .repository_service
-            .get_repo_labels(chat_id, &repo, page)
+            .get_repo_github_labels(chat_id, &repo, page)
             .await
             .map_err(BotHandlerError::InternalError)?;
 
@@ -339,7 +342,7 @@ impl BotHandler {
         // Get updated user repo labels
         let labels = self
             .repository_service
-            .get_repo_labels(chat_id, &repo, page)
+            .get_repo_github_labels(chat_id, &repo, page)
             .await
             .map_err(BotHandlerError::InternalError)?;
 

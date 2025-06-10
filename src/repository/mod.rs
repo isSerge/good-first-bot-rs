@@ -41,12 +41,14 @@ pub trait RepositoryService: Send + Sync {
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
     async fn get_user_repos(&self, chat_id: ChatId, page: usize) -> Result<Paginated<RepoEntity>>;
-    async fn get_repo_labels(
+    async fn get_repo_github_labels(
         &self,
         chat_id: ChatId,
         repo: &RepoEntity,
         page: usize,
     ) -> Result<Paginated<LabelNormalized>>;
+    async fn get_user_repo_labels(&self, chat_id: ChatId, repo: &RepoEntity)
+    -> Result<Vec<String>>;
     async fn toggle_label(
         &self,
         chat_id: ChatId,
@@ -93,7 +95,7 @@ impl RepositoryService for DefaultRepositoryService {
         Ok(Paginated::new(repos?, page))
     }
 
-    async fn get_repo_labels(
+    async fn get_repo_github_labels(
         &self,
         chat_id: ChatId,
         repo: &RepoEntity,
@@ -141,5 +143,15 @@ impl RepositoryService for DefaultRepositoryService {
         let is_selected = self.storage.toggle_label(chat_id, repo, label_name).await?;
 
         Ok(is_selected)
+    }
+
+    async fn get_user_repo_labels(
+        &self,
+        chat_id: ChatId,
+        repo: &RepoEntity,
+    ) -> Result<Vec<String>> {
+        let tracked_labels = self.storage.get_tracked_labels(chat_id, repo).await?;
+
+        Ok(tracked_labels.into_iter().collect())
     }
 }
