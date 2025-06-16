@@ -86,6 +86,7 @@ pub trait MessagingService: Send + Sync {
         message_id: MessageId,
         repo: &RepoEntity,
         labels: &[LabelNormalized],
+        from_page: usize,
     ) -> Result<()>;
 
     /// Sends a callback query with repository labels.
@@ -96,6 +97,7 @@ pub trait MessagingService: Send + Sync {
         message_id: MessageId,
         paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
+        from_page: usize,
     ) -> Result<()>;
 
     /// Sends a callback query to toggle the label.
@@ -123,6 +125,7 @@ pub trait MessagingService: Send + Sync {
         message_id: MessageId,
         paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
+        from_page: usize,
     ) -> Result<()>;
 
     /// Sends a message to the user that there are new issues.
@@ -290,9 +293,10 @@ impl MessagingService for TelegramMessagingService {
         message_id: MessageId,
         repo: &RepoEntity,
         labels: &[LabelNormalized],
+        from_page: usize,
     ) -> Result<()> {
         let repo_link = html::link(&repo.url(), &html::escape(&repo.name_with_owner));
-        let keyboard = build_repo_item_keyboard(repo);
+        let keyboard = build_repo_item_keyboard(repo, from_page);
 
         let mut message_parts = vec![
             format!("📦 Repository: {}", repo_link),
@@ -351,8 +355,10 @@ impl MessagingService for TelegramMessagingService {
         message_id: MessageId,
         paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
+        from_page: usize,
     ) -> Result<()> {
-        let keyboard = build_repo_labels_keyboard(paginated_labels, repo_name_with_owner);
+        let keyboard =
+            build_repo_labels_keyboard(paginated_labels, repo_name_with_owner, from_page);
         let title = format!("🏷️ Manage labels for {}:", html::escape(repo_name_with_owner));
         let text_to_send = Self::format_paginated_message_text(&title, paginated_labels, "labels");
 
@@ -393,8 +399,10 @@ impl MessagingService for TelegramMessagingService {
         message_id: MessageId,
         paginated_labels: &Paginated<LabelNormalized>,
         repo_name_with_owner: &str,
+        from_page: usize,
     ) -> Result<()> {
-        let keyboard = build_repo_labels_keyboard(paginated_labels, repo_name_with_owner);
+        let keyboard =
+            build_repo_labels_keyboard(paginated_labels, repo_name_with_owner, from_page);
         let text = if paginated_labels.items.is_empty() {
             "⚠️ No labels available for this repository."
         } else {
