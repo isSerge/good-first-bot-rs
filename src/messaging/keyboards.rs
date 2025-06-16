@@ -13,8 +13,10 @@ pub fn build_repo_list_keyboard(paginated_repos: &Paginated<RepoEntity>) -> Inli
         .iter()
         .map(|repo| {
             // define callback action
-            let action =
-                utils::serialize_action(&CallbackAction::ViewRepoDetails(&repo.name_with_owner));
+            let action = utils::serialize_action(&CallbackAction::ViewRepoDetails(
+                &repo.name_with_owner,
+                paginated_repos.page,
+            ));
 
             // Repository name with link
             vec![InlineKeyboardButton::callback(repo.name_with_owner.clone(), action)]
@@ -42,11 +44,11 @@ pub fn build_repo_list_keyboard(paginated_repos: &Paginated<RepoEntity>) -> Inli
     InlineKeyboardMarkup::new(buttons)
 }
 
-pub fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
+pub fn build_repo_item_keyboard(repo: &RepoEntity, from_page: usize) -> InlineKeyboardMarkup {
     let id = &repo.name_with_owner;
     // actions
-    let back_to_list = utils::serialize_action(&CallbackAction::BackToRepoList);
-    let repo_labels = utils::serialize_action(&CallbackAction::ViewRepoLabels(id, 1));
+    let back_to_list = utils::serialize_action(&CallbackAction::BackToRepoList(from_page));
+    let repo_labels = utils::serialize_action(&CallbackAction::ViewRepoLabels(id, 1, from_page));
     let remove_repo = utils::serialize_action(&CallbackAction::RemoveRepoPrompt(id));
 
     // buttons
@@ -65,6 +67,7 @@ pub fn build_repo_item_keyboard(repo: &RepoEntity) -> InlineKeyboardMarkup {
 pub fn build_repo_labels_keyboard(
     paginated_labels: &Paginated<LabelNormalized>,
     id: &str, // repo name with owner
+    from_page: usize,
 ) -> InlineKeyboardMarkup {
     let label_buttons = paginated_labels
         .get_page_items()
@@ -74,6 +77,7 @@ pub fn build_repo_labels_keyboard(
             let toggle_action = utils::serialize_action(&CallbackAction::ToggleLabel(
                 &label.name,
                 paginated_labels.page,
+                from_page,
             ));
 
             vec![InlineKeyboardButton::callback(
@@ -90,8 +94,8 @@ pub fn build_repo_labels_keyboard(
         .collect::<Vec<_>>();
 
     // Prepend the back button to the list of buttons
-    let go_back_repo = utils::serialize_action(&CallbackAction::BackToRepoDetails(id));
-    let go_back_list = utils::serialize_action(&CallbackAction::BackToRepoList);
+    let go_back_repo = utils::serialize_action(&CallbackAction::BackToRepoDetails(id, from_page));
+    let go_back_list = utils::serialize_action(&CallbackAction::BackToRepoList(from_page));
     let mut buttons = vec![vec![
         InlineKeyboardButton::callback("🔙 Back to repository".to_string(), go_back_repo),
         InlineKeyboardButton::callback("🔙 Back to list".to_string(), go_back_list),
@@ -104,14 +108,20 @@ pub fn build_repo_labels_keyboard(
     let mut nav_buttons = Vec::new();
 
     if paginated_labels.has_prev() {
-        let prev_action =
-            utils::serialize_action(&CallbackAction::ViewRepoLabels(id, paginated_labels.page - 1));
+        let prev_action = utils::serialize_action(&CallbackAction::ViewRepoLabels(
+            id,
+            paginated_labels.page - 1,
+            from_page,
+        ));
         nav_buttons.push(InlineKeyboardButton::callback("◀️ Previous".to_string(), prev_action));
     }
 
     if paginated_labels.has_next() {
-        let next_action =
-            utils::serialize_action(&CallbackAction::ViewRepoLabels(id, paginated_labels.page + 1));
+        let next_action = utils::serialize_action(&CallbackAction::ViewRepoLabels(
+            id,
+            paginated_labels.page + 1,
+            from_page,
+        ));
         nav_buttons.push(InlineKeyboardButton::callback("Next ▶️".to_string(), next_action));
     }
 
