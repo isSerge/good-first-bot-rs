@@ -260,4 +260,21 @@ impl RepoStorage for SqliteStorage {
 
         Ok(tracked_labels.contains(label_name))
     }
+
+    async fn count_repos_per_user(&self, chat_id: ChatId) -> StorageResult<usize> {
+        tracing::debug!("Counting repositories for user: {}", chat_id);
+
+        let result =
+            query!("SELECT COUNT(*) as count FROM repositories WHERE chat_id = ?", chat_id.0,)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StorageError::DbError(format!(
+                        "Failed to count repositories in SQLite for user {}: {}",
+                        chat_id.0, e
+                    ))
+                })?;
+
+        Ok(result.count.try_into().unwrap_or(0))
+    }
 }

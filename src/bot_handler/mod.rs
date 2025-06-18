@@ -26,12 +26,27 @@ use crate::{
 pub enum BotHandlerError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
     #[error("Failed to get or update dialogue: {0}")]
     DialogueError(#[from] InMemStorageError),
+
     #[error("Failed to send message: {0}")]
     SendMessageError(#[from] MessagingError),
+
     #[error("Internal error: {0}")]
-    InternalError(#[from] RepositoryServiceError),
+    InternalError(RepositoryServiceError),
+
+    #[error("Limit exceeded: {0}")]
+    LimitExceeded(String),
+}
+
+impl From<RepositoryServiceError> for BotHandlerError {
+    fn from(err: RepositoryServiceError) -> Self {
+        match err {
+            RepositoryServiceError::LimitExceeded(msg) => BotHandlerError::LimitExceeded(msg),
+            _ => BotHandlerError::InternalError(err),
+        }
+    }
 }
 
 pub type BotHandlerResult<T> = Result<T, BotHandlerError>;
@@ -204,11 +219,7 @@ impl BotHandler {
         let chat_id = message.chat().id;
 
         // Attempt to remove the repository.
-        let removed = self
-            .repository_service
-            .remove_repo(chat_id, repo_id)
-            .await
-            .map_err(BotHandlerError::InternalError)?;
+        let removed = self.repository_service.remove_repo(chat_id, repo_id).await?;
 
         // Answer the callback query to clear the spinner.
         self.messaging_service.answer_remove_callback_query(&query.id, removed).await?;
@@ -248,8 +259,7 @@ impl BotHandler {
         let repo_labels = self
             .repository_service
             .get_repo_github_labels(chat_id, &repo, 1)
-            .await
-            .map_err(BotHandlerError::InternalError)?
+            .await?
             .items
             .into_iter()
             .filter(|l| l.is_selected)
@@ -283,11 +293,8 @@ impl BotHandler {
         let repo = RepoEntity::from_str(repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-        let paginated_labels = self
-            .repository_service
-            .get_repo_github_labels(chat_id, &repo, page)
-            .await
-            .map_err(BotHandlerError::InternalError)?;
+        let paginated_labels =
+            self.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
 
         // Answer the callback query to clear the spinner.
         self.messaging_service
@@ -336,24 +343,30 @@ impl BotHandler {
         let repo = RepoEntity::from_str(&repo_id)
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-        // update the label in the database
-        let is_selected = self
-            .repository_service
-            .toggle_label(chat_id, &repo, label_name)
-            .await
-            .map_err(BotHandlerError::InternalError)?;
+        // Try to toggle the label for the repository and handle potential limit errors.
+        match self.repository_service.toggle_label(chat_id, &repo, label_name).await {
+            Ok(is_selected) => {
+                // Answer the callback query to clear the spinner.
+                self.messaging_service
+                    .answer_toggle_label_callback_query(&query.id, label_name, is_selected)
+                    .await?;
 
-        // Answer the callback query to clear the spinner.
-        self.messaging_service
-            .answer_toggle_label_callback_query(&query.id, label_name, is_selected)
-            .await?;
+                // Get the updated labels for the repository.
+                let labels =
+                    self.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
+
+                // Edit the labels message to show the updated labels.
+                self.messaging_service
+                    .edit_labels_msg(chat_id, message.id(), &labels, &repo_id, from_page)
+                    .await?;
+            }
+            Err(e) => {
+                return Err(BotHandlerError::InternalError(e));
+            }
+        }
 
         // Get updated user repo labels
-        let labels = self
-            .repository_service
-            .get_repo_github_labels(chat_id, &repo, page)
-            .await
-            .map_err(BotHandlerError::InternalError)?;
+        let labels = self.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
 
         // Edit labels message to show the updated labels
         self.messaging_service

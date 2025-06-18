@@ -1,8 +1,9 @@
 # Good First Bot
 
-A Telegram bot for tracking GitHub issues. The bot allows
-users to easily add, remove, and list repositories they want to track, select specific labels like “good first
-issue”, "enhancement", "bug", etc. It periodically polls GitHub and notifies users of new issues.
+A Telegram bot for tracking GitHub issues. The bot allows users to easily add,
+remove, and list repositories they want to track, select specific labels like
+“good first issue”, "enhancement", "bug", etc. It periodically polls GitHub and
+notifies users of new issues.
 
 ![Good First Bot](good-first-bot.png)
 
@@ -19,12 +20,15 @@ issue”, "enhancement", "bug", etc. It periodically polls GitHub and notifies u
   with specific labels.
 
 - **Telegram Bot Commands:**  
-  Supports commands like `/start`, `/help`, `/add`, and `/list` to
-  interact with the bot.
+  Supports commands like `/start`, `/help`, `/add`, and `/list` to interact with
+  the bot.
 
 - **Polling Mechanism:**  
   Periodically polls tracked repositories to find new issues and sends
   notifications via Telegram.
+
+- **User-based Limits:** Configurable limits on the number of repositories a
+  user can track and the number of labels per repository to ensure fair usage
 
 - **SQLite Storage:**  
   Persists repository tracking and polling states using SQLite, with automatic
@@ -75,11 +79,16 @@ Create a .env file in the project root with the following keys (values are
 examples):
 
 ```bash
+# Required
 GITHUB_TOKEN=your_github_token_here
 TELOXIDE_TOKEN=your_telegram_bot_token_here
+
+# Optional
 GITHUB_GRAPHQL_URL=https://api.github.com/graphql
 POLL_INTERVAL=10
 DATABASE_URL=sqlite://data/data.db
+MAX_REPOS_PER_USER=10
+MAX_LABELS_PER_REPO=5
 ```
 
 - GITHUB_TOKEN: Your GitHub personal access token.
@@ -89,6 +98,10 @@ DATABASE_URL=sqlite://data/data.db
 - POLL_INTERVAL: (Optional) Poll interval in seconds. Default is 10.
 - DATABASE_URL: (Optional) Database URL for SQLite. Default is
   sqlite://data/data.db.
+- MAX_REPOS_PER_USER: (Optional) Maximum number of repositories a user can
+  track. Default is 20.
+- MAX_LABELS_PER_REPO: (Optional) Maximum number of labels per repository a user
+  can track. Default is 10
 
 3. **Install Dependencies:**
 
