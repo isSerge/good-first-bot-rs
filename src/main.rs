@@ -75,8 +75,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let dialogue_storage = InMemStorage::<CommandState>::new();
-    let repo_manager_service =
-        Arc::new(DefaultRepositoryService::new(storage.clone(), github_client.clone()));
+    let repo_manager_service = Arc::new(DefaultRepositoryService::new(
+        storage.clone(),
+        github_client.clone(),
+        config.max_repos_per_user,
+        config.max_labels_per_repo,
+    ));
     let handler = Arc::new(BotHandler::new(messaging_service, repo_manager_service));
     let mut dispatcher = dispatcher::BotDispatcher::new(handler, dialogue_storage).build(bot);
     tracing::debug!("Dispatcher built successfully.");
