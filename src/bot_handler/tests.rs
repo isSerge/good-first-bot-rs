@@ -211,6 +211,48 @@ async fn test_process_add_error() {
 }
 
 #[tokio::test]
+async fn test_process_add_repo_limit_reached() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+
+    let repo_name_with_owner = "owner/repo";
+    let repo_url = "https://github.com/owner/repo";
+    let limit_error_msg = "You have reached the maximum limit of 10 repositories.";
+    let full_error_str =
+        RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()).to_string();
+
+    mock_repository.expect_repo_exists().returning(|_, _| Ok(true));
+    mock_repository.expect_contains_repo().returning(|_, _| Ok(false));
+    mock_repository.expect_add_repo().returning(move |_, _| {
+        Err(RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()))
+    });
+
+    let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, &full_error_str)]);
+
+    mock_messaging
+        .expect_send_add_summary_msg()
+        .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
+            println!("p_errors: {:?}", p_errors);
+            chat_id_param == CHAT_ID
+                && s_added.is_empty()
+                && a_tracked.is_empty()
+                && n_found.is_empty()
+                && inv_urls.is_empty()
+                && *p_errors == expected_errors
+        })
+        .returning(|_, _, _, _, _, _| Ok(()));
+
+    let bot_handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+
+    // Act
+    let result = bot_handler.process_add(repo_url, CHAT_ID).await;
+
+    // Assert
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
 async fn test_process_add_multiple_mixed_outcomes() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
