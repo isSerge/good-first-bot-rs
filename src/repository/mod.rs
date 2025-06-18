@@ -18,8 +18,12 @@ use crate::{
 pub enum RepositoryServiceError {
     #[error("Github client error")]
     GithubClientError(#[from] GithubError),
+
     #[error("Storage error: {0}")]
     StorageError(#[from] StorageError),
+
+    #[error("Limit exceeded for user: {0}")]
+    LimitExceeded(String),
 }
 
 type Result<T> = std::result::Result<T, RepositoryServiceError>;
@@ -36,19 +40,35 @@ pub struct LabelNormalized {
 #[automock]
 #[async_trait]
 pub trait RepositoryService: Send + Sync {
+    /// Check if a repository exists on GitHub.
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;
+
+    /// Check if a repository is already tracked by the user.
     async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool>;
+
+    /// Add a repository to the user's tracked repositories.
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
+
+    /// Remove a repository from the user's tracked repositories.
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
+
+    /// Get all repositories tracked by the user.
     async fn get_user_repos(&self, chat_id: ChatId, page: usize) -> Result<Paginated<RepoEntity>>;
+
+    /// Get labels for a repository from GitHub, normalized and paginated.
     async fn get_repo_github_labels(
         &self,
         chat_id: ChatId,
         repo: &RepoEntity,
         page: usize,
     ) -> Result<Paginated<LabelNormalized>>;
+
+    /// Get labels tracked by the user for a specific repository.
     async fn get_user_repo_labels(&self, chat_id: ChatId, repo: &RepoEntity)
     -> Result<Vec<String>>;
+
+    /// Toggle a label for a repository, adding it if not present or removing it
+    /// if already present.
     async fn toggle_label(
         &self,
         chat_id: ChatId,
@@ -60,11 +80,18 @@ pub trait RepositoryService: Send + Sync {
 pub struct DefaultRepositoryService {
     storage: Arc<dyn RepoStorage>,
     github_client: Arc<dyn GithubClient>,
+    max_repos_per_user: usize,
+    max_labels_per_repo: usize,
 }
 
 impl DefaultRepositoryService {
-    pub fn new(storage: Arc<dyn RepoStorage>, github_client: Arc<dyn GithubClient>) -> Self {
-        Self { storage, github_client }
+    pub fn new(
+        storage: Arc<dyn RepoStorage>,
+        github_client: Arc<dyn GithubClient>,
+        max_repos_per_user: usize,
+        max_labels_per_repo: usize,
+    ) -> Self {
+        Self { storage, github_client, max_repos_per_user, max_labels_per_repo }
     }
 }
 
@@ -79,6 +106,15 @@ impl RepositoryService for DefaultRepositoryService {
     }
 
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
+        let user_repo_count = self.storage.count_repos_per_user(chat_id).await?;
+
+        if user_repo_count >= self.max_repos_per_user {
+            return Err(RepositoryServiceError::LimitExceeded(format!(
+                "User {} has reached the maximum number of repositories: {}",
+                chat_id, self.max_repos_per_user
+            )));
+        }
+
         self.storage.add_repository(chat_id, repo).await.map_err(RepositoryServiceError::from)
     }
 
@@ -140,9 +176,32 @@ impl RepositoryService for DefaultRepositoryService {
         repo: &RepoEntity,
         label_name: &str,
     ) -> Result<bool> {
-        let is_selected = self.storage.toggle_label(chat_id, repo, label_name).await?;
+        // Check if can add more labels
+        let tracked_labels = self.storage.get_tracked_labels(chat_id, repo).await?;
+        let is_selected = tracked_labels.contains(label_name);
 
-        Ok(is_selected)
+        if is_selected {
+            // If label is already selected, remove it
+            self.storage
+                .toggle_label(chat_id, repo, label_name)
+                .await
+                .map_err(RepositoryServiceError::from)?;
+        } else {
+            // Check if user has reached the maximum number of labels per repo
+            if tracked_labels.len() >= self.max_labels_per_repo {
+                return Err(RepositoryServiceError::LimitExceeded(format!(
+                    "User {} has reached the maximum number of labels per repository: {}",
+                    chat_id, self.max_labels_per_repo
+                )));
+            }
+            // If label is not selected, add it
+            self.storage
+                .toggle_label(chat_id, repo, label_name)
+                .await
+                .map_err(RepositoryServiceError::from)?;
+        }
+
+        Ok(!is_selected) // Return true if label was added, false if removed
     }
 
     async fn get_user_repo_labels(
