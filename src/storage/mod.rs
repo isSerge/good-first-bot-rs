@@ -69,4 +69,7 @@ pub trait RepoStorage: Send + Sync {
         repository: &RepoEntity,
         label_name: &str,
     ) -> StorageResult<bool>;
+
+    /// Get the number of repositories per user.
+    async fn count_repos_per_user(&self, chat_id: ChatId) -> StorageResult<usize>;
 }
