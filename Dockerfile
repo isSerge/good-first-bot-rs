@@ -18,6 +18,8 @@ RUN cargo chef prepare --recipe-path recipe.json
 # ---- Builder Stage ----
 FROM chef AS builder
 
+RUN apt-get update && apt-get install -y pkg-config libssl-dev   && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=planner /app/recipe.json recipe.json
