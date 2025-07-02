@@ -30,6 +30,7 @@ pub enum PollerError {
 type Result<T> = std::result::Result<T, PollerError>;
 
 /// A poller for polling issues from GitHub and sending messages to Telegram.
+#[derive(Clone)]
 pub struct GithubPoller {
     github_client: Arc<dyn GithubClient>,
     storage: Arc<dyn RepoStorage>,
@@ -50,7 +51,7 @@ impl GithubPoller {
     }
 
     /// Run the Poller.
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&self) -> Result<()> {
         tracing::debug!("Starting GitHub poller");
 
         let mut interval = tokio::time::interval(Duration::from_secs(self.poll_interval));
@@ -64,14 +65,26 @@ impl GithubPoller {
 
     /// Poll all repos for all users.
     async fn poll_all_repos(
-        &mut self,
+        &self,
         repos_by_chat_id: HashMap<ChatId, HashSet<RepoEntity>>,
     ) -> Result<()> {
+        let mut tasks = Vec::new();
+
         for (chat_id, repos) in repos_by_chat_id {
             tracing::debug!("Polling issues for chat: {chat_id}");
             for repo in repos {
-                // TODO: consider using tokio::spawn to poll repos concurrently
-                self.poll_user_repo(chat_id, repo).await?;
+                let self_clone = self.clone();
+                tasks.push(tokio::spawn(async move {
+                    self_clone.poll_user_repo(chat_id, repo).await
+                }));
+            }
+        }
+
+        for task in tasks {
+            match task.await {
+                Ok(Ok(_)) => (),
+                Ok(Err(e)) => tracing::error!("Error polling repo: {e:?}"),
+                Err(e) => tracing::error!("Error in tokio task: {e:?}"),
             }
         }
 
@@ -79,7 +92,7 @@ impl GithubPoller {
     }
 
     /// Poll a single repo for a single user.
-    async fn poll_user_repo(&mut self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
+    async fn poll_user_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
         tracing::debug!("Polling issues for repository: {}", repo.name_with_owner);
 
         let tracked_labels =
