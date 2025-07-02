@@ -122,7 +122,7 @@ async fn test_poll_user_repo_new_issues() {
         })
         .returning(|_, _| Ok(()));
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -192,7 +192,7 @@ async fn test_poll_user_repo_no_issues() {
     mock_messaging_service.expect_send_new_issues_msg().times(0);
     mock_repo_storage.expect_set_last_poll_time().times(0);
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -227,7 +227,7 @@ async fn test_poll_user_repo_no_tracked_labels_skips() {
     mock_messaging_service.expect_send_new_issues_msg().times(0);
     mock_repo_storage.expect_set_last_poll_time().times(0);
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -275,7 +275,7 @@ async fn test_poll_user_repo_github_unauthorized_error() {
     mock_messaging_service.expect_send_new_issues_msg().times(0);
     mock_repo_storage.expect_set_last_poll_time().times(0);
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -316,7 +316,7 @@ async fn test_poll_user_repo_github_rate_limited() {
     mock_messaging_service.expect_send_new_issues_msg().times(0);
     mock_repo_storage.expect_set_last_poll_time().times(0); // LPT not updated
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -354,7 +354,7 @@ async fn test_poll_user_repo_github_graphql_error() {
     mock_messaging_service.expect_send_new_issues_msg().times(0);
     mock_repo_storage.expect_set_last_poll_time().times(0);
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -399,7 +399,7 @@ async fn test_poll_user_repo_set_lpt_fails() {
         .times(1)
         .returning_st(|_, _| Err(StorageError::DbError("Failed to write LPT".to_string())));
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -425,7 +425,7 @@ async fn test_poll_user_repo_get_tracked_labels_storage_error() {
         .times(1)
         .returning_st(|_, _| Err(StorageError::DbError("DB init fail".to_string())));
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
@@ -456,7 +456,7 @@ async fn test_poll_user_repo_get_last_poll_time_storage_error() {
         .times(1)
         .returning_st(|_, _| Err(StorageError::DbError("LPT read fail".to_string())));
 
-    let mut poller = GithubPoller::new(
+    let poller = GithubPoller::new(
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),

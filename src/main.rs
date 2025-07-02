@@ -61,7 +61,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let messaging_service = Arc::new(TelegramMessagingService::new(bot.clone()));
 
     // Spawn a polling task for issues.
-    let mut github_poller = GithubPoller::new(
+    let github_poller = GithubPoller::new(
         github_client.clone(),
         storage.clone(),
         messaging_service.clone(),

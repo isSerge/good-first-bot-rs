@@ -8,6 +8,7 @@ use std::{
 };
 
 use chrono::DateTime;
+use futures::{StreamExt, stream::FuturesUnordered};
 use teloxide::prelude::*;
 use thiserror::Error;
 
@@ -68,7 +69,7 @@ impl GithubPoller {
         &self,
         repos_by_chat_id: HashMap<ChatId, HashSet<RepoEntity>>,
     ) -> Result<()> {
-        let mut tasks = Vec::new();
+        let mut tasks = FuturesUnordered::new();
 
         for (chat_id, repos) in repos_by_chat_id {
             tracing::debug!("Polling issues for chat: {chat_id}");
@@ -80,8 +81,8 @@ impl GithubPoller {
             }
         }
 
-        for task in tasks {
-            match task.await {
+        while let Some(result) = tasks.next().await {
+            match result {
                 Ok(Ok(_)) => (),
                 Ok(Err(e)) => tracing::error!("Error polling repo: {e:?}"),
                 Err(e) => tracing::error!("Error in tokio task: {e:?}"),
