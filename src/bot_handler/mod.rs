@@ -143,9 +143,8 @@ impl BotHandler {
             let action = serde_json::from_str::<CallbackAction>(data_str)
                 .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
-            // TODO: consider using Option instead of empty str here
             // Answer the callback query to clear the spinner.
-            self.messaging_service.answer_callback_query(&query_id, "").await?;
+            self.messaging_service.answer_callback_query(&query_id, &None).await?;
 
             match action {
                 CallbackAction::ViewRepoDetails(repo_id, from_page) => {
@@ -199,8 +198,15 @@ impl BotHandler {
                 }
             }
         } else {
-            // TODO: consider sending error message to user
             tracing::warn!("Callback query has no data");
+            if let Some(message) = &query.message {
+                self.messaging_service
+                    .send_error_msg(
+                        message.chat().id,
+                        BotHandlerError::InvalidInput("Invalid callback data".to_string()),
+                    )
+                    .await?;
+            }
         }
         Ok(())
     }

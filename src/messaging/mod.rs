@@ -71,7 +71,7 @@ pub trait MessagingService: Send + Sync {
     /// Sends a callback query to the user when they click on a button.
     /// The `query_id` is the ID of the callback query, and the `text` is the
     /// text of the message to be sent.
-    async fn answer_callback_query(&self, query_id: &str, text: &str) -> Result<()>;
+    async fn answer_callback_query(&self, query_id: &str, text: &Option<String>) -> Result<()>;
 
     /// Sends a callback query to the user.
     async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()>;
@@ -263,13 +263,14 @@ impl MessagingService for TelegramMessagingService {
         self.send_response_with_keyboard(chat_id, text, Some(keyboard)).await
     }
 
-    async fn answer_callback_query(&self, query_id: &str, text: &str) -> Result<()> {
-        self.bot
-            .answer_callback_query(query_id)
-            .text(text)
-            .await
-            .map(|_| ())
-            .map_err(MessagingError::TeloxideRequest)
+    async fn answer_callback_query(&self, query_id: &str, text: &Option<String>) -> Result<()> {
+        match text {
+            Some(text) => self.bot.answer_callback_query(query_id).text(text),
+            None => self.bot.answer_callback_query(query_id),
+        }
+        .await
+        .map(|_| ())
+        .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn answer_remove_callback_query(&self, query_id: &str, removed: bool) -> Result<()> {
