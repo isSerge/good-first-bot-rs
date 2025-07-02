@@ -74,9 +74,9 @@ impl GithubPoller {
             tracing::debug!("Polling issues for chat: {chat_id}");
             for repo in repos {
                 let self_clone = self.clone();
-                tasks.push(tokio::spawn(async move {
-                    self_clone.poll_user_repo(chat_id, repo).await
-                }));
+                tasks.push(tokio::spawn(
+                    async move { self_clone.poll_user_repo(chat_id, repo).await },
+                ));
             }
         }
 
