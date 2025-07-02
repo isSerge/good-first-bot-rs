@@ -127,6 +127,7 @@ async fn test_poll_user_repo_new_issues() {
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
         10,
+        10,
     );
 
     let repo = RepoEntity::from_str(REPO_NAME_WITH_OWNER).unwrap();
@@ -197,6 +198,7 @@ async fn test_poll_user_repo_no_issues() {
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
         10,
+        10,
     );
 
     let repo = RepoEntity::from_str(REPO_NAME_WITH_OWNER).unwrap();
@@ -231,6 +233,7 @@ async fn test_poll_user_repo_no_tracked_labels_skips() {
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
+        10,
         10,
     );
 
@@ -280,6 +283,7 @@ async fn test_poll_user_repo_github_unauthorized_error() {
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
         10,
+        10,
     );
 
     // Act
@@ -321,6 +325,7 @@ async fn test_poll_user_repo_github_rate_limited() {
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
         10,
+        10,
     );
 
     // Act
@@ -358,6 +363,7 @@ async fn test_poll_user_repo_github_graphql_error() {
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
+        10,
         10,
     );
 
@@ -404,6 +410,7 @@ async fn test_poll_user_repo_set_lpt_fails() {
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
         10,
+        10,
     );
 
     // Act
@@ -429,6 +436,7 @@ async fn test_poll_user_repo_get_tracked_labels_storage_error() {
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
+        10,
         10,
     );
     let result = poller.poll_user_repo(CHAT_ID, default_repo_entity()).await;
@@ -460,6 +468,7 @@ async fn test_poll_user_repo_get_last_poll_time_storage_error() {
         Arc::new(mock_github_client),
         Arc::new(mock_repo_storage),
         Arc::new(mock_messaging_service),
+        10,
         10,
     );
     let result = poller.poll_user_repo(CHAT_ID, default_repo_entity()).await;

@@ -66,6 +66,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         storage.clone(),
         messaging_service.clone(),
         config.poll_interval,
+        config.max_concurrency,
     );
 
     tokio::spawn(async move {

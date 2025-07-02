@@ -8,10 +8,9 @@ use std::{
 };
 
 use chrono::DateTime;
-use futures::{StreamExt, stream::FuturesUnordered};
+use futures::{StreamExt, stream};
 use teloxide::prelude::*;
 use thiserror::Error;
-use tokio::task::JoinError;
 
 use crate::{
     github::{GithubClient, GithubError, issues},
@@ -27,8 +26,6 @@ pub enum PollerError {
     Storage(#[from] StorageError),
     #[error("Failed to send message to Telegram")]
     Messaging(#[from] MessagingError),
-    #[error("Unexpected error: {0}")]
-    JoinError(#[from] JoinError),
 }
 
 type Result<T> = std::result::Result<T, PollerError>;
@@ -41,6 +38,8 @@ pub struct GithubPoller {
     messaging_service: Arc<dyn MessagingService>,
     // The interval to poll GitHub for new issues.
     poll_interval: u64,
+    // The maximum number of concurrent requests to GitHub.
+    max_concurrency: usize,
 }
 
 impl GithubPoller {
@@ -50,8 +49,9 @@ impl GithubPoller {
         storage: Arc<dyn RepoStorage>,
         messaging_service: Arc<dyn MessagingService>,
         poll_interval: u64,
+        max_concurrency: usize,
     ) -> Self {
-        Self { github_client, storage, messaging_service, poll_interval }
+        Self { github_client, storage, messaging_service, poll_interval, max_concurrency }
     }
 
     /// Run the Poller.
@@ -72,36 +72,22 @@ impl GithubPoller {
         &self,
         repos_by_chat_id: HashMap<ChatId, HashSet<RepoEntity>>,
     ) -> Result<()> {
-        let mut tasks = FuturesUnordered::new();
-
-        for (chat_id, repos) in repos_by_chat_id {
-            tracing::debug!("Polling issues for chat: {chat_id}");
-            for repo in repos {
+        let tasks = repos_by_chat_id
+            .into_iter()
+            .flat_map(|(chat_id, repos)| repos.into_iter().map(move |repo| (chat_id, repo)))
+            .map(|(chat_id, repo)| {
                 let self_clone = self.clone();
-                tasks.push(tokio::spawn(
-                    async move { self_clone.poll_user_repo(chat_id, repo).await },
-                ));
+                async move { self_clone.poll_user_repo(chat_id, repo).await }
+            });
+
+        let mut buffered_tasks = stream::iter(tasks).buffer_unordered(self.max_concurrency);
+
+        while let Some(result) = buffered_tasks.next().await {
+            if let Err(e) = result {
+                tracing::error!("Error polling repo: {e:?}");
             }
         }
 
-        let mut errors = Vec::new();
-        while let Some(result) = tasks.next().await {
-            match result {
-                Ok(Ok(_)) => (),
-                Ok(Err(e)) => {
-                    tracing::error!("Error polling repo: {e:?}");
-                    errors.push(e);
-                }
-                Err(e) => {
-                    tracing::error!("Error in tokio task: {e:?}");
-                    errors.push(PollerError::from(e));
-                }
-            }
-        }
-
-        if !errors.is_empty() {
-            return Err(errors.into_iter().next().unwrap()); // Return the first error encountered
-        }
         Ok(())
     }
 

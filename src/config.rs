@@ -5,6 +5,7 @@ const DEFAULT_GITHUB_GRAPHQL_URL: &str = "https://api.github.com/graphql";
 const DEFAULT_POLL_INTERVAL: u64 = 10;
 const DEFAULT_REPOS_PER_USER: usize = 20;
 const DEFAULT_LABELS_PER_REPO: usize = 10;
+const DEFAULT_MAX_CONCURRENCY: usize = 10;
 
 #[derive(Debug)]
 pub struct Config {
@@ -15,6 +16,7 @@ pub struct Config {
     pub database_url: String,
     pub max_repos_per_user: usize,
     pub max_labels_per_repo: usize,
+    pub max_concurrency: usize,
 }
 
 impl Config {
@@ -38,6 +40,10 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_LABELS_PER_REPO),
+            max_concurrency: env::var("MAX_CONCURRENCY")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(DEFAULT_MAX_CONCURRENCY),
         })
     }
 }
