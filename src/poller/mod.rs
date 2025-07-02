@@ -84,11 +84,20 @@ impl GithubPoller {
         while let Some(result) = tasks.next().await {
             match result {
                 Ok(Ok(_)) => (),
-                Ok(Err(e)) => tracing::error!("Error polling repo: {e:?}"),
-                Err(e) => tracing::error!("Error in tokio task: {e:?}"),
+                Ok(Err(e)) => {
+                    tracing::error!("Error polling repo: {e:?}");
+                    errors.push(e);
+                }
+                Err(e) => {
+                    tracing::error!("Error in tokio task: {e:?}");
+                    errors.push(PollerError::from(e));
+                }
             }
         }
 
+        if !errors.is_empty() {
+            return Err(errors.into_iter().next().unwrap()); // Return the first error encountered
+        }
         Ok(())
     }
 
