@@ -11,6 +11,7 @@ use chrono::DateTime;
 use futures::{StreamExt, stream::FuturesUnordered};
 use teloxide::prelude::*;
 use thiserror::Error;
+use tokio::task::JoinError;
 
 use crate::{
     github::{GithubClient, GithubError, issues},
@@ -26,6 +27,8 @@ pub enum PollerError {
     Storage(#[from] StorageError),
     #[error("Failed to send message to Telegram")]
     Messaging(#[from] MessagingError),
+    #[error("Unexpected error: {0}")]
+    JoinError(#[from] JoinError),
 }
 
 type Result<T> = std::result::Result<T, PollerError>;
@@ -81,6 +84,7 @@ impl GithubPoller {
             }
         }
 
+        let mut errors = Vec::new();
         while let Some(result) = tasks.next().await {
             match result {
                 Ok(Ok(_)) => (),
