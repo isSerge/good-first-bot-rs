@@ -1,4 +1,6 @@
 mod keyboards;
+#[cfg(test)]
+mod tests;
 mod utils;
 
 use std::collections::HashSet;

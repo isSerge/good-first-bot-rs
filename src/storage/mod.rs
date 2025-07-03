@@ -1,5 +1,7 @@
 mod repo_entity;
 pub mod sqlite;
+#[cfg(test)]
+mod tests;
 
 use std::collections::{HashMap, HashSet};
 

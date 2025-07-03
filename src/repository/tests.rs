@@ -388,3 +388,108 @@ async fn test_toggle_label_limit_exceeded() {
         panic!("Expected LimitExceeded error");
     }
 }
+
+#[tokio::test]
+async fn test_toggle_label_add() {
+    // Arrange
+    let chat_id = ChatId(1);
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
+    let label_name = "bug";
+
+    let mut mock_repo_storage = MockRepoStorage::new();
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .with(eq(chat_id), eq(repo.clone()))
+        .returning(|_, _| Ok(HashSet::new())); // No labels tracked yet
+
+    mock_repo_storage
+        .expect_toggle_label()
+        .with(eq(chat_id), eq(repo.clone()), eq(label_name))
+        .returning(|_, _, _| Ok(true)); // Label added
+
+    let mock_github_client = MockGithubClient::new();
+    let repository_service = DefaultRepositoryService::new(
+        Arc::new(mock_repo_storage),
+        Arc::new(mock_github_client),
+        MAX_REPOS_PER_USER,
+        MAX_LABELS_PER_REPO,
+    );
+
+    // Act
+    let result = repository_service.toggle_label(chat_id, &repo, label_name).await;
+
+    // Assert
+    assert!(result.is_ok());
+    assert!(result.unwrap()); // Expecting true, as the label was added
+}
+
+#[tokio::test]
+async fn test_toggle_label_remove() {
+    // Arrange
+    let chat_id = ChatId(1);
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
+    let label_name = "bug";
+
+    let mut tracked_labels = HashSet::new();
+    tracked_labels.insert(label_name.to_string());
+
+    let mut mock_repo_storage = MockRepoStorage::new();
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .with(eq(chat_id), eq(repo.clone()))
+        .returning(move |_, _| Ok(tracked_labels.clone())); // "bug" is already tracked
+
+    mock_repo_storage
+        .expect_toggle_label()
+        .with(eq(chat_id), eq(repo.clone()), eq(label_name))
+        .returning(|_, _, _| Ok(false)); // Label removed
+
+    let mock_github_client = MockGithubClient::new();
+    let repository_service = DefaultRepositoryService::new(
+        Arc::new(mock_repo_storage),
+        Arc::new(mock_github_client),
+        MAX_REPOS_PER_USER,
+        MAX_LABELS_PER_REPO,
+    );
+
+    // Act
+    let result = repository_service.toggle_label(chat_id, &repo, label_name).await;
+
+    // Assert
+    assert!(result.is_ok());
+    assert!(!result.unwrap()); // Expecting false, as the label was removed
+}
+
+#[tokio::test]
+async fn test_get_user_repo_labels() {
+    // Arrange
+    let chat_id = ChatId(1);
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
+    let mut tracked_labels = HashSet::new();
+    tracked_labels.insert("bug".to_string());
+    tracked_labels.insert("enhancement".to_string());
+
+    let mut mock_repo_storage = MockRepoStorage::new();
+    mock_repo_storage
+        .expect_get_tracked_labels()
+        .with(eq(chat_id), eq(repo.clone()))
+        .returning(move |_, _| Ok(tracked_labels.clone()));
+
+    let mock_github_client = MockGithubClient::new();
+    let repository_service = DefaultRepositoryService::new(
+        Arc::new(mock_repo_storage),
+        Arc::new(mock_github_client),
+        MAX_REPOS_PER_USER,
+        MAX_LABELS_PER_REPO,
+    );
+
+    // Act
+    let result = repository_service.get_user_repo_labels(chat_id, &repo).await;
+
+    // Assert
+    assert!(result.is_ok());
+    let labels = result.unwrap();
+    assert_eq!(labels.len(), 2);
+    assert!(labels.contains(&"bug".to_string()));
+    assert!(labels.contains(&"enhancement".to_string()));
+}
