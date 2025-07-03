@@ -152,3 +152,61 @@ lazy_static! {
         ),],
     ]);
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+    use crate::{pagination::Paginated, storage::RepoEntity};
+
+    #[test]
+    fn test_build_repo_list_keyboard() {
+        let mut repos = vec![];
+        for i in 1..=15 {
+            repos.push(RepoEntity::from_str(&format!("owner/repo{}", i)).unwrap());
+        }
+        let paginated_repos = Paginated::new(repos, 1);
+
+        let keyboard = build_repo_list_keyboard(&paginated_repos);
+
+        // 10 repos + 1 nav row
+        assert_eq!(keyboard.inline_keyboard.len(), 11);
+        // Next button
+        assert_eq!(keyboard.inline_keyboard[10].len(), 1);
+        assert_eq!(keyboard.inline_keyboard[10][0].text, "Next ▶️");
+    }
+
+    #[test]
+    fn test_build_repo_item_keyboard() {
+        let repo = RepoEntity::from_str("owner/repo").unwrap();
+        let keyboard = build_repo_item_keyboard(&repo, 1);
+
+        assert_eq!(keyboard.inline_keyboard.len(), 3);
+        assert_eq!(keyboard.inline_keyboard[0][0].text, "🔙 Repository list");
+        assert_eq!(keyboard.inline_keyboard[1][0].text, "⚙️ Labels");
+        assert_eq!(keyboard.inline_keyboard[2][0].text, "❌ Remove");
+    }
+
+    #[test]
+    fn test_build_repo_labels_keyboard() {
+        let mut labels = vec![];
+        for i in 1..=15 {
+            labels.push(LabelNormalized {
+                name: format!("label{}", i),
+                color: "ffffff".to_string(),
+                count: i,
+                is_selected: i % 2 == 0,
+            });
+        }
+        let paginated_labels = Paginated::new(labels, 1);
+
+        let keyboard = build_repo_labels_keyboard(&paginated_labels, "owner/repo", 1);
+
+        // 1 back row + 10 labels + 1 nav row
+        assert_eq!(keyboard.inline_keyboard.len(), 12);
+        // Next button
+        assert_eq!(keyboard.inline_keyboard[11].len(), 1);
+        assert_eq!(keyboard.inline_keyboard[11][0].text, "Next ▶️");
+    }
+}

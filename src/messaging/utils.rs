@@ -38,3 +38,28 @@ pub fn github_color_to_emoji(hex_color: &str) -> &str {
 pub fn serialize_action(action: &CallbackAction) -> String {
     serde_json::to_string(action).expect("Failed to serialize action")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_github_color_to_emoji() {
+        assert_eq!(github_color_to_emoji("b60205"), "🔴");
+        assert_eq!(github_color_to_emoji("f29513"), "🟠");
+        assert_eq!(github_color_to_emoji("fef2c0"), "🟡");
+        assert_eq!(github_color_to_emoji("0e8a16"), "🟢");
+        assert_eq!(github_color_to_emoji("0052cc"), "🔵");
+        assert_eq!(github_color_to_emoji("5319e7"), "🟣");
+        assert_eq!(github_color_to_emoji("8b572a"), "🟤");
+        assert_eq!(github_color_to_emoji("24292e"), "⚫️");
+        assert_eq!(github_color_to_emoji("unknown"), "⚪️");
+    }
+
+    #[test]
+    fn test_serialize_action() {
+        let action = CallbackAction::CmdHelp;
+        let serialized = serialize_action(&action);
+        assert_eq!(serialized, r#""cmd-help""#);
+    }
+}
