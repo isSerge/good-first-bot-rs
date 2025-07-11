@@ -30,6 +30,7 @@ type Result<T> = std::result::Result<T, RepositoryServiceError>;
 
 /// Represents a normalized label with its name, color, count, and selection
 /// status.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabelNormalized {
     pub name: String,
     pub color: String,

@@ -1,17 +1,27 @@
 use std::{collections::HashSet, sync::Arc};
 
+use chrono::Utc;
 use mockall::predicate::*;
-use teloxide::types::ChatId;
+use teloxide::{
+    dispatching::dialogue::{Dialogue, SqliteStorage, serializer},
+    types::{
+        Chat, ChatId, ChatKind, ChatPrivate, MaybeInaccessibleMessage, MediaKind, MediaText,
+        Message, MessageCommon, MessageId, MessageKind, User,
+    },
+};
 
+use super::*;
 use crate::{
-    bot_handler::BotHandler,
+    bot_handler::{BotHandler, Command, CommandState},
     github::GithubError,
     messaging::MockMessagingService,
-    repository::{MockRepositoryService, RepositoryServiceError},
+    pagination::Paginated,
+    repository::{LabelNormalized, MockRepositoryService, RepositoryServiceError},
     storage::{RepoEntity, StorageError},
 };
 
 const CHAT_ID: ChatId = ChatId(123);
+type DialogueStorage = SqliteStorage<serializer::Json>;
 
 // Helper function to create a HashSet from a slice of strings
 fn str_hashset(items: &[&str]) -> HashSet<String> {
@@ -21,6 +31,76 @@ fn str_hashset(items: &[&str]) -> HashSet<String> {
 // Helper function to create a HashSet of (String, String) tuples
 fn str_tuple_hashset(items: &[(&str, &str)]) -> HashSet<(String, String)> {
     items.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+}
+
+// Helper to create a mock teloxide message to reduce boilerplate in tests
+fn mock_message(chat_id: ChatId, text: &str) -> Message {
+    Message {
+        id: MessageId(1),
+        date: Utc::now(),
+        chat: Chat {
+            id: chat_id,
+            kind: ChatKind::Private(ChatPrivate {
+                username: Some("test".to_string()),
+                first_name: Some("Test".to_string()),
+                last_name: None,
+            }),
+        },
+        kind: MessageKind::Common(MessageCommon {
+            media_kind: MediaKind::Text(MediaText {
+                text: text.to_string(),
+                entities: vec![],
+                link_preview_options: None,
+            }),
+            reply_to_message: None,
+            reply_markup: None,
+            edit_date: None,
+            author_signature: None,
+            has_protected_content: false,
+            is_automatic_forward: false,
+            effect_id: None,
+            forward_origin: None,
+            external_reply: None,
+            quote: None,
+            reply_to_story: None,
+            sender_boost_count: None,
+            is_from_offline: false,
+            business_connection_id: None,
+        }),
+        from: None,
+        is_topic_message: false,
+        sender_business_bot: None,
+        sender_chat: None,
+        thread_id: None,
+        via_bot: None,
+    }
+}
+
+// Helper to create a mock callback query
+fn mock_callback_query<'a>(
+    chat_id: ChatId,
+    action: &CallbackAction<'a>,
+) -> (Message, CallbackQuery) {
+    let msg = mock_message(chat_id, "This is a message with a keyboard.");
+    let query = CallbackQuery {
+        id: "test_callback_id".to_string(),
+        from: User {
+            id: UserId(1),
+            is_bot: false,
+            first_name: "Test".to_string(),
+            last_name: None,
+            username: Some("testuser".to_string()),
+            language_code: None,
+            is_premium: false,
+            added_to_attachment_menu: false,
+        },
+        message: Some(MaybeInaccessibleMessage::Regular(Box::new(msg.clone()))),
+        inline_message_id: None,
+        chat_instance: "test_instance".to_string(),
+        data: Some(serde_json::to_string(action).unwrap()),
+        game_short_name: None,
+    };
+    (msg, query)
 }
 
 #[tokio::test]
@@ -354,6 +434,200 @@ async fn test_process_add_multiple_mixed_outcomes() {
 
     // Assert
     assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_dialogue_persists_awaiting_add_repo_state() {
+    // Arrage
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let chat_id = CHAT_ID;
+    let repo_url = "https://github.com/owner/repo";
+    let repo_name_with_owner = "owner/repo";
+
+    // Set ALL expectations for the entire test flow
+    // Expectation for Interaction 1 (/add command)
+    mock_messaging.expect_prompt_for_repo_input().with(eq(chat_id)).times(1).returning(|_| Ok(()));
+
+    // Expectations for Interaction 2 (the reply to the prompt)
+    // Expect the repository to exist
+    mock_repository
+        .expect_repo_exists()
+        .with(eq("owner"), eq("repo"))
+        .times(1)
+        .returning(|_, _| Ok(true));
+    // Expect the repository to not be already tracked
+    mock_repository
+        .expect_contains_repo()
+        .withf(move |&id, e| id == chat_id && e.name_with_owner == repo_name_with_owner)
+        .times(1)
+        .returning(|_, _| Ok(false));
+    // Expect the repository to be added
+    mock_repository
+        .expect_add_repo()
+        .withf(move |&id, e| id == chat_id && e.name_with_owner == repo_name_with_owner)
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    // Expect summary message at the end of reply processing
+    let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
+    mock_messaging
+        .expect_send_add_summary_msg()
+        .withf(move |&cid, s, a, n, i, p| {
+            cid == chat_id
+                && *s == expected_successfully_added
+                && a.is_empty()
+                && n.is_empty()
+                && i.is_empty()
+                && p.is_empty()
+        })
+        .times(1)
+        .returning(|_, _, _, _, _, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+
+    // Act & Assert 1: Initial Command Handling
+    let dialogue1: Dialogue<CommandState, DialogueStorage> =
+        Dialogue::new(storage.clone(), chat_id);
+    let add_msg = mock_message(chat_id, "/add");
+
+    handler.handle_commands(&add_msg, Command::Add, dialogue1.clone()).await.unwrap();
+
+    let state1 = dialogue1.get().await.unwrap();
+    assert!(
+        matches!(state1, Some(CommandState::AwaitingAddRepo)),
+        "State should be AwaitingAddRepo after /add"
+    );
+
+    // Act & Assert 2: Reply Handling
+    // This simulates a new update arriving. We create a new dialogue instance,
+    // which should load its state from the storage.
+    let dialogue2 = Dialogue::new(storage.clone(), chat_id);
+
+    // This is the core check for persistence.
+    let persisted_state = dialogue2.get().await.unwrap();
+    assert!(
+        matches!(persisted_state, Some(CommandState::AwaitingAddRepo)),
+        "State should be loaded from storage for new dialogue instance"
+    );
+
+    // `handle_reply` expects a message that is a reply, so we need to mock that.
+    let mut reply_msg = mock_message(chat_id, repo_url);
+    if let MessageKind::Common(common) = &mut reply_msg.kind {
+        // Just mock a default message as the one being replied to.
+        common.reply_to_message = Some(Box::new(mock_message(chat_id, "random message")));
+    }
+
+    handler.handle_reply(&reply_msg, &dialogue2).await.unwrap();
+
+    // Act & Assert 3: Final State Check
+    let final_state = dialogue2.get().await.unwrap();
+    assert!(final_state.is_none(), "State should be cleared after successful reply");
+}
+
+#[tokio::test]
+async fn test_dialogue_persists_viewing_repo_labels_state() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let chat_id = CHAT_ID;
+    let repo_id = "owner/repo";
+    let from_page = 1;
+    let labels_page = 1;
+    let label_to_toggle = "bug";
+    let repo_entity = RepoEntity::from_str(repo_id).unwrap();
+
+    // --- Expectations for the test flow ---
+
+    // `handle_callback_query` always answers the query immediately.
+    mock_messaging.expect_answer_callback_query().times(2).returning(|_, _| Ok(()));
+
+    // `get_repo_github_labels` is called three times in total.
+    // 1. Once in `action_view_labels`.
+    // 2. Twice in `action_toggle_label` (the bug we are testing around).
+    let initial_labels = Paginated::new(vec![], 1);
+    let updated_labels = Paginated::new(
+        vec![LabelNormalized {
+            name: "bug".to_string(),
+            color: "d73a4a".to_string(),
+            count: 1,
+            is_selected: true,
+        }],
+        1,
+    );
+    let mut call_count = 0;
+    mock_repository
+        .expect_get_repo_github_labels()
+        .with(eq(chat_id), eq(repo_entity.clone()), eq(labels_page))
+        .times(3)
+        .returning(move |_, _, _| {
+            call_count += 1;
+            match call_count {
+                1 => Ok(initial_labels.clone()),
+                _ => Ok(updated_labels.clone()),
+            }
+        });
+
+    // `edit_labels_msg` is called twice due to the bug in `action_toggle_label`.
+    mock_messaging
+        .expect_edit_labels_msg()
+        .withf(move |&cid, _, _, rid, fp| cid == chat_id && rid == repo_id && *fp == from_page)
+        .times(2)
+        .returning(|_, _, _, _, _| Ok(()));
+
+    // Other calls are only expected once.
+    mock_messaging
+        .expect_answer_labels_callback_query()
+        .withf(move |&cid, _, _, rid, fp| cid == chat_id && rid == repo_id && *fp == from_page)
+        .times(1)
+        .returning(|_, _, _, _, _| Ok(()));
+
+    mock_repository
+        .expect_toggle_label()
+        .with(eq(chat_id), eq(repo_entity.clone()), eq(label_to_toggle))
+        .times(1)
+        .returning(|_, _, _| Ok(true));
+
+    mock_messaging
+        .expect_answer_toggle_label_callback_query()
+        .withf(move |_, name, is_selected| name == label_to_toggle && *is_selected)
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+
+    // --- Act & Assert ---
+
+    // 1. Simulate the first callback: viewing labels.
+    let dialogue1: Dialogue<CommandState, DialogueStorage> =
+        Dialogue::new(storage.clone(), chat_id);
+    let (_, view_labels_query) = mock_callback_query(
+        chat_id,
+        &CallbackAction::ViewRepoLabels(repo_id, labels_page, from_page),
+    );
+    handler.handle_callback_query(&view_labels_query, dialogue1.clone()).await.unwrap();
+
+    let state1 = dialogue1.get().await.unwrap();
+    assert!(
+        matches!(&state1, Some(CommandState::ViewingRepoLabels { repo_id: r, from_page: f }) if r == repo_id && *f == from_page),
+        "State should be ViewingRepoLabels after action"
+    );
+
+    // 2. Simulate the second callback: toggling a label.
+    let dialogue2 = Dialogue::new(storage.clone(), chat_id);
+    let (_, toggle_label_query) = mock_callback_query(
+        chat_id,
+        &CallbackAction::ToggleLabel(label_to_toggle, labels_page, from_page),
+    );
+    handler.handle_callback_query(&toggle_label_query, dialogue2.clone()).await.unwrap();
+
+    let final_state = dialogue2.get().await.unwrap();
+    assert!(
+        matches!(&final_state, Some(CommandState::ViewingRepoLabels { repo_id: r, from_page: f }) if r == repo_id && *f == from_page),
+        "State should remain ViewingRepoLabels after toggling"
+    );
 }
 
 // TODO: add tests for:
