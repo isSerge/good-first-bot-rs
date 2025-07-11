@@ -557,14 +557,14 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
         }],
         1,
     );
-    let mut call_count = 0;
+    let call_count = RefCell::new(0);
     mock_repository
         .expect_get_repo_github_labels()
         .with(eq(chat_id), eq(repo_entity.clone()), eq(labels_page))
         .times(3)
         .returning(move |_, _, _| {
-            call_count += 1;
-            match call_count {
+            *call_count.borrow_mut() += 1;
+            match *call_count.borrow() {
                 1 => Ok(initial_labels.clone()),
                 _ => Ok(updated_labels.clone()),
             }
