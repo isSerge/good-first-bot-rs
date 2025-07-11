@@ -17,16 +17,16 @@ mod storage;
 
 use std::sync::Arc;
 
-use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
+use teloxide::{
+    dispatching::dialogue::{SqliteStorage, serializer},
+    prelude::*,
+};
 use tracing_subscriber::EnvFilter;
 
 use crate::{
-    bot_handler::{BotHandler, CommandState},
-    config::Config,
-    messaging::TelegramMessagingService,
-    poller::GithubPoller,
-    repository::DefaultRepositoryService,
-    storage::sqlite::SqliteStorage,
+    bot_handler::BotHandler, config::Config, messaging::TelegramMessagingService,
+    poller::GithubPoller, repository::DefaultRepositoryService,
+    storage::sqlite::SqliteStorage as ApplicationStorage,
 };
 
 #[tokio::main]
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
-    let storage = Arc::new(SqliteStorage::new(&config.database_url).await?);
+    let storage = Arc::new(ApplicationStorage::new(&config.database_url).await?);
     let bot = Bot::new(config.telegram_bot_token.clone());
     let github_client = Arc::new(github::DefaultGithubClient::new(
         &config.github_token,
@@ -75,7 +75,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let dialogue_storage = InMemStorage::<CommandState>::new();
+    let dialogue_storage = SqliteStorage::open(&config.database_url, serializer::Json).await?;
     let repo_manager_service = Arc::new(DefaultRepositoryService::new(
         storage.clone(),
         github_client.clone(),

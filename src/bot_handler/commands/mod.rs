@@ -5,15 +5,15 @@ mod overview;
 mod start;
 
 use async_trait::async_trait;
-use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
+use teloxide::prelude::*;
 
-use crate::bot_handler::{BotHandler, BotHandlerResult, CommandState};
+use crate::bot_handler::{BotHandler, BotHandlerResult, CommandState, DialogueStorage};
 
 /// CommandContext groups the data needed by all command handlers.
 pub struct CommandContext<'a> {
     pub handler: &'a BotHandler,
     pub message: &'a Message,
-    pub dialogue: &'a Dialogue<CommandState, InMemStorage<CommandState>>,
+    pub dialogue: &'a Dialogue<CommandState, DialogueStorage>,
 }
 
 #[async_trait]

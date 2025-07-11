@@ -8,7 +8,7 @@ use std::{collections::HashSet, str::FromStr, sync::Arc};
 pub use callback_actions::CallbackAction;
 use serde::{Deserialize, Serialize};
 use teloxide::{
-    dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
+    dispatching::dialogue::{Dialogue, SqliteStorage, SqliteStorageError, serializer::Json},
     prelude::*,
     types::Message,
     utils::command::BotCommands,
@@ -22,13 +22,15 @@ use crate::{
     storage::RepoEntity,
 };
 
+type DialogueStorage = SqliteStorage<Json>;
+
 #[derive(Error, Debug)]
 pub enum BotHandlerError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
     #[error("Failed to get or update dialogue: {0}")]
-    DialogueError(#[from] InMemStorageError),
+    DialogueError(#[from] SqliteStorageError<serde_json::Error>),
 
     #[error("Failed to send message: {0}")]
     SendMessageError(#[from] MessagingError),
@@ -98,7 +100,7 @@ impl BotHandler {
         &self,
         msg: &Message,
         cmd: Command,
-        dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+        dialogue: Dialogue<CommandState, DialogueStorage>,
     ) -> BotHandlerResult<()> {
         let ctx = CommandContext { handler: self, message: msg, dialogue: &dialogue };
 
@@ -109,7 +111,7 @@ impl BotHandler {
     pub async fn handle_reply(
         &self,
         msg: &Message,
-        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
+        dialogue: &Dialogue<CommandState, DialogueStorage>,
     ) -> BotHandlerResult<()> {
         let text = msg.text();
         let dialogue_state = dialogue.get().await.map_err(BotHandlerError::DialogueError)?;
@@ -128,14 +130,14 @@ impl BotHandler {
                     .await?;
             }
         }
-        dialogue.exit().await?;
+        dialogue.exit().await.map_err(BotHandlerError::DialogueError)?;
         Ok(())
     }
 
     pub async fn handle_callback_query(
         &self,
         query: &CallbackQuery,
-        dialogue: Dialogue<CommandState, InMemStorage<CommandState>>,
+        dialogue: Dialogue<CommandState, DialogueStorage>,
     ) -> BotHandlerResult<()> {
         let query_id = query.id.clone();
 
@@ -247,7 +249,7 @@ impl BotHandler {
 
     pub async fn action_view_repo_details(
         &self,
-        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
+        dialogue: &Dialogue<CommandState, DialogueStorage>,
         query: &CallbackQuery,
         repo_id: &str,
         from_page: usize,
@@ -277,14 +279,14 @@ impl BotHandler {
             .await?;
 
         // Reset the dialogue state
-        dialogue.update(CommandState::None).await?;
+        dialogue.update(CommandState::None).await.map_err(BotHandlerError::DialogueError)?;
 
         Ok(())
     }
 
     pub async fn action_view_labels(
         &self,
-        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
+        dialogue: &Dialogue<CommandState, DialogueStorage>,
         query: &CallbackQuery,
         repo_id: &str,
         page: usize,
@@ -324,7 +326,7 @@ impl BotHandler {
 
     pub async fn action_toggle_label(
         &self,
-        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
+        dialogue: &Dialogue<CommandState, DialogueStorage>,
         query: &CallbackQuery,
         label_name: &str,
         page: usize,
@@ -402,7 +404,7 @@ impl BotHandler {
     async fn prompt_and_wait_for_reply(
         &self,
         chat_id: ChatId,
-        dialogue: &Dialogue<CommandState, InMemStorage<CommandState>>,
+        dialogue: &Dialogue<CommandState, DialogueStorage>,
         command: Command,
     ) -> BotHandlerResult<()> {
         self.messaging_service.prompt_for_repo_input(chat_id).await?;
