@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS dialogues (
+    chat_id INTEGER PRIMARY KEY NOT NULL,
+    state TEXT NOT NULL
+);
