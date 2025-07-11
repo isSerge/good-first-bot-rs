@@ -8,7 +8,7 @@ use std::{collections::HashSet, str::FromStr, sync::Arc};
 pub use callback_actions::CallbackAction;
 use serde::{Deserialize, Serialize};
 use teloxide::{
-    dispatching::dialogue::{Dialogue, SqliteStorage, serializer::Json},
+    dispatching::dialogue::{Dialogue, SqliteStorage, SqliteStorageError, serializer::Json},
     prelude::*,
     types::Message,
     utils::command::BotCommands,
@@ -30,7 +30,7 @@ pub enum BotHandlerError {
     InvalidInput(String),
 
     #[error("Failed to get or update dialogue: {0}")]
-    DialogueError(String),
+    DialogueError(#[from] SqliteStorageError<serde_json::Error>),
 
     #[error("Failed to send message: {0}")]
     SendMessageError(#[from] MessagingError),
@@ -114,8 +114,7 @@ impl BotHandler {
         dialogue: &Dialogue<CommandState, DialogueStorage>,
     ) -> BotHandlerResult<()> {
         let text = msg.text();
-        let dialogue_state =
-            dialogue.get().await.map_err(|e| BotHandlerError::DialogueError(e.to_string()))?;
+        let dialogue_state = dialogue.get().await.map_err(BotHandlerError::DialogueError)?;
         // Check if we're waiting for repository input.
         match (dialogue_state, text) {
             (Some(CommandState::AwaitingAddRepo), Some(text)) =>
@@ -131,7 +130,7 @@ impl BotHandler {
                     .await?;
             }
         }
-        dialogue.exit().await.map_err(|e| BotHandlerError::DialogueError(e.to_string()))?;
+        dialogue.exit().await.map_err(BotHandlerError::DialogueError)?;
         Ok(())
     }
 
@@ -280,10 +279,7 @@ impl BotHandler {
             .await?;
 
         // Reset the dialogue state
-        dialogue
-            .update(CommandState::None)
-            .await
-            .map_err(|e| BotHandlerError::DialogueError(e.to_string()))?;
+        dialogue.update(CommandState::None).await.map_err(BotHandlerError::DialogueError)?;
 
         Ok(())
     }
@@ -323,7 +319,7 @@ impl BotHandler {
         dialogue
             .update(CommandState::ViewingRepoLabels { repo_id: repo.name_with_owner, from_page })
             .await
-            .map_err(|e| BotHandlerError::DialogueError(e.to_string()))?;
+            .map_err(BotHandlerError::DialogueError)?;
 
         Ok(())
     }
@@ -342,8 +338,7 @@ impl BotHandler {
         let chat_id = message.chat().id;
 
         // Extract repository name with owner from the dialogue state
-        let dialogue_state =
-            dialogue.get().await.map_err(|e| BotHandlerError::DialogueError(e.to_string()))?;
+        let dialogue_state = dialogue.get().await.map_err(BotHandlerError::DialogueError)?;
 
         let (repo_id, from_page) = match dialogue_state {
             Some(CommandState::ViewingRepoLabels { repo_id, from_page }) => (repo_id, from_page),
@@ -417,7 +412,7 @@ impl BotHandler {
             Command::Add => CommandState::AwaitingAddRepo,
             _ => unreachable!(),
         };
-        dialogue.update(state).await.map_err(|e| BotHandlerError::DialogueError(e.to_string()))?;
+        dialogue.update(state).await.map_err(BotHandlerError::DialogueError)?;
         Ok(())
     }
 
