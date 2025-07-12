@@ -33,34 +33,11 @@ async fn test_repo_exists() {
 }
 
 #[tokio::test]
-async fn test_contains_repo() {
-    // Arrange
-    let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage.expect_contains().returning(|_, _| Ok(true));
-    let mock_github_client = MockGithubClient::new();
-    let repository_service = DefaultRepositoryService::new(
-        Arc::new(mock_repo_storage),
-        Arc::new(mock_github_client),
-        MAX_REPOS_PER_USER,
-        MAX_LABELS_PER_REPO,
-    );
-
-    let repo = RepoEntity::from_str("owner/repo").unwrap();
-
-    // Act
-    let contains = repository_service.contains_repo(ChatId(1), &repo).await;
-
-    // Assert
-    assert!(contains.is_ok());
-    assert!(contains.unwrap());
-}
-
-#[tokio::test]
 async fn test_add_repo() {
     // Arrange
     let mut mock_repo_storage = MockRepoStorage::new();
     mock_repo_storage.expect_count_repos_per_user().returning(|_| Ok(5));
-    mock_repo_storage.expect_add_repository().returning(|_, _| Ok(()));
+    mock_repo_storage.expect_add_repository().returning(|_, _| Ok(true));
     let mock_github_client = MockGithubClient::new();
     let repository_service = DefaultRepositoryService::new(
         Arc::new(mock_repo_storage),
@@ -187,30 +164,6 @@ async fn test_repo_exists_error() {
 
     // Act
     let result = repository_service.repo_exists("owner", "repo").await;
-
-    // Assert
-    assert!(result.is_err());
-}
-
-#[tokio::test]
-async fn test_contains_repo_error() {
-    // Arrange
-    let mut mock_repo_storage = MockRepoStorage::new();
-    mock_repo_storage
-        .expect_contains()
-        .returning(|_, _| Err(StorageError::DbError("error".to_string())));
-    let mock_github_client = MockGithubClient::new();
-    let repository_service = DefaultRepositoryService::new(
-        Arc::new(mock_repo_storage),
-        Arc::new(mock_github_client),
-        MAX_REPOS_PER_USER,
-        MAX_LABELS_PER_REPO,
-    );
-
-    // Act
-    let result = repository_service
-        .contains_repo(ChatId(1), &RepoEntity::from_str("owner/repo").unwrap())
-        .await;
 
     // Assert
     assert!(result.is_err());

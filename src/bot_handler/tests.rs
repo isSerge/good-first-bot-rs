@@ -121,15 +121,10 @@ async fn test_process_add_success() {
         .times(1) // Expect it to be called once for this repo
         .returning(|_, _| Ok(true));
     mock_repository
-        .expect_contains_repo()
-        .withf(move |&id, entity| id == CHAT_ID && entity.name_with_owner == repo_name_with_owner)
-        .times(1)
-        .returning(|_, _| Ok(false));
-    mock_repository
         .expect_add_repo()
         .withf(move |&id, entity| id == CHAT_ID && entity.name_with_owner == repo_name_with_owner)
         .times(1)
-        .returning(|_, _| Ok(()));
+        .returning(|_, _| Ok(true));
 
     // Expect send_add_summary_msg to be called
     let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
@@ -165,8 +160,11 @@ async fn test_process_add_already_tracked() {
     let repo_url = "https://github.com/owner/repo";
 
     mock_repository.expect_repo_exists().returning(|_, _| Ok(true));
-    mock_repository.expect_contains_repo().returning(|_, _| Ok(true));
-    // add_repo should not be called
+    mock_repository
+        .expect_add_repo()
+        .withf(move |&id, entity| id == CHAT_ID && entity.name_with_owner == repo_name_with_owner)
+        .times(1)
+        .returning(|_, _| Ok(false));
 
     let expected_already_tracked = str_hashset(&[repo_name_with_owner]);
     mock_messaging
@@ -303,7 +301,6 @@ async fn test_process_add_repo_limit_reached() {
         RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()).to_string();
 
     mock_repository.expect_repo_exists().returning(|_, _| Ok(true));
-    mock_repository.expect_contains_repo().returning(|_, _| Ok(false));
     mock_repository.expect_add_repo().returning(move |_, _| {
         Err(RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()))
     });
@@ -356,13 +353,9 @@ async fn test_process_add_multiple_mixed_outcomes() {
     // Mocking for 'new' repo
     mock_repository.expect_repo_exists().with(eq("owner"), eq("new")).returning(|_, _| Ok(true));
     mock_repository
-        .expect_contains_repo()
-        .withf(move |_, e: &RepoEntity| e.name_with_owner == name_new)
-        .returning(|_, _| Ok(false));
-    mock_repository
         .expect_add_repo()
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_new)
-        .returning(|_, _| Ok(()));
+        .returning(|_, _| Ok(true));
 
     // Mocking for 'tracked' repo
     mock_repository
@@ -370,9 +363,9 @@ async fn test_process_add_multiple_mixed_outcomes() {
         .with(eq("owner"), eq("tracked"))
         .returning(|_, _| Ok(true));
     mock_repository
-        .expect_contains_repo()
+        .expect_add_repo()
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_tracked)
-        .returning(|_, _| Ok(true));
+        .returning(|_, _| Ok(false));
 
     // Mocking for 'notfound' repo
     mock_repository
@@ -390,10 +383,7 @@ async fn test_process_add_multiple_mixed_outcomes() {
         .expect_repo_exists()
         .with(eq("owner"), eq("add-error"))
         .returning(|_, _| Ok(true));
-    mock_repository
-        .expect_contains_repo()
-        .withf(move |_, e: &RepoEntity| e.name_with_owner == name_add_error)
-        .returning(|_, _| Ok(false));
+
     mock_repository
         .expect_add_repo()
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_add_error)
@@ -457,18 +447,13 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
         .with(eq("owner"), eq("repo"))
         .times(1)
         .returning(|_, _| Ok(true));
-    // Expect the repository to not be already tracked
-    mock_repository
-        .expect_contains_repo()
-        .withf(move |&id, e| id == chat_id && e.name_with_owner == repo_name_with_owner)
-        .times(1)
-        .returning(|_, _| Ok(false));
+
     // Expect the repository to be added
     mock_repository
         .expect_add_repo()
         .withf(move |&id, e| id == chat_id && e.name_with_owner == repo_name_with_owner)
         .times(1)
-        .returning(|_, _| Ok(()));
+        .returning(|_, _| Ok(true));
 
     // Expect summary message at the end of reply processing
     let expected_successfully_added = str_hashset(&[repo_name_with_owner]);

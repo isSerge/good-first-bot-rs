@@ -25,7 +25,7 @@ pub type StorageResult<T> = Result<T, StorageError>;
 #[async_trait]
 pub trait RepoStorage: Send + Sync {
     /// Add a repository to the storage.
-    async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> StorageResult<()>;
+    async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> StorageResult<bool>;
 
     /// Remove a repository from the storage.
     async fn remove_repository(
@@ -36,9 +36,6 @@ pub trait RepoStorage: Send + Sync {
 
     /// Get all repositories for a user.
     async fn get_repos_per_user(&self, chat_id: ChatId) -> StorageResult<Vec<RepoEntity>>;
-
-    /// Check if a repository exists in the storage.
-    async fn contains(&self, chat_id: ChatId, repository: &RepoEntity) -> StorageResult<bool>;
 
     /// Get all repositories from the storage.
     async fn get_all_repos(&self) -> StorageResult<HashMap<ChatId, HashSet<RepoEntity>>>;

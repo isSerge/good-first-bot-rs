@@ -461,24 +461,14 @@ impl BotHandler {
             // Check if the repository exists on GitHub.
             match repo_exists {
                 Ok(true) => {
-                    let is_already_tracked =
-                        self.repository_service.contains_repo(chat_id, &repo).await;
+                    let add_result = self.repository_service.add_repo(chat_id, repo.clone()).await;
 
-                    match is_already_tracked {
+                    match add_result {
                         Ok(true) => {
-                            already_tracked.insert(repo.name_with_owner);
+                            successfully_added.insert(repo.name_with_owner);
                         }
                         Ok(false) => {
-                            let add = self.repository_service.add_repo(chat_id, repo.clone()).await;
-
-                            match add {
-                                Ok(_) => {
-                                    successfully_added.insert(repo.name_with_owner);
-                                }
-                                Err(e) => {
-                                    errors.insert((repo.name_with_owner, e.to_string()));
-                                }
-                            }
+                            already_tracked.insert(repo.name_with_owner);
                         }
                         Err(e) => {
                             errors.insert((repo.name_with_owner, e.to_string()));

@@ -44,11 +44,8 @@ pub trait RepositoryService: Send + Sync {
     /// Check if a repository exists on GitHub.
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;
 
-    /// Check if a repository is already tracked by the user.
-    async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool>;
-
     /// Add a repository to the user's tracked repositories.
-    async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()>;
+    async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<bool>;
 
     /// Remove a repository from the user's tracked repositories.
     async fn remove_repo(&self, chat_id: ChatId, repo_name_with_owner: &str) -> Result<bool>;
@@ -102,11 +99,7 @@ impl RepositoryService for DefaultRepositoryService {
         self.github_client.repo_exists(owner, name).await.map_err(RepositoryServiceError::from)
     }
 
-    async fn contains_repo(&self, chat_id: ChatId, repo: &RepoEntity) -> Result<bool> {
-        self.storage.contains(chat_id, repo).await.map_err(RepositoryServiceError::from)
-    }
-
-    async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<()> {
+    async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<bool> {
         let user_repo_count = self.storage.count_repos_per_user(chat_id).await?;
 
         if user_repo_count >= self.max_repos_per_user {

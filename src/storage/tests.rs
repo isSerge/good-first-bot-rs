@@ -36,18 +36,6 @@ async fn test_remove_repository() {
 }
 
 #[tokio::test]
-async fn test_contains_repository() {
-    let storage = create_in_memory_storage().await;
-    let chat_id = ChatId(1);
-    let repo = RepoEntity::from_str("owner/repo").unwrap();
-
-    storage.add_repository(chat_id, repo.clone()).await.unwrap();
-
-    let contains = storage.contains(chat_id, &repo).await.unwrap();
-    assert!(contains);
-}
-
-#[tokio::test]
 async fn test_get_all_repos() {
     let storage = create_in_memory_storage().await;
     let chat_id1 = ChatId(1);
