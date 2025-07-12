@@ -45,6 +45,8 @@ pub trait RepositoryService: Send + Sync {
     async fn repo_exists(&self, owner: &str, name: &str) -> Result<bool>;
 
     /// Add a repository to the user's tracked repositories.
+    /// Returns `true` if the repository was added, `false` if it was already
+    /// present.
     async fn add_repo(&self, chat_id: ChatId, repo: RepoEntity) -> Result<bool>;
 
     /// Remove a repository from the user's tracked repositories.

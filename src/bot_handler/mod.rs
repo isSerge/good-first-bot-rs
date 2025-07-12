@@ -461,9 +461,9 @@ impl BotHandler {
             // Check if the repository exists on GitHub.
             match repo_exists {
                 Ok(true) => {
-                    let add_result = self.repository_service.add_repo(chat_id, repo.clone()).await;
+                    let was_added = self.repository_service.add_repo(chat_id, repo.clone()).await;
 
-                    match add_result {
+                    match was_added {
                         Ok(true) => {
                             successfully_added.insert(repo.name_with_owner);
                         }

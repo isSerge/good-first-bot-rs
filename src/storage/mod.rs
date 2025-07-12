@@ -24,7 +24,9 @@ pub type StorageResult<T> = Result<T, StorageError>;
 #[automock]
 #[async_trait]
 pub trait RepoStorage: Send + Sync {
-    /// Add a repository to the storage.
+    /// Add a repository to the storage
+    /// Returns `true` if the repository was added, `false` if it was already
+    /// present.
     async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> StorageResult<bool>;
 
     /// Remove a repository from the storage.
