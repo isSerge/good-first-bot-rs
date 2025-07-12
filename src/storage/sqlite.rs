@@ -36,12 +36,12 @@ impl SqliteStorage {
 
 #[async_trait]
 impl RepoStorage for SqliteStorage {
-    async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> StorageResult<()> {
+    async fn add_repository(&self, chat_id: ChatId, repository: RepoEntity) -> StorageResult<bool> {
         tracing::debug!("Adding repository to SQLite: {:?}", repository);
 
         let chat_id = chat_id.0;
 
-        query!(
+        let result = query!(
             "INSERT OR IGNORE INTO repositories (chat_id, owner, name, name_with_owner, \
              tracked_labels) VALUES (?, ?, ?, ?, ?)",
             chat_id,
@@ -54,7 +54,7 @@ impl RepoStorage for SqliteStorage {
         .await
         .map_err(|e| StorageError::DbError(format!("Failed to add repository to SQLite: {e}")))?;
 
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
     async fn remove_repository(
@@ -106,22 +106,6 @@ impl RepoStorage for SqliteStorage {
             .collect::<Result<Vec<RepoEntity>, _>>()?;
 
         Ok(repos)
-    }
-
-    async fn contains(&self, chat_id: ChatId, repository: &RepoEntity) -> StorageResult<bool> {
-        tracing::debug!("Checking if repository exists in SQLite: {:?}", repository);
-        let chat_id = chat_id.0;
-
-        let result = query!(
-            "SELECT COUNT(*) as count FROM repositories WHERE chat_id = ? AND name_with_owner = ?",
-            chat_id,
-            repository.name_with_owner,
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| StorageError::DbError(format!("Failed to check repository in SQLite: {e}")))?;
-
-        Ok(result.count > 0)
     }
 
     async fn get_all_repos(&self) -> StorageResult<HashMap<ChatId, HashSet<RepoEntity>>> {
