@@ -14,7 +14,28 @@ async fn test_add_and_get_repository() {
     let chat_id = ChatId(1);
     let repo = RepoEntity::from_str("owner/repo").unwrap();
 
-    storage.add_repository(chat_id, repo.clone()).await.unwrap();
+    let result = storage.add_repository(chat_id, repo.clone()).await.unwrap();
+
+    assert!(result);
+
+    let repos = storage.get_repos_per_user(chat_id).await.unwrap();
+    assert_eq!(repos.len(), 1);
+    assert_eq!(repos[0], repo);
+}
+
+#[tokio::test]
+async fn test_add_same_repository() {
+    let storage = create_in_memory_storage().await;
+    let chat_id = ChatId(1);
+    let repo = RepoEntity::from_str("owner/repo").unwrap();
+
+    let result = storage.add_repository(chat_id, repo.clone()).await.unwrap();
+
+    assert!(result);
+
+    // Adding the same repository again should return false
+    let result = storage.add_repository(chat_id, repo.clone()).await.unwrap();
+    assert!(!result);
 
     let repos = storage.get_repos_per_user(chat_id).await.unwrap();
     assert_eq!(repos.len(), 1);
