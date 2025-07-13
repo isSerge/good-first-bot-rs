@@ -636,14 +636,12 @@ async fn test_handle_callback_view_repo_details() {
 
     mock_messaging
         .expect_answer_details_callback_query()
-        .withf(
-            move |&cid, _, repo, labels, page| {
-                cid == CHAT_ID &&
-                    repo.name_with_owner == repo_id &&
-                    labels.is_empty() &&
-                    *page == from_page
-            },
-        )
+        .withf(move |&cid, _, repo, labels, page| {
+            cid == CHAT_ID
+                && repo.name_with_owner == repo_id
+                && labels.is_empty()
+                && *page == from_page
+        })
         .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
@@ -766,11 +764,9 @@ async fn test_handle_callback_view_repo_labels() {
 
     mock_messaging
         .expect_answer_labels_callback_query()
-        .withf(
-            move |&cid, _, labels, r_id, fp| {
-                cid == CHAT_ID && labels.items.is_empty() && r_id == repo_id && *fp == from_page
-            },
-        )
+        .withf(move |&cid, _, labels, r_id, fp| {
+            cid == CHAT_ID && labels.items.is_empty() && r_id == repo_id && *fp == from_page
+        })
         .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
@@ -834,15 +830,13 @@ async fn test_handle_callback_remove_repo_error() {
     let repo_id = "owner/repo";
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
 
-    mock_repository
-        .expect_remove_repo()
-        .with(eq(CHAT_ID), eq(repo_id))
-        .times(1)
-        .returning(|_, _| {
+    mock_repository.expect_remove_repo().with(eq(CHAT_ID), eq(repo_id)).times(1).returning(
+        |_, _| {
             Err(RepositoryServiceError::StorageError(StorageError::DbError(
                 "DB is down".to_string(),
             )))
-        });
+        },
+    );
 
     mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
 
@@ -876,14 +870,12 @@ async fn test_handle_callback_back_to_repo_details() {
 
     mock_messaging
         .expect_answer_details_callback_query()
-        .withf(
-            move |&cid, _, repo, labels, page| {
-                cid == CHAT_ID &&
-                    repo.name_with_owner == repo_id &&
-                    labels.is_empty() &&
-                    *page == from_page
-            },
-        )
+        .withf(move |&cid, _, repo, labels, page| {
+            cid == CHAT_ID
+                && repo.name_with_owner == repo_id
+                && labels.is_empty()
+                && *page == from_page
+        })
         .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
@@ -898,7 +890,7 @@ async fn test_handle_callback_back_to_repo_details() {
     assert!(result.is_ok());
     let state = dialogue.get().await.unwrap();
     assert!(matches!(state, Some(CommandState::None)), "Dialogue state should be reset to None");
-} 
+}
 
 #[tokio::test]
 async fn test_handle_callback_back_to_repo_list() {
@@ -912,10 +904,7 @@ async fn test_handle_callback_back_to_repo_list() {
 
     // Set an initial state to ensure it gets cleared.
     dialogue
-        .update(CommandState::ViewingRepoLabels {
-            repo_id: "owner/repo".to_string(),
-            from_page: 1,
-        })
+        .update(CommandState::ViewingRepoLabels { repo_id: "owner/repo".to_string(), from_page: 1 })
         .await
         .unwrap();
 
