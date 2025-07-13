@@ -899,3 +899,51 @@ async fn test_handle_callback_back_to_repo_details() {
     let state = dialogue.get().await.unwrap();
     assert!(matches!(state, Some(CommandState::None)), "Dialogue state should be reset to None");
 } 
+
+#[tokio::test]
+async fn test_handle_callback_back_to_repo_list() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let chat_id = CHAT_ID;
+    let page = 2; // Test going back to a specific page
+    let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), chat_id);
+
+    // Set an initial state to ensure it gets cleared.
+    dialogue
+        .update(CommandState::ViewingRepoLabels {
+            repo_id: "owner/repo".to_string(),
+            from_page: 1,
+        })
+        .await
+        .unwrap();
+
+    let repos = vec![RepoEntity::from_str("owner/repo1").unwrap()];
+    let paginated_repos = Paginated::new(repos.clone(), page);
+
+    mock_repository
+        .expect_get_user_repos()
+        .with(eq(chat_id), eq(page))
+        .times(1)
+        .returning(move |_, _| Ok(paginated_repos.clone()));
+
+    mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
+
+    mock_messaging
+        .expect_edit_list_msg()
+        .withf(move |&cid, _, p_repos| cid == chat_id && p_repos.items == repos)
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+    let (_, query) = mock_callback_query(chat_id, &CallbackAction::BackToRepoList(page));
+
+    // Act
+    let result = handler.handle_callback_query(&query, dialogue.clone()).await;
+
+    // Assert
+    assert!(result.is_ok());
+    let state = dialogue.get().await.unwrap();
+    assert!(matches!(state, Some(CommandState::None)), "Dialogue state should be reset to None");
+}
