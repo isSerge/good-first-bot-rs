@@ -128,6 +128,20 @@ To run tests:
 cargo test
 ```
 
+## Generate Test Coverage Report
+
+_Interactive HTML Report_
+
+```sh
+RUST_TEST_THREADS=1 cargo +stable llvm-cov --html --open
+```
+
+_CLI Report_
+
+```sh
+RUST_TEST_THREADS=1 cargo +stable llvm-cov
+```
+
 ## Running with Docker
 
 This project includes a `Dockerfile` and a `docker-compose.yml` for easy

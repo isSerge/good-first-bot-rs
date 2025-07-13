@@ -165,7 +165,7 @@ impl BotHandler {
                     self.action_toggle_label(&dialogue, query, label, page).await?;
                 }
                 CallbackAction::BackToRepoList(page) => {
-                    self.action_back_to_repo_list(query, page).await?;
+                    self.action_back_to_repo_list(&dialogue, query, page).await?;
                 }
                 CallbackAction::ListReposPage(page) => {
                     let message = query.message.as_ref().ok_or(BotHandlerError::InvalidInput(
@@ -385,6 +385,7 @@ impl BotHandler {
 
     async fn action_back_to_repo_list(
         &self,
+        dialogue: &Dialogue<CommandState, DialogueStorage>,
         query: &CallbackQuery,
         page: usize,
     ) -> BotHandlerResult<()> {
@@ -396,6 +397,7 @@ impl BotHandler {
         // Get the updated repository list.
         let user_repos = self.repository_service.get_user_repos(chat_id, page).await?;
         self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
+        dialogue.update(CommandState::None).await.map_err(BotHandlerError::DialogueError)?;
         Ok(())
     }
 
