@@ -165,7 +165,7 @@ impl BotHandler {
                     self.action_toggle_label(&dialogue, query, label, page).await?;
                 }
                 CallbackAction::BackToRepoList(page) => {
-                    self.action_back_to_repo_list(query, &dialogue, page).await?;
+                    self.action_back_to_repo_list(&dialogue, query, page).await?;
                 }
                 CallbackAction::ListReposPage(page) => {
                     let message = query.message.as_ref().ok_or(BotHandlerError::InvalidInput(
@@ -385,8 +385,8 @@ impl BotHandler {
 
     async fn action_back_to_repo_list(
         &self,
-        query: &CallbackQuery,
         dialogue: &Dialogue<CommandState, DialogueStorage>,
+        query: &CallbackQuery,
         page: usize,
     ) -> BotHandlerResult<()> {
         let message = query
