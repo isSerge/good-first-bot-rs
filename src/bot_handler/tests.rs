@@ -620,3 +620,86 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
 // handle_labels_callback_query
 // handle_details_callback_query
 // handle_remove_callback_query
+
+#[tokio::test]
+async fn test_handle_reply_invalid_state() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
+
+    // Set an initial state for the dialogue to ensure it exists in storage.
+    dialogue.update(CommandState::None).await.unwrap();
+
+    mock_messaging
+        .expect_send_error_msg()
+        .withf(move |&cid, e| {
+            cid == CHAT_ID && matches!(e, BotHandlerError::InvalidInput(s) if s == "Invalid state")
+        })
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+    let msg = mock_message(CHAT_ID, "some random text");
+
+    // Act
+    let result = handler.handle_reply(&msg, &dialogue).await;
+
+    // Assert
+    assert!(result.is_ok());
+    let state = dialogue.get().await.unwrap();
+    assert!(state.is_none(), "Dialogue state should be cleared");
+}
+
+#[tokio::test]
+async fn test_handle_reply_awaiting_add_repo_success() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let repo_url = "https://github.com/owner/repo";
+    let repo_name_with_owner = "owner/repo";
+    let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
+
+    // Set the state to AwaitingAddRepo
+    dialogue.update(CommandState::AwaitingAddRepo).await.unwrap();
+
+    // Mock the repository interactions for a successful add
+    mock_repository
+        .expect_repo_exists()
+        .with(eq("owner"), eq("repo"))
+        .times(1)
+        .returning(|_, _| Ok(true));
+    mock_repository
+        .expect_add_repo()
+        .withf(move |&id, e| id == CHAT_ID && e.name_with_owner == repo_name_with_owner)
+        .times(1)
+        .returning(|_, _| Ok(true));
+
+    // Expect the summary message
+    let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
+    mock_messaging
+        .expect_send_add_summary_msg()
+        .withf(move |&cid, s, a, n, i, p| {
+            cid == CHAT_ID
+                && *s == expected_successfully_added
+                && a.is_empty()
+                && n.is_empty()
+                && i.is_empty()
+                && p.is_empty()
+        })
+        .times(1)
+        .returning(|_, _, _, _, _, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+    let msg = mock_message(CHAT_ID, repo_url);
+
+    // Act
+    let result = handler.handle_reply(&msg, &dialogue).await;
+
+    // Assert
+    assert!(result.is_ok());
+    let state = dialogue.get().await.unwrap();
+    assert!(state.is_none(), "Dialogue state should be cleared after successful reply");
+}
