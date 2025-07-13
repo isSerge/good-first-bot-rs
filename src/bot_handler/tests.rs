@@ -616,7 +616,6 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
 }
 
 // TODO: add tests for:
-// handle_reply
 // handle_labels_callback_query
 // handle_details_callback_query
 // handle_remove_callback_query
@@ -702,4 +701,117 @@ async fn test_handle_reply_awaiting_add_repo_success() {
     assert!(result.is_ok());
     let state = dialogue.get().await.unwrap();
     assert!(state.is_none(), "Dialogue state should be cleared after successful reply");
+}
+
+#[tokio::test]
+async fn test_handle_callback_view_repo_labels() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let repo_id = "owner/repo";
+    let page = 1;
+    let from_page = 1;
+    let repo_entity = RepoEntity::from_str(repo_id).unwrap();
+    let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
+
+    let paginated_labels = Paginated::new(vec![], page);
+    mock_repository
+        .expect_get_repo_github_labels()
+        .with(eq(CHAT_ID), eq(repo_entity.clone()), eq(page))
+        .times(1)
+        .returning(move |_, _, _| Ok(paginated_labels.clone()));
+
+    mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
+
+    mock_messaging
+        .expect_answer_labels_callback_query()
+        .withf(
+            move |&cid, _, labels, r_id, fp| {
+                cid == CHAT_ID && labels.items.is_empty() && r_id == repo_id && *fp == from_page
+            },
+        )
+        .times(1)
+        .returning(|_, _, _, _, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+    let (_, query) =
+        mock_callback_query(CHAT_ID, &CallbackAction::ViewRepoLabels(repo_id, page, from_page));
+
+    // Act
+    let result = handler.handle_callback_query(&query, dialogue.clone()).await;
+
+    // Assert
+    assert!(result.is_ok());
+    let state = dialogue.get().await.unwrap();
+    assert!(
+        matches!(&state, Some(CommandState::ViewingRepoLabels { repo_id: r, from_page: f }) if r == repo_id && *f == from_page),
+        "State should be ViewingRepoLabels"
+    );
+}
+
+#[tokio::test]
+async fn test_handle_callback_view_repo_labels_error() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let repo_id = "owner/repo";
+    let page = 1;
+    let from_page = 1;
+    let repo_entity = RepoEntity::from_str(repo_id).unwrap();
+    let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
+
+    mock_repository
+        .expect_get_repo_github_labels()
+        .with(eq(CHAT_ID), eq(repo_entity.clone()), eq(page))
+        .times(1)
+        .returning(|_, _, _| {
+            Err(RepositoryServiceError::StorageError(StorageError::DbError(
+                "DB is down".to_string(),
+            )))
+        });
+
+    mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+    let (_, query) =
+        mock_callback_query(CHAT_ID, &CallbackAction::ViewRepoLabels(repo_id, page, from_page));
+
+    // Act
+    let result = handler.handle_callback_query(&query, dialogue.clone()).await;
+
+    // Assert
+    assert!(matches!(result, Err(BotHandlerError::InternalError(_))));
+}
+
+#[tokio::test]
+async fn test_handle_callback_remove_repo_error() {
+    // Arrange
+    let mut mock_messaging = MockMessagingService::new();
+    let mut mock_repository = MockRepositoryService::new();
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let repo_id = "owner/repo";
+    let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
+
+    mock_repository
+        .expect_remove_repo()
+        .with(eq(CHAT_ID), eq(repo_id))
+        .times(1)
+        .returning(|_, _| {
+            Err(RepositoryServiceError::StorageError(StorageError::DbError(
+                "DB is down".to_string(),
+            )))
+        });
+
+    mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
+
+    let handler = BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository));
+    let (_, query) = mock_callback_query(CHAT_ID, &CallbackAction::RemoveRepoPrompt(repo_id));
+
+    // Act
+    let result = handler.handle_callback_query(&query, dialogue).await;
+
+    // Assert
+    assert!(matches!(result, Err(BotHandlerError::InternalError(_))));
 }
