@@ -128,7 +128,7 @@ To run tests:
 cargo test
 ```
 
-### Generate Test Coverage Report
+## Generate Test Coverage Report
 
 _Interactive HTML Report_
 
