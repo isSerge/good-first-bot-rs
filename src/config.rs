@@ -6,6 +6,7 @@ const DEFAULT_POLL_INTERVAL: u64 = 10;
 const DEFAULT_REPOS_PER_USER: usize = 20;
 const DEFAULT_LABELS_PER_REPO: usize = 10;
 const DEFAULT_MAX_CONCURRENCY: usize = 10;
+const DEFAULT_RATE_LIMIT_THRESHOLD: u32 = 10;
 
 #[derive(Debug)]
 pub struct Config {
@@ -17,6 +18,7 @@ pub struct Config {
     pub max_repos_per_user: usize,
     pub max_labels_per_repo: usize,
     pub max_concurrency: usize,
+    pub rate_limit_threshold: u32,
 }
 
 impl Config {
@@ -44,6 +46,11 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_MAX_CONCURRENCY),
+            rate_limit_threshold: env::var("RATE_LIMIT_THRESHOLD")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(DEFAULT_RATE_LIMIT_THRESHOLD), // Default threshold for rate limiting
+
         })
     }
 }
