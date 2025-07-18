@@ -332,22 +332,24 @@ impl BotHandler {
         let paginated_labels =
             self.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
 
-        // Answer the callback query to clear the spinner.
-        self.messaging_service
-            .answer_labels_callback_query(
-                chat_id,
-                message.id(),
-                &paginated_labels,
-                repo_id,
-                from_page,
-            )
-            .await?;
-
-        // Update the dialogue state to ViewingRepoLabels
-        dialogue
-            .update(CommandState::ViewingRepoLabels { repo_id: repo.name_with_owner, from_page })
-            .await
-            .map_err(BotHandlerError::DialogueError)?;
+        // Concurrently answer the callback query and update the dialogue state.
+        try_join!(
+            self.messaging_service
+                .answer_labels_callback_query(
+                    chat_id,
+                    message.id(),
+                    &paginated_labels,
+                    repo_id,
+                    from_page,
+                )
+                .map_err(BotHandlerError::from),
+            dialogue
+                .update(CommandState::ViewingRepoLabels {
+                    repo_id: repo.name_with_owner,
+                    from_page
+                })
+                .map_err(BotHandlerError::from)
+        )?;
 
         Ok(())
     }
