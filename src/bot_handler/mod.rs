@@ -413,10 +413,18 @@ impl BotHandler {
             .as_ref()
             .ok_or(BotHandlerError::InvalidInput("Callback query has no message".to_string()))?;
         let chat_id = message.chat().id;
+
         // Get the updated repository list.
         let user_repos = self.repository_service.get_user_repos(chat_id, page).await?;
-        self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
-        dialogue.update(CommandState::None).await.map_err(BotHandlerError::DialogueError)?;
+
+        // Concurrently edit the message and reset the dialogue state.
+        try_join!(
+            self.messaging_service
+                .edit_list_msg(chat_id, message.id(), user_repos)
+                .map_err(BotHandlerError::from),
+            dialogue.update(CommandState::None).map_err(BotHandlerError::from)
+        )?;
+
         Ok(())
     }
 
