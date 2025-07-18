@@ -12,6 +12,17 @@ use reqwest::{
     header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
 };
 use thiserror::Error;
+use tokio::sync::Mutex;
+use std::{
+    sync::Arc,
+    time::Instant,
+};
+
+#[derive(Debug)]
+struct RateLimitState {
+    remaining: u32,
+    reset_at: Instant,
+}
 
 #[derive(Debug, Error)]
 pub enum GithubError {
@@ -102,6 +113,7 @@ pub struct Labels;
 pub struct DefaultGithubClient {
     client: Client,
     graphql_url: String,
+    rate_limit: Arc<Mutex<RateLimitState>>,
 }
 
 impl DefaultGithubClient {
@@ -113,10 +125,13 @@ impl DefaultGithubClient {
         headers.insert(USER_AGENT, HeaderValue::from_static("github-activity-rs"));
 
         let client = reqwest::Client::builder().default_headers(headers).build()?;
-
+        let initial_state = RateLimitState {
+            remaining: u32::MAX,
+            reset_at: Instant::now(),
+        };
         tracing::debug!("HTTP client built successfully.");
 
-        Ok(Self { client, graphql_url: graphql_url.to_string() })
+        Ok(Self { client, graphql_url: graphql_url.to_string(), rate_limit: Arc::new(Mutex::new(initial_state))})
     }
 
     /// Re-usable configuration for exponential backoff.
@@ -142,6 +157,10 @@ impl DefaultGithubClient {
     {
         // closure that Backoff expects
         let operation = || async {
+
+            //0. Rate limit guard
+            self.rate_limit_guard().await;
+
             // 1. Build the request
             let request_body = Q::build_query(variables.clone());
 
@@ -153,6 +172,9 @@ impl DefaultGithubClient {
                         BackoffError::transient(GithubError::RequestError { source: e })
                     },
                 )?;
+
+            //2.5 Update rate limit state from headers
+            self.update_rate_limit_from_headers(resp.headers());
 
             // 3. HTTP-status check
             if !resp.status().is_success() {
@@ -234,6 +256,48 @@ impl DefaultGithubClient {
 
         // kick off the retry loop
         retry(Self::backoff_config(), operation).await
+    }
+
+    async fn rate_limit_guard(&self) {
+        let mut state = self.rate_limit.lock().await;
+
+        // define a safety threshold
+        let threshold = 10;
+        if state.remaining <= threshold {
+            let now = Instant::now();
+            if now < state.reset_at {
+                let wait = state.reset_at - now;
+                tracing::info!(
+                    "Approaching rate limit ({} left). Sleeping {:?} until reset...",
+                    state.remaining,
+                    wait
+                );
+                tokio::time::sleep(wait).await;
+            }
+        }
+    }
+
+    fn update_rate_limit_from_headers(&self, headers: &HeaderMap) {
+        let mut state = futures::executor::block_on(self.rate_limit.lock());
+        if let (Some(rem), Some(reset)) = (
+            headers.get("X-RateLimit-Remaining"),
+            headers.get("X-RateLimit-Reset"),
+        ) {
+            if let (Ok(rem), Ok(reset_ts)) = (rem.to_str(), reset.to_str()) {
+                if let (Ok(rem_n), Ok(reset_unix)) = (rem.parse::<u32>(), reset_ts.parse::<u64>()) {
+                    state.remaining = rem_n;
+                    // GitHub resets at a UNIX timestamp in seconds
+                    let reset_in = reset_unix
+                        .saturating_sub(chrono::Utc::now().timestamp() as u64);
+                    state.reset_at = Instant::now() + Duration::from_secs(reset_in);
+                    tracing::debug!(
+                        "Rate limit updated: {} remaining, resets in {}s",
+                        rem_n,
+                        reset_in
+                    );
+                }
+            }
+        }
     }
 }
 
