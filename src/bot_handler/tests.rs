@@ -546,7 +546,7 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
     mock_repository
         .expect_get_repo_github_labels()
         .with(eq(chat_id), eq(repo_entity.clone()), eq(labels_page))
-        .times(3)
+        .times(2)
         .returning(move |_, _, _| {
             *call_count.borrow_mut() += 1;
             match *call_count.borrow() {
@@ -555,11 +555,10 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
             }
         });
 
-    // `edit_labels_msg` is called twice due to the bug in `action_toggle_label`.
     mock_messaging
         .expect_edit_labels_msg()
         .withf(move |&cid, _, _, rid, fp| cid == chat_id && rid == repo_id && *fp == from_page)
-        .times(2)
+        .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
     // Other calls are only expected once.
