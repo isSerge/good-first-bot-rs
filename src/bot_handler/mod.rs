@@ -6,7 +6,7 @@ mod tests;
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 pub use callback_actions::CallbackAction;
-use futures::{stream, TryFutureExt, try_join, StreamExt};
+use futures::{StreamExt, TryFutureExt, stream, try_join};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, SqliteStorage, SqliteStorageError, serializer::Json},
@@ -430,7 +430,8 @@ impl BotHandler {
     /// Add single or multiple repositories to the user's list.
     async fn process_add(&self, urls: &str, chat_id: ChatId) -> BotHandlerResult<()> {
         // Split the input by newlines or whitespaces and create owned Strings
-        let urls: Vec<String> = urls.split_whitespace().filter(|s| !s.is_empty()).map(String::from).collect();
+        let urls: Vec<String> =
+            urls.split_whitespace().filter(|s| !s.is_empty()).map(String::from).collect();
 
         if urls.is_empty() {
             self.messaging_service
@@ -450,7 +451,8 @@ impl BotHandler {
                 };
 
                 match self.repository_service.repo_exists(&repo.owner, &repo.name).await {
-                    Ok(true) => match self.repository_service.add_repo(chat_id, repo.clone()).await {
+                    Ok(true) => match self.repository_service.add_repo(chat_id, repo.clone()).await
+                    {
                         Ok(true) => AddRepoResult::Success(repo.name_with_owner),
                         Ok(false) => AddRepoResult::AlreadyTracked(repo.name_with_owner),
                         Err(e) => AddRepoResult::Error(repo.name_with_owner, e.to_string()),
