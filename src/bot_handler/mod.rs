@@ -6,7 +6,7 @@ mod tests;
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 pub use callback_actions::CallbackAction;
-use futures::{TryFutureExt, try_join};
+use futures::{StreamExt, TryFutureExt, stream, try_join};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, SqliteStorage, SqliteStorageError, serializer::Json},
@@ -24,6 +24,25 @@ use crate::{
 };
 
 type DialogueStorage = SqliteStorage<Json>;
+
+// An enum to represent the result of adding a repository.
+enum AddRepoResult {
+    Success(String),
+    AlreadyTracked(String),
+    NotFound(String),
+    InvalidUrl(String),
+    Error(String, String),
+}
+
+// A struct to hold the summary of the add operation.
+#[derive(Default)]
+struct AddSummary {
+    successfully_added: HashSet<String>,
+    already_tracked: HashSet<String>,
+    not_found: HashSet<String>,
+    invalid_urls: HashSet<String>,
+    errors: HashSet<(String, String)>,
+}
 
 #[derive(Error, Debug)]
 pub enum BotHandlerError {
@@ -73,6 +92,7 @@ pub enum Command {
 pub struct BotHandler {
     messaging_service: Arc<dyn MessagingService>,
     repository_service: Arc<dyn RepositoryService>,
+    max_concurrency: usize,
 }
 
 /// The state of the command.
@@ -92,8 +112,9 @@ impl BotHandler {
     pub fn new(
         messaging_service: Arc<dyn MessagingService>,
         repository_service: Arc<dyn RepositoryService>,
+        max_concurrency: usize,
     ) -> Self {
-        Self { messaging_service, repository_service }
+        Self { messaging_service, repository_service, max_concurrency }
     }
 
     /// Dispatches the incoming command to the appropriate handler.
@@ -410,10 +431,10 @@ impl BotHandler {
 
     /// Add single or multiple repositories to the user's list.
     async fn process_add(&self, urls: &str, chat_id: ChatId) -> BotHandlerResult<()> {
-        // Split the input by newlines or whitespaces
-        let urls = urls.split_whitespace().collect::<Vec<_>>();
+        // Split the input by newlines or whitespaces and create owned Strings
+        let urls: Vec<String> =
+            urls.split_whitespace().filter(|s| !s.is_empty()).map(String::from).collect();
 
-        // Check if the user provided any URLs
         if urls.is_empty() {
             self.messaging_service
                 .send_error_msg(
@@ -424,67 +445,55 @@ impl BotHandler {
             return Ok(());
         }
 
-        // Track the results for summary message
-        let mut successfully_added = HashSet::<String>::new();
-        let mut already_tracked = HashSet::<String>::new();
-        let mut not_found = HashSet::<String>::new();
-        let mut invalid_urls = HashSet::<String>::new();
-        let mut errors = HashSet::<(String, String)>::new();
+        let summary = stream::iter(urls)
+            .map(|url| async move {
+                let repo = match RepoEntity::from_url(&url) {
+                    Ok(repo) => repo,
+                    Err(_) => return AddRepoResult::InvalidUrl(url),
+                };
 
-        // Process each URL separately
-        for url in urls {
-            // Trim the URL to remove leading and trailing whitespace
-            if url.trim().is_empty() {
-                continue;
-            }
-
-            // Parse the repository from the text.
-            let repo = match RepoEntity::from_url(url) {
-                Ok(repo) => repo,
-                Err(_) => {
-                    invalid_urls.insert(url.to_string());
-                    continue;
+                match self.repository_service.repo_exists(&repo.owner, &repo.name).await {
+                    Ok(true) => match self.repository_service.add_repo(chat_id, repo.clone()).await
+                    {
+                        Ok(true) => AddRepoResult::Success(repo.name_with_owner),
+                        Ok(false) => AddRepoResult::AlreadyTracked(repo.name_with_owner),
+                        Err(e) => AddRepoResult::Error(repo.name_with_owner, e.to_string()),
+                    },
+                    Ok(false) => AddRepoResult::NotFound(repo.name_with_owner),
+                    Err(e) => AddRepoResult::Error(repo.name_with_owner, e.to_string()),
                 }
-            };
-
-            // Check if the repository exists on GitHub.
-            let repo_exists = self.repository_service.repo_exists(&repo.owner, &repo.name).await;
-
-            // Check if the repository exists on GitHub.
-            match repo_exists {
-                Ok(true) => {
-                    let was_added = self.repository_service.add_repo(chat_id, repo.clone()).await;
-
-                    match was_added {
-                        Ok(true) => {
-                            successfully_added.insert(repo.name_with_owner);
-                        }
-                        Ok(false) => {
-                            already_tracked.insert(repo.name_with_owner);
-                        }
-                        Err(e) => {
-                            errors.insert((repo.name_with_owner, e.to_string()));
-                        }
+            })
+            .buffer_unordered(self.max_concurrency)
+            .fold(AddSummary::default(), |mut summary, res| async move {
+                match res {
+                    AddRepoResult::Success(name) => {
+                        summary.successfully_added.insert(name);
+                    }
+                    AddRepoResult::AlreadyTracked(name) => {
+                        summary.already_tracked.insert(name);
+                    }
+                    AddRepoResult::NotFound(name) => {
+                        summary.not_found.insert(name);
+                    }
+                    AddRepoResult::InvalidUrl(url) => {
+                        summary.invalid_urls.insert(url);
+                    }
+                    AddRepoResult::Error(name, e) => {
+                        summary.errors.insert((name, e));
                     }
                 }
-                Ok(false) => {
-                    not_found.insert(repo.name_with_owner);
-                }
-                Err(e) => {
-                    errors.insert((repo.name_with_owner, e.to_string()));
-                }
-            }
-        }
+                summary
+            })
+            .await;
 
-        // Send add summary message
         self.messaging_service
             .send_add_summary_msg(
                 chat_id,
-                successfully_added,
-                already_tracked,
-                not_found,
-                invalid_urls,
-                errors,
+                summary.successfully_added,
+                summary.already_tracked,
+                summary.not_found,
+                summary.invalid_urls,
+                summary.errors,
             )
             .await?;
 
