@@ -82,7 +82,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         config.max_repos_per_user,
         config.max_labels_per_repo,
     ));
-    let handler = Arc::new(BotHandler::new(messaging_service, repo_manager_service));
+    let handler =
+        Arc::new(BotHandler::new(messaging_service, repo_manager_service, config.max_concurrency));
     let mut dispatcher = dispatcher::BotDispatcher::new(handler, dialogue_storage).build(bot);
     tracing::debug!("Dispatcher built successfully.");
 
