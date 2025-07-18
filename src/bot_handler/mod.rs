@@ -251,21 +251,27 @@ impl BotHandler {
         // Attempt to remove the repository.
         let removed = self.repository_service.remove_repo(chat_id, repo_id).await?;
 
-        // Answer the callback query to clear the spinner.
-        self.messaging_service.answer_remove_callback_query(&query.id, removed).await?;
-
-        // If removal was successful, update the inline keyboard on the original
-        // message.
         if removed {
-            // Get the updated repository list.
-            let user_repos = self.repository_service.get_user_repos(chat_id, 1).await?;
+            // Concurrently fetch the updated repository list and answer the callback query.
+            let (user_repos, _) = try_join!(
+                self.repository_service
+                    .get_user_repos(chat_id, 1)
+                    .map_err(BotHandlerError::from),
+                self.messaging_service
+                    .answer_remove_callback_query(&query.id, removed)
+                    .map_err(BotHandlerError::from)
+            )?;
 
             if user_repos.items.is_empty() {
                 self.messaging_service.send_list_empty_msg(chat_id).await?;
             }
 
             self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
+        } else {
+            // If not removed, just answer the callback.
+            self.messaging_service.answer_remove_callback_query(&query.id, removed).await?;
         }
+
         Ok(())
     }
 
