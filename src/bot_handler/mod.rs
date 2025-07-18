@@ -254,9 +254,7 @@ impl BotHandler {
         if removed {
             // Concurrently fetch the updated repository list and answer the callback query.
             let (user_repos, _) = try_join!(
-                self.repository_service
-                    .get_user_repos(chat_id, 1)
-                    .map_err(BotHandlerError::from),
+                self.repository_service.get_user_repos(chat_id, 1).map_err(BotHandlerError::from),
                 self.messaging_service
                     .answer_remove_callback_query(&query.id, removed)
                     .map_err(BotHandlerError::from)
