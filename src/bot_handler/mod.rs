@@ -92,6 +92,7 @@ pub enum Command {
 pub struct BotHandler {
     messaging_service: Arc<dyn MessagingService>,
     repository_service: Arc<dyn RepositoryService>,
+    max_concurrency: usize,
 }
 
 /// The state of the command.
@@ -111,8 +112,9 @@ impl BotHandler {
     pub fn new(
         messaging_service: Arc<dyn MessagingService>,
         repository_service: Arc<dyn RepositoryService>,
+        max_concurrency: usize,
     ) -> Self {
-        Self { messaging_service, repository_service }
+        Self { messaging_service, repository_service, max_concurrency }
     }
 
     /// Dispatches the incoming command to the appropriate handler.
@@ -461,7 +463,7 @@ impl BotHandler {
                     Err(e) => AddRepoResult::Error(repo.name_with_owner, e.to_string()),
                 }
             })
-            .buffer_unordered(10)
+            .buffer_unordered(self.max_concurrency)
             .fold(AddSummary::default(), |mut summary, res| async move {
                 match res {
                     AddRepoResult::Success(name) => {
