@@ -251,25 +251,21 @@ impl BotHandler {
         // Attempt to remove the repository.
         let removed = self.repository_service.remove_repo(chat_id, repo_id).await?;
 
+        // Answer the callback query to clear the spinner.
+        self.messaging_service.answer_remove_callback_query(&query.id, removed).await?;
+
+        // If removal was successful, update the inline keyboard on the original
+        // message.
         if removed {
-            // Concurrently fetch the updated repository list and answer the callback query.
-            let (user_repos, _) = try_join!(
-                self.repository_service.get_user_repos(chat_id, 1).map_err(BotHandlerError::from),
-                self.messaging_service
-                    .answer_remove_callback_query(&query.id, removed)
-                    .map_err(BotHandlerError::from)
-            )?;
+            // Get the updated repository list.
+            let user_repos = self.repository_service.get_user_repos(chat_id, 1).await?;
 
             if user_repos.items.is_empty() {
                 self.messaging_service.send_list_empty_msg(chat_id).await?;
             }
 
             self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
-        } else {
-            // If not removed, just answer the callback.
-            self.messaging_service.answer_remove_callback_query(&query.id, removed).await?;
         }
-
         Ok(())
     }
 
@@ -330,24 +326,22 @@ impl BotHandler {
         let paginated_labels =
             self.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
 
-        // Concurrently answer the callback query and update the dialogue state.
-        try_join!(
-            self.messaging_service
-                .answer_labels_callback_query(
-                    chat_id,
-                    message.id(),
-                    &paginated_labels,
-                    repo_id,
-                    from_page,
-                )
-                .map_err(BotHandlerError::from),
-            dialogue
-                .update(CommandState::ViewingRepoLabels {
-                    repo_id: repo.name_with_owner,
-                    from_page
-                })
-                .map_err(BotHandlerError::from)
-        )?;
+        // Answer the callback query to clear the spinner.
+        self.messaging_service
+            .answer_labels_callback_query(
+                chat_id,
+                message.id(),
+                &paginated_labels,
+                repo_id,
+                from_page,
+            )
+            .await?;
+
+        // Update the dialogue state to ViewingRepoLabels
+        dialogue
+            .update(CommandState::ViewingRepoLabels { repo_id: repo.name_with_owner, from_page })
+            .await
+            .map_err(BotHandlerError::DialogueError)?;
 
         Ok(())
     }
