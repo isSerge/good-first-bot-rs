@@ -6,7 +6,7 @@ mod tests;
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 pub use callback_actions::CallbackAction;
-use futures::{try_join, TryFutureExt};
+use futures::{TryFutureExt, try_join};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, SqliteStorage, SqliteStorageError, serializer::Json},
