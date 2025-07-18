@@ -3,10 +3,10 @@ mod commands;
 #[cfg(test)]
 mod tests;
 
-use futures::try_join;
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 pub use callback_actions::CallbackAction;
+use futures::try_join;
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, SqliteStorage, SqliteStorageError, serializer::Json},
@@ -358,8 +358,11 @@ impl BotHandler {
         // Concurrently fetch updated labels and answer the callback query.
         let (labels, _) = try_join!(
             self.repository_service.get_repo_github_labels(chat_id, &repo, page),
-            self.messaging_service
-                .answer_toggle_label_callback_query(&query.id, label_name, is_selected)
+            self.messaging_service.answer_toggle_label_callback_query(
+                &query.id,
+                label_name,
+                is_selected
+            )
         )?;
 
         // Edit labels message to show the updated labels.
