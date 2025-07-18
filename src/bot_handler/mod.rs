@@ -3,6 +3,7 @@ mod commands;
 #[cfg(test)]
 mod tests;
 
+use futures::try_join;
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 pub use callback_actions::CallbackAction;
@@ -352,34 +353,20 @@ impl BotHandler {
             .map_err(|e| BotHandlerError::InvalidInput(e.to_string()))?;
 
         // Try to toggle the label for the repository and handle potential limit errors.
-        match self.repository_service.toggle_label(chat_id, &repo, label_name).await {
-            Ok(is_selected) => {
-                // Answer the callback query to clear the spinner.
-                self.messaging_service
-                    .answer_toggle_label_callback_query(&query.id, label_name, is_selected)
-                    .await?;
+        let is_selected = self.repository_service.toggle_label(chat_id, &repo, label_name).await?;
 
-                // Get the updated labels for the repository.
-                let labels =
-                    self.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
+        // Concurrently fetch updated labels and answer the callback query.
+        let (labels, _) = try_join!(
+            self.repository_service.get_repo_github_labels(chat_id, &repo, page),
+            self.messaging_service
+                .answer_toggle_label_callback_query(&query.id, label_name, is_selected)
+        )?;
 
-                // Edit the labels message to show the updated labels.
-                self.messaging_service
-                    .edit_labels_msg(chat_id, message.id(), &labels, &repo_id, from_page)
-                    .await?;
-            }
-            Err(e) => {
-                return Err(BotHandlerError::InternalError(e));
-            }
-        }
-
-        // Get updated user repo labels
-        let labels = self.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
-
-        // Edit labels message to show the updated labels
+        // Edit labels message to show the updated labels.
         self.messaging_service
             .edit_labels_msg(chat_id, message.id(), &labels, &repo_id, from_page)
             .await?;
+
         Ok(())
     }
 
