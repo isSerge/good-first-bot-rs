@@ -2,6 +2,7 @@
 mod tests;
 
 use std::{collections::HashSet, time::Duration};
+use rand::Rng;
 
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
@@ -275,7 +276,11 @@ impl DefaultGithubClient {
                     remaining,
                     wait
                 );
-                tokio::time::sleep(wait).await;
+
+                // Sleep until the rate limit resets
+                //added a jitter to avoid thundering herd problem
+                let jitter_ms = rand::thread_rng().gen_range(0..500);
+                tokio::time::sleep(jitter_ms).await;
             }
         }
     }
