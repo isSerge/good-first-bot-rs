@@ -259,7 +259,7 @@ impl DefaultGithubClient {
     }
 
     async fn rate_limit_guard(&self) {
-        let state = self.rate_limit.lock().await;
+        let mut state = self.rate_limit.lock().await;
 
         // define a safety threshold
         let threshold = 10;
@@ -277,8 +277,8 @@ impl DefaultGithubClient {
         }
     }
 
-    async fn update_rate_limit_from_headers(&self, headers: &HeaderMap) {
-        let mut state = self.rate_limit.lock().await;
+    fn update_rate_limit_from_headers(&self, headers: &HeaderMap) {
+        let mut state = futures::executor::block_on(self.rate_limit.lock());
         if let (Some(rem), Some(reset)) = (
             headers.get("X-RateLimit-Remaining"),
             headers.get("X-RateLimit-Reset"),
