@@ -45,6 +45,8 @@ pub enum GithubError {
     RateLimited,
     #[error("GitHub authentication failed")]
     Unauthorized,
+    #[error("Failed to parse header: {0}")]
+    HeaderError(String),
 }
 
 // Helper function to check if a GraphQL error is retryable
@@ -115,10 +117,11 @@ pub struct DefaultGithubClient {
     client: Client,
     graphql_url: String,
     rate_limit: Arc<Mutex<RateLimitState>>,
+    rate_limit_threshhold: u64
 }
 
 impl DefaultGithubClient {
-    pub fn new(github_token: &str, graphql_url: &str) -> Result<Self, GithubError> {
+    pub fn new(github_token: &str, graphql_url: &str, rate_limit_threshhold: u64) -> Result<Self, GithubError> {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
 
@@ -132,7 +135,7 @@ impl DefaultGithubClient {
         };
         tracing::debug!("HTTP client built successfully.");
 
-        Ok(Self { client, graphql_url: graphql_url.to_string(), rate_limit: Arc::new(Mutex::new(initial_state))})
+        Ok(Self { client, graphql_url: graphql_url.to_string(), rate_limit: Arc::new(Mutex::new(initial_state)), rate_limit_threshhold})
     }
 
     /// Re-usable configuration for exponential backoff.
@@ -176,6 +179,10 @@ impl DefaultGithubClient {
 
             //2.5 Update rate limit state from headers
             self.update_rate_limit_from_headers(resp.headers()).await;
+            if let Err(e) = self.update_rate_limit_from_headers(resp.headers()).await {
+                // Option A: warn and continue
+                tracing::warn!("Could not update rate-limit info: {}", e);
+            }
 
             // 3. HTTP-status check
             if !resp.status().is_success() {
@@ -259,6 +266,7 @@ impl DefaultGithubClient {
         retry(Self::backoff_config(), operation).await
     }
 
+    /// Rate limit guard that sleeps until the rate limit resets if we're close to the threshold.
     async fn rate_limit_guard(&self) {
         let (remaining, reset_at) = {
             let state = self.rate_limit.lock().await;  // acquire lock
@@ -266,7 +274,7 @@ impl DefaultGithubClient {
         };
 
         // define a safety threshold
-        let threshold = 10;
+        let threshold = self.rate_limit_threshhold as u32;
         if remaining <= threshold {
             let now = Instant::now();
             if now < reset_at {
@@ -286,30 +294,92 @@ impl DefaultGithubClient {
         }
     }
 
-    async fn update_rate_limit_from_headers(&self, headers: &HeaderMap) {
+    // Update the rate limit state from the HTTP headers.
+    // async fn update_rate_limit_from_headers(&self, headers: &HeaderMap) -> Result<(), GithubError> {
+    //     let mut state = self.rate_limit.lock().await;
+    //     let rem_val = headers.get("X-RateLimit-Remaining").or_else(|| {
+    //         tracing::error!("{}", "Missing X-RateLimit-Remaining header".to_string());
+    //         GithubError::HeaderError(("Missing X-RateLimit-Remaining header".to_string()));
+    //     });
+    //     if let (Some(rem), Some(reset)) = (
+    //         headers.get("X-RateLimit-Remaining"),
+    //         headers.get("X-RateLimit-Reset"),
+    //     ) {
+
+
+    //         if let (Ok(rem), Ok(reset_ts)) = (rem.to_str(), reset.to_str()) {
+    //             if let (Ok(rem_n), Ok(reset_unix)) = (rem.parse::<u32>(), reset_ts.parse::<u64>()) {
+    //                 state.remaining = rem_n;
+    //                 // GitHub resets at a UNIX timestamp in seconds
+    //                 let reset_in = reset_unix
+    //                     .saturating_sub(chrono::Utc::now().timestamp() as u64);
+    //                state.reset_at = Instant::now() + Duration::from_secs(reset_in);
+    //                 tracing::debug!(
+    //                     "Rate limit updated: {} remaining, resets in {}s",
+    //                     rem_n,
+    //                     reset_in
+    //                 );
+    //             }
+    //         }
+    //     }
+    // }
+    
+    async fn update_rate_limit_from_headers(&self, headers: &HeaderMap)
+        -> Result<(), GithubError>
+    {
+        // Names are case-insensitive in HeaderMap
+        let rem_val = headers
+            .get("X-RateLimit-Remaining")
+            .ok_or_else(|| {
+                let msg = "Missing X-RateLimit-Remaining header".to_string();
+                tracing::error!("{}", msg);
+                GithubError::HeaderError(msg)
+            })?;
+        let rem_str = rem_val.to_str().map_err(|e| {
+            let msg = format!("Invalid X-RateLimit-Remaining value: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+        let remaining = rem_str.parse::<u32>().map_err(|e| {
+            let msg = format!("Cannot parse remaining as u32: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+
+        let reset_val = headers
+            .get("X-RateLimit-Reset")
+            .ok_or_else(|| {
+                let msg = "Missing X-RateLimit-Reset header".to_string();
+                tracing::error!("{}", msg);
+                GithubError::HeaderError(msg)
+            })?;
+        let reset_str = reset_val.to_str().map_err(|e| {
+            let msg = format!("Invalid X-RateLimit-Reset value: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+        let reset_unix = reset_str.parse::<u64>().map_err(|e| {
+            let msg = format!("Cannot parse reset timestamp as u64: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+
+        // All good — update the shared state
         let mut state = self.rate_limit.lock().await;
-        if let (Some(rem), Some(reset)) = (
-            headers.get("X-RateLimit-Remaining"),
-            headers.get("X-RateLimit-Reset"),
-        ) {
+        state.remaining = remaining;
+        let reset_in = reset_unix
+            .saturating_sub(chrono::Utc::now().timestamp() as u64);
+        state.reset_at = Instant::now() + Duration::from_secs(reset_in);
 
-
-            if let (Ok(rem), Ok(reset_ts)) = (rem.to_str(), reset.to_str()) {
-                if let (Ok(rem_n), Ok(reset_unix)) = (rem.parse::<u32>(), reset_ts.parse::<u64>()) {
-                    state.remaining = rem_n;
-                    // GitHub resets at a UNIX timestamp in seconds
-                    let reset_in = reset_unix
-                        .saturating_sub(chrono::Utc::now().timestamp() as u64);
-                   state.reset_at = Instant::now() + Duration::from_secs(reset_in);
-                    tracing::debug!(
-                        "Rate limit updated: {} remaining, resets in {}s",
-                        rem_n,
-                        reset_in
-                    );
-                }
-            }
-        }
+        tracing::debug!(
+            "Rate limit updated: {} remaining, resets in {}s",
+            remaining,
+            reset_in
+        );
+        Ok(())
     }
+
+    
 }
 
 #[async_trait]
