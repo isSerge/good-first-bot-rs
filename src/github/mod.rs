@@ -259,17 +259,20 @@ impl DefaultGithubClient {
     }
 
     async fn rate_limit_guard(&self) {
-        let mut state = self.rate_limit.lock().await;
+        let (remaining, reset_at) = {
+            let state = self.rate_limit.lock().await;  // acquire lock
+            (state.remaining, state.reset_at)
+        };
 
         // define a safety threshold
         let threshold = 10;
-        if state.remaining <= threshold {
+        if remaining <= threshold {
             let now = Instant::now();
-            if now < state.reset_at {
-                let wait = state.reset_at - now;
+            if now < reset_at {
+                let wait = reset_at - now;
                 tracing::info!(
                     "Approaching rate limit ({} left). Sleeping {:?} until reset...",
-                    state.remaining,
+                    remaining,
                     wait
                 );
                 tokio::time::sleep(wait).await;
