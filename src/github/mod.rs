@@ -174,7 +174,7 @@ impl DefaultGithubClient {
                 )?;
 
             //2.5 Update rate limit state from headers
-            self.update_rate_limit_from_headers(resp.headers());
+            self.update_rate_limit_from_headers(resp.headers()).await;
 
             // 3. HTTP-status check
             if !resp.status().is_success() {
@@ -280,8 +280,8 @@ impl DefaultGithubClient {
         }
     }
 
-    fn update_rate_limit_from_headers(&self, headers: &HeaderMap) {
-        let mut state = futures::executor::block_on(self.rate_limit.lock());
+    async fn update_rate_limit_from_headers(&self, headers: &HeaderMap) {
+        let mut state = self.rate_limit.lock().await;
         if let (Some(rem), Some(reset)) = (
             headers.get("X-RateLimit-Remaining"),
             headers.get("X-RateLimit-Reset"),
