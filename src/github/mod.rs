@@ -2,7 +2,7 @@
 mod tests;
 
 use std::{collections::HashSet, time::Duration};
-use rand::Rng;
+use rand::{rng, Rng};
 
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
@@ -279,8 +279,9 @@ impl DefaultGithubClient {
 
                 // Sleep until the rate limit resets
                 //added a jitter to avoid thundering herd problem
-                let jitter_ms = rand::thread_rng().gen_range(0..500);
-                tokio::time::sleep(jitter_ms).await;
+                let max_jitter = wait.as_millis() as u64 / 10;
+                let jitter_ms   = rng().random_range(0..=max_jitter);
+                tokio::time::sleep(wait + Duration::from_millis(jitter_ms)).await;
             }
         }
     }
@@ -291,13 +292,15 @@ impl DefaultGithubClient {
             headers.get("X-RateLimit-Remaining"),
             headers.get("X-RateLimit-Reset"),
         ) {
+
+
             if let (Ok(rem), Ok(reset_ts)) = (rem.to_str(), reset.to_str()) {
                 if let (Ok(rem_n), Ok(reset_unix)) = (rem.parse::<u32>(), reset_ts.parse::<u64>()) {
                     state.remaining = rem_n;
                     // GitHub resets at a UNIX timestamp in seconds
                     let reset_in = reset_unix
                         .saturating_sub(chrono::Utc::now().timestamp() as u64);
-                    state.reset_at = Instant::now() + Duration::from_secs(reset_in);
+                   state.reset_at = Instant::now() + Duration::from_secs(reset_in);
                     tracing::debug!(
                         "Rate limit updated: {} remaining, resets in {}s",
                         rem_n,
