@@ -200,24 +200,11 @@ impl BotHandler {
                 CallbackAction::ListReposPage(page) => {
                     commands::list::handle(ctx, page).await?;
                 }
-
-                // Handle commands like Help, List, Add, Remove
-                command_action => {
-                    let msg = query.message.as_ref().and_then(|m| m.regular_message()).ok_or(
-                        BotHandlerError::InvalidInput("Callback query has no message".to_string()),
-                    )?;
-
-                    let cmd = match command_action {
-                        CallbackAction::CmdHelp => Command::Help,
-                        CallbackAction::CmdList => Command::List,
-                        CallbackAction::CmdAdd => Command::Add,
-                        CallbackAction::CmdOverview => Command::Overview,
-                        _ => unreachable!(),
-                    };
-
-                    self.handle_commands(msg, cmd, dialogue).await?;
-                }
-            }
+                CallbackAction::CmdHelp => commands::help::handle(ctx).await?,
+                CallbackAction::CmdList => commands::list::handle(ctx, 1).await?,
+                CallbackAction::CmdAdd => commands::add::handle(ctx).await?,
+                CallbackAction::CmdOverview => commands::overview::handle(ctx).await?,
+            };
         } else {
             tracing::warn!("Callback query has no data");
             if let Some(message) = &query.message {
