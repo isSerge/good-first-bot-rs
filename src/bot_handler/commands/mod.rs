@@ -3,10 +3,6 @@ pub mod help;
 pub mod list;
 pub mod overview;
 pub mod start;
-pub mod view_repo;
-pub mod remove;
-pub mod toggle_label;
-pub mod view_labels;
 
 use async_trait::async_trait;
 use teloxide::prelude::*;
@@ -26,7 +22,6 @@ pub trait CommandHandler {
     async fn handle(self, ctx: CommandContext<'_>) -> BotHandlerResult<()>;
 }
 
-// Simplified CommandHandler implementation
 #[async_trait]
 impl CommandHandler for super::Command {
     async fn handle(self, ctx: CommandContext<'_>) -> BotHandlerResult<()> {

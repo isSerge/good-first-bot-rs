@@ -1,4 +1,5 @@
 mod callback_actions;
+mod callbacks;
 mod commands;
 #[cfg(test)]
 mod tests;
@@ -249,26 +250,29 @@ impl BotHandler {
 
             match action {
                 CallbackAction::ViewRepoDetails(repo_id, from_page) => {
-                    commands::view_repo::handle(ctx, repo_id, from_page).await?;
+                    callbacks::view_repo::handle(ctx, repo_id, from_page).await?;
                 }
                 CallbackAction::BackToRepoDetails(repo_id, from_page) => {
-                    println!("Handling back to repo details for repo_id: {}, from_page: {}", repo_id, from_page);
-                    commands::view_repo::handle(ctx, repo_id, from_page).await?;
+                    println!(
+                        "Handling back to repo details for repo_id: {}, from_page: {}",
+                        repo_id, from_page
+                    );
+                    callbacks::view_repo::handle(ctx, repo_id, from_page).await?;
                 }
                 CallbackAction::ViewRepoLabels(repo_id, page, from_page) => {
-                    commands::view_labels::handle(ctx, repo_id, page, from_page).await?;
+                    callbacks::view_labels::handle(ctx, repo_id, page, from_page).await?;
                 }
                 CallbackAction::RemoveRepoPrompt(repo_id) => {
-                    commands::remove::handle(ctx, repo_id, 1).await?;
+                    callbacks::remove::handle(ctx, repo_id, 1).await?;
                 }
                 CallbackAction::ToggleLabel(label, _, _) => {
-                    commands::toggle_label::handle(ctx, label).await?;
+                    callbacks::toggle_label::handle(ctx, label).await?;
                 }
                 CallbackAction::BackToRepoList(page) => {
-                    commands::list::handle(ctx, page).await?;
+                    callbacks::list::handle(ctx, page).await?;
                 }
                 CallbackAction::ListReposPage(page) => {
-                    commands::list::handle(ctx, page).await?;
+                    callbacks::list::handle(ctx, page).await?;
                 }
                 CallbackAction::CmdHelp => commands::help::handle(ctx).await?,
                 CallbackAction::CmdList => commands::list::handle(ctx, 1).await?,
