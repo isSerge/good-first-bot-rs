@@ -1,8 +1,8 @@
-mod add;
-mod help;
-mod list;
-mod overview;
-mod start;
+pub mod add;
+pub mod help;
+pub mod list;
+pub mod overview;
+pub mod start;
 
 use async_trait::async_trait;
 use teloxide::prelude::*;
@@ -27,7 +27,7 @@ impl CommandHandler for super::Command {
     async fn handle(self, ctx: CommandContext<'_>) -> BotHandlerResult<()> {
         match self {
             super::Command::Help => help::handle(ctx).await,
-            super::Command::List => list::handle(ctx).await,
+            super::Command::List => list::handle(ctx, 1).await,
             super::Command::Add => add::handle(ctx).await,
             super::Command::Start => start::handle(ctx).await,
             super::Command::Overview => overview::handle(ctx).await,

@@ -170,6 +170,14 @@ impl BotHandler {
             // Answer the callback query to clear the spinner.
             self.messaging_service.answer_callback_query(&query_id, &None).await?;
 
+            let ctx = CommandContext {
+                handler: self,
+                message: query.message.as_ref().and_then(|m| m.regular_message()).ok_or(
+                    BotHandlerError::InvalidInput("Callback query has no message".to_string()),
+                )?,
+                dialogue: &dialogue,
+            };
+
             match action {
                 CallbackAction::ViewRepoDetails(repo_id, from_page) => {
                     self.action_view_repo_details(&dialogue, query, repo_id, from_page).await?;
@@ -190,18 +198,7 @@ impl BotHandler {
                     self.action_back_to_repo_list(&dialogue, query, page).await?;
                 }
                 CallbackAction::ListReposPage(page) => {
-                    let message = query.message.as_ref().ok_or(BotHandlerError::InvalidInput(
-                        "Callback query has no message".to_string(),
-                    ))?;
-                    let chat_id = message.chat().id;
-                    // Get the updated repository list.
-                    let user_repos = self.repository_service.get_user_repos(chat_id, page).await?;
-
-                    if user_repos.items.is_empty() {
-                        self.messaging_service.send_list_empty_msg(chat_id).await?;
-                    }
-
-                    self.messaging_service.edit_list_msg(chat_id, message.id(), user_repos).await?;
+                    commands::list::handle(ctx, page).await?;
                 }
 
                 // Handle commands like Help, List, Add, Remove
