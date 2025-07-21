@@ -1,16 +1,15 @@
 use std::str::FromStr;
 
 use crate::{
-    bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::CommandContext},
+    bot_handler::{BotHandlerError, BotHandlerResult, Context, CommandState},
     storage::RepoEntity,
 };
 
 pub async fn handle(
-    ctx: CommandContext<'_>,
+    ctx: Context<'_>,
     repo_id: &str,
     from_page: usize,
 ) -> BotHandlerResult<()> {
-  println!("Handling view_repo command for repo_id: {}, from_page: {}", repo_id, from_page);
     let chat_id = ctx.message.chat.id;
 
     // Extract repository name with owner

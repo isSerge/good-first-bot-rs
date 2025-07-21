@@ -3,11 +3,11 @@ use std::collections::HashSet;
 use futures::{StreamExt, stream};
 
 use crate::{
-    bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::CommandContext},
+    bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::Context},
     storage::RepoEntity,
 };
 
-pub async fn handle(ctx: CommandContext<'_>) -> BotHandlerResult<()> {
+pub async fn handle(ctx: Context<'_>) -> BotHandlerResult<()> {
     ctx.handler.messaging_service.prompt_for_repo_input(ctx.message.chat.id).await?;
     ctx.dialogue
         .update(CommandState::AwaitingAddRepo)
@@ -36,11 +36,9 @@ struct AddSummary {
 }
 
 /// Handle the reply message when we're waiting for repository input.
-/// It processes the input, checks each URL, and adds the repositories accordingly.
-pub async fn handle_reply(
-    ctx: CommandContext<'_>,
-    text: &str,
-) -> BotHandlerResult<()> {
+/// It processes the input, checks each URL, and adds the repositories
+/// accordingly.
+pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> {
     // Split the input by newlines or whitespaces and create owned Strings
     let urls: Vec<String> =
         text.split_whitespace().filter(|s| !s.is_empty()).map(String::from).collect();

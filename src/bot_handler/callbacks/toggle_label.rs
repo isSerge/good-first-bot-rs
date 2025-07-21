@@ -3,14 +3,11 @@ use std::str::FromStr;
 use futures::{TryFutureExt, try_join};
 
 use crate::{
-    bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::CommandContext},
+    bot_handler::{BotHandlerError, BotHandlerResult, Context, CommandState},
     storage::RepoEntity,
 };
 
-pub async fn handle(
-    ctx: CommandContext<'_>,
-    label_name: &str,
-) -> BotHandlerResult<()> {
+pub async fn handle(ctx: Context<'_>, label_name: &str) -> BotHandlerResult<()> {
     let chat_id = ctx.message.chat.id;
     let query = ctx
         .query

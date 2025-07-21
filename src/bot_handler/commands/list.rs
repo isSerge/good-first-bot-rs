@@ -1,6 +1,6 @@
-use crate::bot_handler::{BotHandlerResult, commands::CommandContext};
+use crate::bot_handler::{BotHandlerResult, commands::Context};
 
-pub async fn handle(ctx: CommandContext<'_>, page: usize) -> BotHandlerResult<()> {
+pub async fn handle(ctx: Context<'_>, page: usize) -> BotHandlerResult<()> {
     let user_repos =
         ctx.handler.repository_service.get_user_repos(ctx.message.chat.id, page).await?;
 

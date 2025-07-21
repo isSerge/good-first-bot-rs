@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 use crate::{
-    bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::CommandContext},
+    bot_handler::{BotHandlerError, BotHandlerResult, Context, CommandState},
     storage::RepoEntity,
 };
 
 pub async fn handle(
-    ctx: CommandContext<'_>,
+    ctx: Context<'_>,
     repo_id: &str,
     page: usize,
     from_page: usize,
@@ -22,8 +22,15 @@ pub async fn handle(
         ctx.handler.repository_service.get_repo_github_labels(chat_id, &repo, page).await?;
 
     // Answer the callback query to clear the spinner.
-    ctx.handler.messaging_service
-        .answer_labels_callback_query(chat_id, ctx.message.id, &paginated_labels, repo_id, from_page)
+    ctx.handler
+        .messaging_service
+        .answer_labels_callback_query(
+            chat_id,
+            ctx.message.id,
+            &paginated_labels,
+            repo_id,
+            from_page,
+        )
         .await?;
 
     // Update the dialogue state to ViewingRepoLabels

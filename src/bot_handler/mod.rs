@@ -17,12 +17,20 @@ use teloxide::{
 use thiserror::Error;
 
 use crate::{
-    bot_handler::commands::{CommandContext, CommandHandler},
+    bot_handler::commands::CommandHandler,
     messaging::{MessagingError, MessagingService},
     repository::{RepositoryService, RepositoryServiceError},
 };
 
 type DialogueStorage = SqliteStorage<Json>;
+
+/// Context groups the data needed by all command and callback handlers.
+pub struct Context<'a> {
+    pub handler: &'a BotHandler,
+    pub message: &'a Message,
+    pub dialogue: &'a Dialogue<CommandState, DialogueStorage>,
+    pub query: Option<&'a CallbackQuery>,
+}
 
 #[derive(Error, Debug)]
 pub enum BotHandlerError {
@@ -104,7 +112,7 @@ impl BotHandler {
         cmd: Command,
         dialogue: Dialogue<CommandState, DialogueStorage>,
     ) -> BotHandlerResult<()> {
-        let ctx = CommandContext { handler: self, message: msg, dialogue: &dialogue, query: None };
+        let ctx = Context { handler: self, message: msg, dialogue: &dialogue, query: None };
         cmd.handle(ctx).await
     }
 
@@ -119,7 +127,7 @@ impl BotHandler {
         // Check if we're waiting for repository input.
         match (dialogue_state, text) {
             (Some(CommandState::AwaitingAddRepo), Some(text)) => {
-                let ctx = CommandContext { handler: self, message: msg, dialogue, query: None };
+                let ctx = Context { handler: self, message: msg, dialogue, query: None };
                 commands::add::handle_reply(ctx, text).await?;
             }
             _ => {
@@ -151,7 +159,7 @@ impl BotHandler {
             // Answer the callback query to clear the spinner.
             self.messaging_service.answer_callback_query(&query_id, &None).await?;
 
-            let ctx = CommandContext {
+            let ctx = Context {
                 handler: self,
                 message: query.message.as_ref().and_then(|m| m.regular_message()).ok_or(
                     BotHandlerError::InvalidInput("Callback query has no message".to_string()),

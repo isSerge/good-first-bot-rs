@@ -1,7 +1,7 @@
-use crate::bot_handler::{BotHandlerError, BotHandlerResult, commands::CommandContext};
+use crate::bot_handler::{BotHandlerError, BotHandlerResult, Context};
 
 pub async fn handle(
-    ctx: CommandContext<'_>,
+    ctx: Context<'_>,
     repo_id: &str,
     from_page: usize,
 ) -> BotHandlerResult<()> {

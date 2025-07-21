@@ -5,26 +5,17 @@ pub mod overview;
 pub mod start;
 
 use async_trait::async_trait;
-use teloxide::prelude::*;
 
-use crate::bot_handler::{BotHandler, BotHandlerResult, CommandState, DialogueStorage};
-
-/// CommandContext groups the data needed by all command handlers.
-pub struct CommandContext<'a> {
-    pub handler: &'a BotHandler,
-    pub message: &'a Message,
-    pub dialogue: &'a Dialogue<CommandState, DialogueStorage>,
-    pub query: Option<&'a CallbackQuery>,
-}
+use crate::bot_handler::{BotHandlerResult, Context};
 
 #[async_trait]
 pub trait CommandHandler {
-    async fn handle(self, ctx: CommandContext<'_>) -> BotHandlerResult<()>;
+    async fn handle(self, ctx: Context<'_>) -> BotHandlerResult<()>;
 }
 
 #[async_trait]
 impl CommandHandler for super::Command {
-    async fn handle(self, ctx: CommandContext<'_>) -> BotHandlerResult<()> {
+    async fn handle(self, ctx: Context<'_>) -> BotHandlerResult<()> {
         match self {
             super::Command::Help => help::handle(ctx).await,
             super::Command::List => list::handle(ctx, 1).await,
