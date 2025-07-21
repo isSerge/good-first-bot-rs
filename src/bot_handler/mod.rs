@@ -4,10 +4,9 @@ mod commands;
 #[cfg(test)]
 mod tests;
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 pub use callback_actions::CallbackAction;
-use futures::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{Dialogue, SqliteStorage, SqliteStorageError, serializer::Json},
@@ -21,29 +20,9 @@ use crate::{
     bot_handler::commands::{CommandContext, CommandHandler},
     messaging::{MessagingError, MessagingService},
     repository::{RepositoryService, RepositoryServiceError},
-    storage::RepoEntity,
 };
 
 type DialogueStorage = SqliteStorage<Json>;
-
-// An enum to represent the result of adding a repository.
-enum AddRepoResult {
-    Success(String),
-    AlreadyTracked(String),
-    NotFound(String),
-    InvalidUrl(String),
-    Error(String, String),
-}
-
-// A struct to hold the summary of the add operation.
-#[derive(Default)]
-struct AddSummary {
-    successfully_added: HashSet<String>,
-    already_tracked: HashSet<String>,
-    not_found: HashSet<String>,
-    invalid_urls: HashSet<String>,
-    errors: HashSet<(String, String)>,
-}
 
 #[derive(Error, Debug)]
 pub enum BotHandlerError {
@@ -126,7 +105,6 @@ impl BotHandler {
         dialogue: Dialogue<CommandState, DialogueStorage>,
     ) -> BotHandlerResult<()> {
         let ctx = CommandContext { handler: self, message: msg, dialogue: &dialogue, query: None };
-
         cmd.handle(ctx).await
     }
 
@@ -141,74 +119,8 @@ impl BotHandler {
         // Check if we're waiting for repository input.
         match (dialogue_state, text) {
             (Some(CommandState::AwaitingAddRepo), Some(text)) => {
-                // Split the input by newlines or whitespaces and create owned Strings
-                let urls: Vec<String> =
-                    text.split_whitespace().filter(|s| !s.is_empty()).map(String::from).collect();
-
-                if urls.is_empty() {
-                    self.messaging_service
-                        .send_error_msg(
-                            msg.chat.id,
-                            BotHandlerError::InvalidInput("Invalid repository URL".to_string()),
-                        )
-                        .await?;
-                    return Ok(());
-                }
-
-                let summary = stream::iter(urls)
-                    .map(|url| async move {
-                        let repo = match RepoEntity::from_url(&url) {
-                            Ok(repo) => repo,
-                            Err(_) => return AddRepoResult::InvalidUrl(url),
-                        };
-
-                        match self.repository_service.repo_exists(&repo.owner, &repo.name).await {
-                            Ok(true) => match self
-                                .repository_service
-                                .add_repo(msg.chat.id, repo.clone())
-                                .await
-                            {
-                                Ok(true) => AddRepoResult::Success(repo.name_with_owner),
-                                Ok(false) => AddRepoResult::AlreadyTracked(repo.name_with_owner),
-                                Err(e) => AddRepoResult::Error(repo.name_with_owner, e.to_string()),
-                            },
-                            Ok(false) => AddRepoResult::NotFound(repo.name_with_owner),
-                            Err(e) => AddRepoResult::Error(repo.name_with_owner, e.to_string()),
-                        }
-                    })
-                    .buffer_unordered(self.max_concurrency)
-                    .fold(AddSummary::default(), |mut summary, res| async move {
-                        match res {
-                            AddRepoResult::Success(name) => {
-                                summary.successfully_added.insert(name);
-                            }
-                            AddRepoResult::AlreadyTracked(name) => {
-                                summary.already_tracked.insert(name);
-                            }
-                            AddRepoResult::NotFound(name) => {
-                                summary.not_found.insert(name);
-                            }
-                            AddRepoResult::InvalidUrl(url) => {
-                                summary.invalid_urls.insert(url);
-                            }
-                            AddRepoResult::Error(name, e) => {
-                                summary.errors.insert((name, e));
-                            }
-                        }
-                        summary
-                    })
-                    .await;
-
-                self.messaging_service
-                    .send_add_summary_msg(
-                        msg.chat.id,
-                        summary.successfully_added,
-                        summary.already_tracked,
-                        summary.not_found,
-                        summary.invalid_urls,
-                        summary.errors,
-                    )
-                    .await?;
+                let ctx = CommandContext { handler: self, message: msg, dialogue, query: None };
+                commands::add::handle_reply(ctx, text).await?;
             }
             _ => {
                 // Should not happen, because force reply does not accept empty input and there
