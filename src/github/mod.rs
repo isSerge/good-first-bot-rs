@@ -177,14 +177,13 @@ impl DefaultGithubClient {
                     },
                 )?;
 
-            //2.5 Update rate limit state from headers
-            self.update_rate_limit_from_headers(resp.headers()).await;
+            //3 Update rate limit state from headers
             if let Err(e) = self.update_rate_limit_from_headers(resp.headers()).await {
                 // Option A: warn and continue
                 tracing::warn!("Could not update rate-limit info: {}", e);
             }
 
-            // 3. HTTP-status check
+            // 4. HTTP-status check
             if !resp.status().is_success() {
                 let status = resp.status();
                 let text = resp.text().await.unwrap_or_else(|e| {
@@ -228,7 +227,7 @@ impl DefaultGithubClient {
                 return Err(be);
             }
 
-            // 4. Parse JSON
+            // 5. Parse JSON
             let body: Response<Q::ResponseData> = resp.json().await.map_err(|e| {
                 tracing::warn!("Failed to parse JSON: {e}. Retrying...");
                 BackoffError::transient(GithubError::GraphQLApiError(format!(
@@ -236,7 +235,7 @@ impl DefaultGithubClient {
                 )))
             })?;
 
-            // 5. GraphQL errors?
+            // 6. GraphQL errors?
             if let Some(errors) = &body.errors {
                 let is_rate_limit_error = errors.iter().any(|e| {
                     e.message.to_lowercase().contains("rate limit") || is_retryable_graphql_error(e)
@@ -253,7 +252,7 @@ impl DefaultGithubClient {
                 }
             }
 
-            // 6. Unwrap the data or permanent-fail
+            // 7. Unwrap the data or permanent-fail
             body.data.ok_or_else(|| {
                 tracing::error!("GraphQL response had no data field; permanent failure");
                 BackoffError::permanent(GithubError::GraphQLApiError(
