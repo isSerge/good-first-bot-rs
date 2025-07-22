@@ -73,7 +73,15 @@ src
    cd good-first-bot-rs
    ```
 
-2. **Set up environment variables:**
+2. **Prerequisites:**
+
+   - **Rust:** Ensure you have [Rust](https://www.rust-lang.org/tools/install) installed.
+   - **sqlx-cli:** Install the SQLx command-line tool for database migrations.
+     ```bash
+     cargo install sqlx-cli
+     ```
+
+3. **Set up environment variables:**
 
 Create a .env file in the project root with the following keys (values are
 examples):
@@ -103,10 +111,18 @@ MAX_LABELS_PER_REPO=5
 - MAX_LABELS_PER_REPO: (Optional) Maximum number of labels per repository a user
   can track. Default is 10
 
-3. **Install Dependencies:**
+4. **Database Setup:**
 
-Ensure you have [Rust](https://www.rust-lang.org/tools/install) installed. Then,
-in the project directory run:
+Run the following command to set up the database and apply migrations:
+
+```bash
+mkdir data
+sqlx database setup
+```
+
+5. **Install Dependencies:**
+
+In the project directory run:
 
 ```bash
 cargo build
