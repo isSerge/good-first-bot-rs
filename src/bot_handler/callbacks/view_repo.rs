@@ -16,7 +16,7 @@ pub async fn handle(ctx: Context<'_>, repo_id: &str, from_page: usize) -> BotHan
     let repo_labels = ctx
         .handler
         .repository_service
-        .get_repo_github_labels(chat_id, &repo, from_page)
+        .get_repo_github_labels(chat_id, &repo, 1)
         .await?
         .items
         .into_iter()
