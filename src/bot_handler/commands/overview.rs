@@ -1,8 +1,8 @@
 use futures::future;
 
-use crate::bot_handler::{BotHandlerResult, commands::CommandContext};
+use crate::bot_handler::{BotHandlerResult, commands::Context};
 
-pub async fn handle(ctx: CommandContext<'_>) -> BotHandlerResult<()> {
+pub async fn handle(ctx: Context<'_>) -> BotHandlerResult<()> {
     tracing::debug!("Handling overview command for chat: {}", ctx.message.chat.id);
 
     let user_repos = ctx.handler.repository_service.get_user_repos(ctx.message.chat.id, 1).await?;
