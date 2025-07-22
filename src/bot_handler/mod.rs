@@ -173,10 +173,6 @@ impl BotHandler {
                     callbacks::view_repo::handle(ctx, repo_id, from_page).await?;
                 }
                 CallbackAction::BackToRepoDetails(repo_id, from_page) => {
-                    println!(
-                        "Handling back to repo details for repo_id: {}, from_page: {}",
-                        repo_id, from_page
-                    );
                     callbacks::view_repo::handle(ctx, repo_id, from_page).await?;
                 }
                 CallbackAction::ViewRepoLabels(repo_id, page, from_page) => {

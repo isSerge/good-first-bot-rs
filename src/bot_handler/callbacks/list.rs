@@ -1,4 +1,4 @@
-use crate::bot_handler::{BotHandlerError, BotHandlerResult, Context, CommandState};
+use crate::bot_handler::{BotHandlerError, BotHandlerResult, CommandState, Context};
 
 pub async fn handle(ctx: Context<'_>, page: usize) -> BotHandlerResult<()> {
     let user_repos =

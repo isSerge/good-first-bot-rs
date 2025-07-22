@@ -1,10 +1,6 @@
 use crate::bot_handler::{BotHandlerError, BotHandlerResult, Context};
 
-pub async fn handle(
-    ctx: Context<'_>,
-    repo_id: &str,
-    from_page: usize,
-) -> BotHandlerResult<()> {
+pub async fn handle(ctx: Context<'_>, repo_id: &str, from_page: usize) -> BotHandlerResult<()> {
     let chat_id = ctx.message.chat.id;
     let query = ctx
         .query

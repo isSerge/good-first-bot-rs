@@ -3,7 +3,7 @@ use std::str::FromStr;
 use futures::{TryFutureExt, try_join};
 
 use crate::{
-    bot_handler::{BotHandlerError, BotHandlerResult, Context, CommandState},
+    bot_handler::{BotHandlerError, BotHandlerResult, CommandState, Context},
     storage::RepoEntity,
 };
 
