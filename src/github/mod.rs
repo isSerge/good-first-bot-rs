@@ -294,36 +294,6 @@ impl DefaultGithubClient {
         }
     }
 
-    // Update the rate limit state from the HTTP headers.
-    // async fn update_rate_limit_from_headers(&self, headers: &HeaderMap) -> Result<(), GithubError> {
-    //     let mut state = self.rate_limit.lock().await;
-    //     let rem_val = headers.get("X-RateLimit-Remaining").or_else(|| {
-    //         tracing::error!("{}", "Missing X-RateLimit-Remaining header".to_string());
-    //         GithubError::HeaderError(("Missing X-RateLimit-Remaining header".to_string()));
-    //     });
-    //     if let (Some(rem), Some(reset)) = (
-    //         headers.get("X-RateLimit-Remaining"),
-    //         headers.get("X-RateLimit-Reset"),
-    //     ) {
-
-
-    //         if let (Ok(rem), Ok(reset_ts)) = (rem.to_str(), reset.to_str()) {
-    //             if let (Ok(rem_n), Ok(reset_unix)) = (rem.parse::<u32>(), reset_ts.parse::<u64>()) {
-    //                 state.remaining = rem_n;
-    //                 // GitHub resets at a UNIX timestamp in seconds
-    //                 let reset_in = reset_unix
-    //                     .saturating_sub(chrono::Utc::now().timestamp() as u64);
-    //                state.reset_at = Instant::now() + Duration::from_secs(reset_in);
-    //                 tracing::debug!(
-    //                     "Rate limit updated: {} remaining, resets in {}s",
-    //                     rem_n,
-    //                     reset_in
-    //                 );
-    //             }
-    //         }
-    //     }
-    // }
-    
     async fn update_rate_limit_from_headers(&self, headers: &HeaderMap)
         -> Result<(), GithubError>
     {
