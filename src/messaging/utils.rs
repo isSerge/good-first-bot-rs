@@ -13,8 +13,9 @@ pub fn github_color_to_emoji(hex_color: &str) -> &str {
         "fef2c0" | "fbca04" | "e4e669" | "ffeb3b" | "f9e076" | "fadc73" => "🟡",
 
         // Greens
-        "0e8a16" | "006b75" | "5ab302" | "a2eeef" | "008672" | "c2e0c6" | "1aa34a" | "4caf50" =>
-            "🟢",
+        "0e8a16" | "006b75" | "5ab302" | "a2eeef" | "008672" | "c2e0c6" | "1aa34a" | "4caf50" => {
+            "🟢"
+        }
 
         // Blues / Teals
         "0052cc" | "c5def5" | "0075ca" | "1d76db" | "89d2fc" | "00bcd4" | "b3f4f4" => "🔵",

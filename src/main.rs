@@ -56,7 +56,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let github_client = Arc::new(github::DefaultGithubClient::new(
         &config.github_token,
         &config.github_graphql_url,
-        config.rate_limit_threshold
+        config.rate_limit_threshold,
     )?);
 
     let messaging_service = Arc::new(TelegramMessagingService::new(bot.clone()));

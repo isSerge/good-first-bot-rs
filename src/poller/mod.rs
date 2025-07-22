@@ -196,8 +196,8 @@ impl GithubPoller {
                         return Err(PollerError::Github(github_error));
                     }
                     GithubError::HeaderError(_) => {
-                        tracing::error!(
-                            "Header error while polling issues for repository");                    }
+                        tracing::error!("Header error while polling issues for repository");
+                    }
                 },
                 unexpected_error => {
                     tracing::error!(

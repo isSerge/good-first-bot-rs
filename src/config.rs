@@ -50,7 +50,6 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_RATE_LIMIT_THRESHOLD),
-
         })
     }
 }

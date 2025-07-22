@@ -18,10 +18,11 @@ pub async fn handle(ctx: Context<'_>, label_name: &str, label_page: usize) -> Bo
 
     let (repo_id, from_page) = match dialogue_state {
         Some(CommandState::ViewingRepoLabels { repo_id, from_page }) => (repo_id, from_page),
-        _ =>
+        _ => {
             return Err(BotHandlerError::InvalidInput(
                 "Invalid state: expected ViewingRepoLabels".to_string(),
-            )),
+            ));
+        }
     };
 
     let repo =
