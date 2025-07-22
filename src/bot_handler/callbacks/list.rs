@@ -1,4 +1,4 @@
-use crate::bot_handler::{BotHandlerResult, commands::Context};
+use crate::bot_handler::{BotHandlerError, BotHandlerResult, CommandState, Context};
 
 pub async fn handle(ctx: Context<'_>, page: usize) -> BotHandlerResult<()> {
     let user_repos =
@@ -9,7 +9,12 @@ pub async fn handle(ctx: Context<'_>, page: usize) -> BotHandlerResult<()> {
         return Ok(());
     }
 
-    ctx.handler.messaging_service.send_list_msg(ctx.message.chat.id, user_repos).await?;
+    ctx.handler
+        .messaging_service
+        .edit_list_msg(ctx.message.chat.id, ctx.message.id, user_repos)
+        .await?;
+
+    ctx.dialogue.update(CommandState::None).await.map_err(BotHandlerError::DialogueError)?;
 
     Ok(())
 }

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet, sync::Arc};
+use std::{cell::RefCell, collections::HashSet, str::FromStr, sync::Arc};
 
 use chrono::Utc;
 use mockall::predicate::*;
@@ -104,7 +104,7 @@ fn mock_callback_query<'a>(
 }
 
 #[tokio::test]
-async fn test_process_add_success() {
+async fn test_add_repos_success() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
@@ -133,7 +133,7 @@ async fn test_process_add_success() {
         .expect_send_add_summary_msg()
         .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
             chat_id_param == CHAT_ID &&
-                *s_added == expected_successfully_added && // Compare HashSets directly
+                *s_added == expected_successfully_added && // Compare HashSets directly                 
                 a_tracked.is_empty() &&
                 n_found.is_empty() &&
                 inv_urls.is_empty() &&
@@ -144,16 +144,22 @@ async fn test_process_add_success() {
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
+    let message = mock_message(CHAT_ID, repo_url);
+
+    let ctx =
+        Context { handler: &bot_handler, message: &message, dialogue: &dialogue, query: None };
 
     // Act
-    let result = bot_handler.process_add(repo_url, CHAT_ID).await;
+    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
 
     // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-async fn test_process_add_already_tracked() {
+async fn test_add_repos_already_tracked() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
@@ -184,16 +190,22 @@ async fn test_process_add_already_tracked() {
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
+    let message = mock_message(CHAT_ID, repo_url);
+
+    let ctx =
+        Context { handler: &bot_handler, message: &message, dialogue: &dialogue, query: None };
 
     // Act
-    let result = bot_handler.process_add(repo_url, CHAT_ID).await;
+    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
 
     // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-async fn test_process_add_repo_does_not_exist() {
+async fn test_add_repos_does_not_exist() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
@@ -220,16 +232,22 @@ async fn test_process_add_repo_does_not_exist() {
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
+    let message = mock_message(CHAT_ID, repo_url);
+
+    let ctx =
+        Context { handler: &bot_handler, message: &message, dialogue: &dialogue, query: None };
 
     // Act
-    let result = bot_handler.process_add(repo_url, CHAT_ID).await;
+    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
 
     // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-async fn test_process_add_parse_error() {
+async fn test_add_repos_parse_error() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mock_repository = MockRepositoryService::new(); // No repo interactions expected
@@ -252,16 +270,22 @@ async fn test_process_add_parse_error() {
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
+    let message = mock_message(CHAT_ID, invalid_url);
+
+    let ctx =
+        Context { handler: &bot_handler, message: &message, dialogue: &dialogue, query: None };
 
     // Act
-    let result = bot_handler.process_add(invalid_url, CHAT_ID).await;
+    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
 
     // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-async fn test_process_add_error() {
+async fn test_add_repos_error() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
@@ -290,16 +314,22 @@ async fn test_process_add_error() {
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
+    let message = mock_message(CHAT_ID, repo_url);
+
+    let ctx =
+        Context { handler: &bot_handler, message: &message, dialogue: &dialogue, query: None };
 
     // Act
-    let result = bot_handler.process_add(repo_url, CHAT_ID).await;
+    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
 
     // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-async fn test_process_add_repo_limit_reached() {
+async fn test_add_repos_limit_reached() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
@@ -307,7 +337,8 @@ async fn test_process_add_repo_limit_reached() {
 
     let repo_name_with_owner = "owner/repo";
     let repo_url = "https://github.com/owner/repo";
-    let limit_error_msg = "You have reached the maximum limit of 10 repositories.";
+    let limit_error_msg = "You have reached the maximum limit of 10
+repositories.";
     let full_error_str =
         RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()).to_string();
 
@@ -333,16 +364,22 @@ async fn test_process_add_repo_limit_reached() {
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
+    let message = mock_message(CHAT_ID, repo_url);
+
+    let ctx =
+        Context { handler: &bot_handler, message: &message, dialogue: &dialogue, query: None };
 
     // Act
-    let result = bot_handler.process_add(repo_url, CHAT_ID).await;
+    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
 
     // Assert
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-async fn test_process_add_multiple_mixed_outcomes() {
+async fn test_add_repos_multiple_mixed_outcomes() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
@@ -430,11 +467,18 @@ async fn test_process_add_multiple_mixed_outcomes() {
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
     let mock_msg_text = format!(
-        "{url_new} {url_tracked} {url_notfound} {url_invalid} {url_gh_error} {url_add_error}"
+        "{url_new} {url_tracked} {url_notfound} {url_invalid} {url_gh_error}
+{url_add_error}"
     );
+    let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+    let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
+    let message = mock_message(CHAT_ID, mock_msg_text.as_str());
+
+    let ctx =
+        Context { handler: &bot_handler, message: &message, dialogue: &dialogue, query: None };
 
     // Act
-    let result = bot_handler.process_add(&mock_msg_text, CHAT_ID).await;
+    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
 
     // Assert
     assert!(result.is_ok());
