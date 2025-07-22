@@ -35,7 +35,7 @@ pub async fn handle(ctx: Context<'_>, label_name: &str) -> BotHandlerResult<()> 
     let (labels, _) = try_join!(
         ctx.handler
             .repository_service
-            .get_repo_github_labels(chat_id, &repo, from_page)
+            .get_repo_github_labels(chat_id, &repo, current_page)
             .map_err(BotHandlerError::from),
         ctx.handler
             .messaging_service
