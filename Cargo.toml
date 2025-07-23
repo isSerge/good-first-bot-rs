@@ -1,5 +1,5 @@
 [package]
-name = "good-first-bot-rs"
+name = "good-first-bot"
 version = "0.1.0"
 edition = "2024"
 
