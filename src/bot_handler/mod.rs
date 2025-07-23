@@ -1,6 +1,11 @@
-mod callback_actions;
-mod callbacks;
-mod commands;
+//! This module provides the main bot handler for processing commands and
+//! callback queries.
+#[allow(missing_docs)]
+pub mod callback_actions;
+#[allow(missing_docs)]
+pub mod callbacks;
+#[allow(missing_docs)]
+pub mod commands;
 #[cfg(test)]
 mod tests;
 
