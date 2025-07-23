@@ -1,3 +1,6 @@
+//! This module provides an implementation of `RepoStorage` using SQLite as the
+//! backing store.
+
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
@@ -14,11 +17,13 @@ use crate::storage::{RepoEntity, RepoStorage, StorageError, StorageResult};
 const INITIAL_DEFAULT_LABELS_JSON: &str =
     r#"["good first issue","beginner-friendly","help wanted"]"#;
 
+/// An implementation of `RepoStorage` that uses SQLite as the backing store.
 pub struct SqliteStorage {
     pool: Pool<Sqlite>,
 }
 
 impl SqliteStorage {
+    /// Creates a new `SqliteStorage` instance.
     pub async fn new(database_url: &str) -> StorageResult<Self> {
         tracing::debug!("Connecting to SQLite database: {database_url}");
         let pool = SqlitePool::connect(database_url)

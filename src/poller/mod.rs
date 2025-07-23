@@ -18,12 +18,16 @@ use crate::{
     storage::{RepoEntity, RepoStorage, StorageError},
 };
 
+/// Represents errors that can occur during the polling process.
 #[derive(Debug, Error)]
 pub enum PollerError {
+    /// An error from the GitHub client.
     #[error("Failed to poll GitHub issues")]
     Github(#[from] GithubError),
+    /// An error from the storage layer.
     #[error("Failed to access storage")]
     Storage(#[from] StorageError),
+    /// An error from the messaging service.
     #[error("Failed to send message to Telegram")]
     Messaging(#[from] MessagingError),
 }
@@ -43,7 +47,7 @@ pub struct GithubPoller {
 }
 
 impl GithubPoller {
-    /// Create a new GithubPoller.
+    /// Create a new `GithubPoller`.
     pub fn new(
         github_client: Arc<dyn GithubClient>,
         storage: Arc<dyn RepoStorage>,
@@ -54,7 +58,7 @@ impl GithubPoller {
         Self { github_client, storage, messaging_service, poll_interval, max_concurrency }
     }
 
-    /// Run the Poller.
+    /// Run the poller.
     pub async fn run(&self) -> Result<()> {
         tracing::debug!("Starting GitHub poller");
 

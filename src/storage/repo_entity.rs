@@ -3,22 +3,30 @@ use std::{fmt, str::FromStr};
 use thiserror::Error;
 use url::Url;
 
+/// Represents errors that can occur when parsing a `RepoEntity`.
 #[derive(Error, Debug, Clone)]
 pub enum RepoEntityError {
+    /// An error indicating that the URL is invalid.
     #[error("Invalid URL: {0}")]
     Url(String),
+    /// An error indicating that the repository format is invalid.
     #[error("Invalid repository format: {0}")]
     Format(String),
+    /// An error indicating that the owner or repository name is empty.
     #[error("Owner or repository name cannot be empty")]
     NameWithOwner,
 }
 
 type Result<T> = std::result::Result<T, RepoEntityError>;
 
+/// Represents a GitHub repository.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RepoEntity {
+    /// The owner of the repository.
     pub owner: String,
+    /// The name of the repository.
     pub name: String,
+    /// The name of the repository with the owner (e.g., "owner/repo").
     pub name_with_owner: String,
 }
 

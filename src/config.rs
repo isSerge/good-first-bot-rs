@@ -7,19 +7,29 @@ const DEFAULT_REPOS_PER_USER: usize = 20;
 const DEFAULT_LABELS_PER_REPO: usize = 10;
 const DEFAULT_MAX_CONCURRENCY: usize = 10;
 
+/// Represents the application configuration.
 #[derive(Debug)]
 pub struct Config {
+    /// The GitHub API token.
     pub github_token: String,
+    /// The URL of the GitHub GraphQL API.
     pub github_graphql_url: String,
+    /// The Telegram bot token.
     pub telegram_bot_token: String,
+    /// The interval in seconds to poll for new issues.
     pub poll_interval: u64,
+    /// The URL of the database.
     pub database_url: String,
+    /// The maximum number of repositories a user can track.
     pub max_repos_per_user: usize,
+    /// The maximum number of labels a user can track per repository.
     pub max_labels_per_repo: usize,
+    /// The maximum number of concurrent requests to make to the GitHub API.
     pub max_concurrency: usize,
 }
 
 impl Config {
+    /// Creates a new `Config` instance from environment variables.
     pub fn from_env() -> Result<Self, VarError> {
         Ok(Self {
             github_token: env::var("GITHUB_TOKEN")?,
