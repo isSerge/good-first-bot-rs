@@ -1,3 +1,6 @@
+//! This module provides an implementation of `RepoStorage` using SQLite as the
+//! backing store.
+
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,

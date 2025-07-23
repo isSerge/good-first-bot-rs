@@ -1,5 +1,4 @@
 mod repo_entity;
-/// An implementation of `RepoStorage` that uses SQLite as the backing store.
 pub mod sqlite;
 #[cfg(test)]
 mod tests;
