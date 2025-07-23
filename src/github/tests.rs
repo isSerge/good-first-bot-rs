@@ -56,6 +56,38 @@ async fn test_update_rate_limit_from_headers() {
     assert!(diff >= Duration::from_secs(59) && diff <= Duration::from_secs(61));
 }
 
-async fn test_rate_limit_guard(){
-    
+#[tokio::test(flavor = "multi_thread")]
+async fn rate_limit_guard_sleeps_when_below_threshold_and_before_reset() {
+    // -------- Arrange --------
+    let threshold = 5;
+    let client = DefaultGithubClient::new("fake_token", "https://example.com/graphql", threshold as u64)
+        .expect("client");
+
+    // Force a short wait window
+    const WAIT_MS: u64 = 40;
+    {
+        let mut state = client.rate_limit.lock().await;
+        state.remaining = threshold; // at or below threshold
+        state.reset_at = Instant::now() + Duration::from_millis(WAIT_MS);
+    }
+
+    // Bounds: wait .. wait + wait/10  (+ a little fudge for scheduler noise)
+    let expected_min = Duration::from_millis(WAIT_MS);
+    let expected_max = Duration::from_millis(WAIT_MS + WAIT_MS / 10);
+    let fudge = Duration::from_millis(10);
+
+    // -------- Act --------
+    let start = Instant::now();
+    client.rate_limit_guard().await;
+    let elapsed = start.elapsed();
+
+    // -------- Assert --------
+    assert!(
+        elapsed >= expected_min,
+        "Guard returned too fast: {:?} < {:?}", elapsed, expected_min
+    );
+    assert!(
+        elapsed <= expected_max + fudge,
+        "Guard slept too long: {:?} > {:?}", elapsed, expected_max + fudge
+    );
 }

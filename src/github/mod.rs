@@ -273,7 +273,7 @@ impl DefaultGithubClient {
     /// Rate limit guard that sleeps until the rate limit resets if we're close to the threshold.
     async fn rate_limit_guard(&self) {
         let (remaining, reset_at) = {
-            let state = self.rate_limit.lock().await; // acquire lock
+            let state = self.rate_limit.lock().await;
             (state.remaining, state.reset_at)
         };
 
