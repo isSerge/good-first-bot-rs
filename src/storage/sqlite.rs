@@ -34,13 +34,6 @@ impl SqliteStorage {
 
         Ok(Self { pool })
     }
-
-    /// Creates a new `SqliteStorage` instance with an existing `SqlitePool`.
-    /// This is useful for integration tests.
-    #[cfg(feature = "test-utils")]
-    pub fn new_with_pool(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
 }
 
 #[async_trait]
