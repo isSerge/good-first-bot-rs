@@ -63,15 +63,13 @@ async fn rate_limit_guard_sleeps_when_below_threshold_and_before_reset() {
     let client = DefaultGithubClient::new("fake_token", "https://example.com/graphql", threshold as u64)
         .expect("client");
 
-    // Force a short wait window
     const WAIT_MS: u64 = 40;
     {
         let mut state = client.rate_limit.lock().await;
-        state.remaining = threshold; // at or below threshold
+        state.remaining = threshold;
         state.reset_at = Instant::now() + Duration::from_millis(WAIT_MS);
     }
 
-    // Bounds: wait .. wait + wait/10  (+ a little fudge for scheduler noise)
     let expected_min = Duration::from_millis(WAIT_MS);
     let expected_max = Duration::from_millis(WAIT_MS + WAIT_MS / 10);
     let fudge = Duration::from_millis(10);
