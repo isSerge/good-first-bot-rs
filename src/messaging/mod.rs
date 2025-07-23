@@ -27,8 +27,10 @@ use crate::{
     storage::RepoEntity,
 };
 
+/// Represents errors that can occur when sending messages.
 #[derive(Debug, Error)]
 pub enum MessagingError {
+    /// An error from the underlying `teloxide` library.
     #[error("Teloxide API request failed: {0}")]
     TeloxideRequest(#[from] teloxide::RequestError),
 }
@@ -161,12 +163,13 @@ pub trait MessagingService: Send + Sync {
     ) -> Result<()>;
 }
 
-/// Telegram messaging service.
+/// The default implementation of the `MessagingService` trait.
 pub struct TelegramMessagingService {
     bot: Bot,
 }
 
 impl TelegramMessagingService {
+    /// Creates a new `TelegramMessagingService`.
     pub fn new(bot: Bot) -> Self {
         Self { bot }
     }

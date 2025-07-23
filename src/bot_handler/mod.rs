@@ -26,26 +26,36 @@ type DialogueStorage = SqliteStorage<Json>;
 
 /// Context groups the data needed by all command and callback handlers.
 pub struct Context<'a> {
+    /// A reference to the main `BotHandler`.
     pub handler: &'a BotHandler,
+    /// The message that triggered the handler.
     pub message: &'a Message,
+    /// The dialogue for managing command state.
     pub dialogue: &'a Dialogue<CommandState, DialogueStorage>,
+    /// The callback query, if the handler was triggered by one.
     pub query: Option<&'a CallbackQuery>,
 }
 
+/// Represents errors that can occur in the bot handler.
 #[derive(Error, Debug)]
 pub enum BotHandlerError {
+    /// Represents an error with invalid user input.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    /// Represents an error with the dialogue storage.
     #[error("Failed to get or update dialogue: {0}")]
     DialogueError(#[from] SqliteStorageError<serde_json::Error>),
 
+    /// Represents an error sending a message.
     #[error("Failed to send message: {0}")]
     SendMessageError(#[from] MessagingError),
 
+    /// Represents an internal error from the repository service.
     #[error("Internal error: {0}")]
     InternalError(RepositoryServiceError),
 
+    /// Represents an error when a user exceeds a limit.
     #[error("Limit exceeded: {0}")]
     LimitExceeded(String),
 }
@@ -59,19 +69,26 @@ impl From<RepositoryServiceError> for BotHandlerError {
     }
 }
 
+/// A convenience type alias for `Result<T, BotHandlerError>`.
 pub type BotHandlerResult<T> = Result<T, BotHandlerError>;
 
+/// Represents the available bot commands.
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
 pub enum Command {
+    /// Start the bot and show a welcome message.
     #[command(description = "Start the bot and show welcome message.")]
     Start,
+    /// Show the help message.
     #[command(description = "Show this help text.")]
     Help,
+    /// Add a repository to track.
     #[command(description = "Add a repository by replying with the repository url.")]
     Add,
+    /// List the repositories being tracked.
     #[command(description = "List tracked repositories.")]
     List,
+    /// Show an overview of all tracked repositories and their labels.
     #[command(description = "Show an overview of tracked repositories.")]
     Overview,
 }
@@ -86,12 +103,17 @@ pub struct BotHandler {
 /// The state of the command.
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CommandState {
+    /// The default state, where no command is active.
     #[default]
     None,
+    /// The bot is waiting for the user to reply with repository URLs.
     AwaitingAddRepo,
+    /// The user is viewing the labels for a specific repository.
     ViewingRepoLabels {
+        /// The full name of the repository (e.g., "owner/repo").
         repo_id: String,
-        from_page: usize, // The page from which the user navigated to labels
+        /// The page number of the repository list the user came from.
+        from_page: usize,
     },
 }
 
@@ -145,6 +167,7 @@ impl BotHandler {
         Ok(())
     }
 
+    /// Handles an incoming callback query.
     pub async fn handle_callback_query(
         &self,
         query: &CallbackQuery,

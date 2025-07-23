@@ -14,14 +14,18 @@ use crate::{
     storage::{RepoEntity, RepoStorage, StorageError},
 };
 
+/// Represents errors that can occur in the repository service.
 #[derive(Debug, Error)]
 pub enum RepositoryServiceError {
+    /// An error from the GitHub client.
     #[error("Github client error")]
     GithubClientError(#[from] GithubError),
 
+    /// An error from the storage layer.
     #[error("Storage error: {0}")]
     StorageError(#[from] StorageError),
 
+    /// An error indicating that a user has exceeded a limit.
     #[error("Limit exceeded for user: {0}")]
     LimitExceeded(String),
 }
@@ -32,12 +36,17 @@ type Result<T> = std::result::Result<T, RepositoryServiceError>;
 /// status.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabelNormalized {
+    /// The name of the label.
     pub name: String,
+    /// The color of the label.
     pub color: String,
+    /// The number of issues with this label.
     pub count: i64,
+    /// Whether the user is tracking this label.
     pub is_selected: bool,
 }
 
+/// A trait for managing repositories.
 #[automock]
 #[async_trait]
 pub trait RepositoryService: Send + Sync {
@@ -77,6 +86,7 @@ pub trait RepositoryService: Send + Sync {
     ) -> Result<bool>;
 }
 
+/// The default implementation of the `RepositoryService` trait.
 pub struct DefaultRepositoryService {
     storage: Arc<dyn RepoStorage>,
     github_client: Arc<dyn GithubClient>,
@@ -85,6 +95,7 @@ pub struct DefaultRepositoryService {
 }
 
 impl DefaultRepositoryService {
+    /// Creates a new `DefaultRepositoryService`.
     pub fn new(
         storage: Arc<dyn RepoStorage>,
         github_client: Arc<dyn GithubClient>,

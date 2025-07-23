@@ -1,4 +1,3 @@
-
 #![warn(missing_docs)]
 //! A Telegram bot for tracking GitHub issues.
 //!
@@ -6,14 +5,23 @@
 //! new issues. It provides a simple interface to
 //! add, remove, and list tracked repositories.
 
+/// The main handler for the bot's logic.
 pub mod bot_handler;
+/// The configuration for the application.
 pub mod config;
+/// The dispatcher for routing updates to the correct handlers.
 pub mod dispatcher;
+/// The client for interacting with the GitHub API.
 pub mod github;
+/// The service for sending messages to the user.
 pub mod messaging;
+/// A utility for paginating data.
 pub mod pagination;
+/// The poller for fetching new issues from GitHub.
 pub mod poller;
+/// The service for managing repositories.
 pub mod repository;
+/// The storage layer for persisting data.
 pub mod storage;
 
 use std::sync::Arc;

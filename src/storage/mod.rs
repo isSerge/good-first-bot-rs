@@ -1,4 +1,5 @@
 mod repo_entity;
+/// An implementation of `RepoStorage` that uses SQLite as the backing store.
 pub mod sqlite;
 #[cfg(test)]
 mod tests;
@@ -11,16 +12,21 @@ pub use repo_entity::RepoEntity;
 use teloxide::types::ChatId;
 use thiserror::Error;
 
+/// Represents errors that can occur in the storage layer.
 #[derive(Debug, Error)]
 pub enum StorageError {
+    /// An error from the underlying database.
     #[error("Database error: {0}")]
     DbError(String),
+    /// An error indicating that data in the database is invalid.
     #[error("Data integrity error: Stored repository '{0}' is invalid: {1}")]
     DataIntegrityError(String, #[source] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
+/// A convenience type alias for `Result<T, StorageError>`.
 pub type StorageResult<T> = Result<T, StorageError>;
 
+/// A trait for storing and retrieving repository data.
 #[automock]
 #[async_trait]
 pub trait RepoStorage: Send + Sync {

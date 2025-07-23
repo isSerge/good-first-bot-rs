@@ -1,3 +1,5 @@
+//! This module contains handlers for bot commands.
+
 pub mod add;
 pub mod help;
 pub mod list;
@@ -8,8 +10,10 @@ use async_trait::async_trait;
 
 use crate::bot_handler::{BotHandlerResult, Context};
 
+/// A trait for handling bot commands.
 #[async_trait]
 pub trait CommandHandler {
+    /// Handles a command.
     async fn handle(self, ctx: Context<'_>) -> BotHandlerResult<()>;
 }
 
