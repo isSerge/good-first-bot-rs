@@ -55,3 +55,7 @@ async fn test_update_rate_limit_from_headers() {
     let diff = state.reset_at.checked_duration_since(Instant::now()).unwrap();
     assert!(diff >= Duration::from_secs(59) && diff <= Duration::from_secs(61));
 }
+
+async fn test_rate_limit_guard(){
+    
+}
