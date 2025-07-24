@@ -27,6 +27,7 @@ pub struct Config {
     pub max_labels_per_repo: usize,
     /// The maximum number of concurrent requests to make to the GitHub API.
     pub max_concurrency: usize,
+    /// The threshold before the bot should pause operations.
     pub rate_limit_threshold: u64,
 }
 
