@@ -6,6 +6,7 @@ const DEFAULT_POLL_INTERVAL: u64 = 10;
 const DEFAULT_REPOS_PER_USER: usize = 20;
 const DEFAULT_LABELS_PER_REPO: usize = 10;
 const DEFAULT_MAX_CONCURRENCY: usize = 10;
+const DEFAULT_RATE_LIMIT_THRESHOLD: u64 = 10;
 
 /// Represents the application configuration.
 #[derive(Debug)]
@@ -26,6 +27,8 @@ pub struct Config {
     pub max_labels_per_repo: usize,
     /// The maximum number of concurrent requests to make to the GitHub API.
     pub max_concurrency: usize,
+    /// The threshold before the bot should pause operations.
+    pub rate_limit_threshold: u64,
 }
 
 impl Config {
@@ -54,6 +57,10 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_MAX_CONCURRENCY),
+            rate_limit_threshold: env::var("RATE_LIMIT_THRESHOLD")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(DEFAULT_RATE_LIMIT_THRESHOLD),
         })
     }
 }

@@ -2,17 +2,29 @@
 #[cfg(test)]
 mod tests;
 
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
 use graphql_client::{GraphQLQuery, Response};
 use mockall::automock;
+use rand::{Rng, rng};
 use reqwest::{
     Client,
     header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
 };
 use thiserror::Error;
+use tokio::sync::Mutex;
+
+#[derive(Debug)]
+struct RateLimitState {
+    remaining: u32,
+    reset_at: Instant,
+}
 
 /// Represents errors that can occur when interacting with the GitHub API.
 #[derive(Debug, Error)]
@@ -43,6 +55,10 @@ pub enum GithubError {
     /// An error indicating that the request was not authorized.
     #[error("GitHub authentication failed")]
     Unauthorized,
+
+    /// An error indicating that a required header could not be parsed.
+    #[error("Failed to parse header: {0}")]
+    HeaderError(String),
 }
 
 // Helper function to check if a GraphQL error is retryable
@@ -117,11 +133,17 @@ pub struct Labels;
 pub struct DefaultGithubClient {
     client: Client,
     graphql_url: String,
+    rate_limit: Arc<Mutex<RateLimitState>>,
+    rate_limit_threshold: u64,
 }
 
 impl DefaultGithubClient {
     /// Creates a new `DefaultGithubClient`.
-    pub fn new(github_token: &str, graphql_url: &str) -> Result<Self, GithubError> {
+    pub fn new(
+        github_token: &str,
+        graphql_url: &str,
+        rate_limit_threshold: u64,
+    ) -> Result<Self, GithubError> {
         // Build the HTTP client with the GitHub token.
         let mut headers = HeaderMap::new();
 
@@ -129,10 +151,15 @@ impl DefaultGithubClient {
         headers.insert(USER_AGENT, HeaderValue::from_static("github-activity-rs"));
 
         let client = reqwest::Client::builder().default_headers(headers).build()?;
-
+        let initial_state = RateLimitState { remaining: u32::MAX, reset_at: Instant::now() };
         tracing::debug!("HTTP client built successfully.");
 
-        Ok(Self { client, graphql_url: graphql_url.to_string() })
+        Ok(Self {
+            client,
+            graphql_url: graphql_url.to_string(),
+            rate_limit: Arc::new(Mutex::new(initial_state)),
+            rate_limit_threshold,
+        })
     }
 
     /// Re-usable configuration for exponential backoff.
@@ -158,6 +185,9 @@ impl DefaultGithubClient {
     {
         // closure that Backoff expects
         let operation = || async {
+            // 0. Rate limit guard
+            self.rate_limit_guard().await;
+
             // 1. Build the request
             let request_body = Q::build_query(variables.clone());
 
@@ -170,7 +200,13 @@ impl DefaultGithubClient {
                     },
                 )?;
 
-            // 3. HTTP-status check
+            //3 Update rate limit state from headers
+            if let Err(e) = self.update_rate_limit_from_headers(resp.headers()).await {
+                // Option A: warn and continue
+                tracing::warn!("Could not update rate-limit info: {}", e);
+            }
+
+            // 4. HTTP-status check
             if !resp.status().is_success() {
                 let status = resp.status();
                 let text = resp.text().await.unwrap_or_else(|e| {
@@ -214,7 +250,7 @@ impl DefaultGithubClient {
                 return Err(be);
             }
 
-            // 4. Parse JSON
+            // 5. Parse JSON
             let body: Response<Q::ResponseData> = resp.json().await.map_err(|e| {
                 tracing::warn!("Failed to parse JSON: {e}. Retrying...");
                 BackoffError::transient(GithubError::GraphQLApiError(format!(
@@ -222,7 +258,7 @@ impl DefaultGithubClient {
                 )))
             })?;
 
-            // 5. GraphQL errors?
+            // 6. GraphQL errors?
             if let Some(errors) = &body.errors {
                 let is_rate_limit_error = errors.iter().any(|e| {
                     e.message.to_lowercase().contains("rate limit") || is_retryable_graphql_error(e)
@@ -239,7 +275,7 @@ impl DefaultGithubClient {
                 }
             }
 
-            // 6. Unwrap the data or permanent-fail
+            // 7. Unwrap the data or permanent-fail
             body.data.ok_or_else(|| {
                 tracing::error!("GraphQL response had no data field; permanent failure");
                 BackoffError::permanent(GithubError::GraphQLApiError(
@@ -250,6 +286,80 @@ impl DefaultGithubClient {
 
         // kick off the retry loop
         retry(Self::backoff_config(), operation).await
+    }
+
+    /// Rate limit guard that sleeps until the rate limit resets if we're close
+    /// to the threshold.
+    async fn rate_limit_guard(&self) {
+        let (remaining, reset_at) = {
+            let state = self.rate_limit.lock().await;
+            (state.remaining, state.reset_at)
+        };
+
+        // define a safety threshold
+        let threshold = self.rate_limit_threshold as u32;
+        if remaining <= threshold {
+            let now = Instant::now();
+            if now < reset_at {
+                let wait = reset_at - now;
+                tracing::info!(
+                    "Approaching rate limit ({} left). Sleeping {:?} until reset...",
+                    remaining,
+                    wait
+                );
+
+                // Sleep until the rate limit resets
+                //added a jitter to avoid thundering herd problem
+                let max_jitter = wait.as_millis() as u64 / 10;
+                let jitter_ms = rng().random_range(0..=max_jitter);
+                tokio::time::sleep(wait + Duration::from_millis(jitter_ms)).await;
+            }
+        }
+    }
+
+    /// Update the rate limit state from the response headers.
+    async fn update_rate_limit_from_headers(&self, headers: &HeaderMap) -> Result<(), GithubError> {
+        // Names are case-insensitive in HeaderMap
+        let rem_val = headers.get("X-RateLimit-Remaining").ok_or_else(|| {
+            let msg = "Missing X-RateLimit-Remaining header".to_string();
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+        let rem_str = rem_val.to_str().map_err(|e| {
+            let msg = format!("Invalid X-RateLimit-Remaining value: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+        let remaining = rem_str.parse::<u32>().map_err(|e| {
+            let msg = format!("Cannot parse remaining as u32: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+
+        let reset_val = headers.get("X-RateLimit-Reset").ok_or_else(|| {
+            let msg = "Missing X-RateLimit-Reset header".to_string();
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+        let reset_str = reset_val.to_str().map_err(|e| {
+            let msg = format!("Invalid X-RateLimit-Reset value: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+        let reset_unix = reset_str.parse::<u64>().map_err(|e| {
+            let msg = format!("Cannot parse reset timestamp as u64: {e}");
+            tracing::error!("{}", msg);
+            GithubError::HeaderError(msg)
+        })?;
+
+        // All good — update the shared state
+        let mut state = self.rate_limit.lock().await;
+        state.remaining = remaining;
+        let reset_in = reset_unix.saturating_sub(chrono::Utc::now().timestamp() as u64);
+        state.reset_at = Instant::now() + Duration::from_secs(reset_in);
+
+        tracing::debug!("Rate limit updated: {} remaining, resets in {}s", remaining, reset_in);
+        Ok(())
     }
 }
 

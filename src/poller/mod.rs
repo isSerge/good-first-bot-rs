@@ -199,6 +199,15 @@ impl GithubPoller {
                         );
                         return Err(PollerError::Github(github_error));
                     }
+                    GithubError::HeaderError(msg) => {
+                        tracing::warn!(
+                            "Could not parse rate limit headers for repo {} (chat {}): {}. \
+                             Skipping this repo for this cycle.",
+                            repo.name_with_owner,
+                            chat_id,
+                            msg
+                        );
+                    }
                 },
                 unexpected_error => {
                     tracing::error!(
