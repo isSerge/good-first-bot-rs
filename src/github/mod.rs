@@ -52,6 +52,8 @@ pub enum GithubError {
     /// An error indicating that the request was not authorized.
     #[error("GitHub authentication failed")]
     Unauthorized,
+
+    /// An error indicating that a required header could not be parsed.
     #[error("Failed to parse header: {0}")]
     HeaderError(String),
 }
@@ -314,6 +316,7 @@ impl DefaultGithubClient {
         }
     }
 
+    /// Update the rate limit state from the response headers.
     async fn update_rate_limit_from_headers(&self, headers: &HeaderMap) -> Result<(), GithubError> {
         // Names are case-insensitive in HeaderMap
         let rem_val = headers.get("X-RateLimit-Remaining").ok_or_else(|| {
