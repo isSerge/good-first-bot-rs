@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use futures::{StreamExt, stream};
+use teloxide::types::ChatAction;
 
 use crate::{
     bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::Context},
@@ -54,6 +55,17 @@ pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> 
         return Ok(());
     }
 
+    ctx.handler
+        .messaging_service
+        .send_chat_action(ctx.message.chat.id, ChatAction::Typing)
+        .await?;
+
+    let status_msg = ctx
+        .handler
+        .messaging_service
+        .send_text_message(ctx.message.chat.id, "Processing... ⏳")
+        .await?;
+
     let summary = stream::iter(urls)
         .map(|url| async move {
             let repo = match RepoEntity::from_url(&url) {
@@ -101,8 +113,9 @@ pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> 
 
     ctx.handler
         .messaging_service
-        .send_add_summary_msg(
+        .edit_add_summary_msg(
             ctx.message.chat.id,
+            status_msg.id,
             summary.successfully_added,
             summary.already_tracked,
             summary.not_found,

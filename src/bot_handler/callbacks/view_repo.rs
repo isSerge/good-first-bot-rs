@@ -5,7 +5,12 @@ use crate::{
     storage::RepoEntity,
 };
 
-pub async fn handle(ctx: Context<'_>, repo_id: &str, from_page: usize) -> BotHandlerResult<()> {
+pub async fn handle(
+    ctx: Context<'_>,
+    repo_id: &str,
+    from_page: usize,
+    _query_id: &str,
+) -> BotHandlerResult<()> {
     let chat_id = ctx.message.chat.id;
 
     // Extract repository name with owner

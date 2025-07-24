@@ -5,8 +5,8 @@ use mockall::predicate::*;
 use teloxide::{
     dispatching::dialogue::{Dialogue, SqliteStorage, serializer},
     types::{
-        Chat, ChatId, ChatKind, ChatPrivate, MaybeInaccessibleMessage, MediaKind, MediaText,
-        Message, MessageCommon, MessageId, MessageKind, User,
+        Chat, ChatAction, ChatId, ChatKind, ChatPrivate, MaybeInaccessibleMessage, MediaKind,
+        MediaText, Message, MessageCommon, MessageId, MessageKind, User,
     },
 };
 
@@ -103,6 +103,21 @@ fn mock_callback_query<'a>(
     (msg, query)
 }
 
+fn setup_add_repo_mocks(mock_messaging: &mut MockMessagingService) {
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(CHAT_ID), eq(ChatAction::Typing))
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    let status_msg = mock_message(CHAT_ID, "Processing... ⏳");
+    mock_messaging
+        .expect_send_text_message()
+        .with(eq(CHAT_ID), eq("Processing... ⏳"))
+        .times(1)
+        .returning(move |_, _| Ok(status_msg.clone()));
+}
+
 #[tokio::test]
 async fn test_add_repos_success() {
     // Arrange
@@ -114,6 +129,8 @@ async fn test_add_repos_success() {
     let repo_name = "repo";
     let repo_name_with_owner = "owner/repo";
     let repo_url = "https://github.com/owner/repo";
+
+    setup_add_repo_mocks(&mut mock_messaging);
 
     // Mock repository interactions
     mock_repository
@@ -130,17 +147,17 @@ async fn test_add_repos_success() {
     // Expect send_add_summary_msg to be called
     let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
             chat_id_param == CHAT_ID &&
-                *s_added == expected_successfully_added && // Compare HashSets directly                 
+                *s_added == expected_successfully_added && // Compare HashSets directly
                 a_tracked.is_empty() &&
                 n_found.is_empty() &&
                 inv_urls.is_empty() &&
                 p_errors.is_empty()
         })
         .times(1)
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -168,6 +185,8 @@ async fn test_add_repos_already_tracked() {
     let repo_name_with_owner = "owner/repo";
     let repo_url = "https://github.com/owner/repo";
 
+    setup_add_repo_mocks(&mut mock_messaging);
+
     mock_repository.expect_repo_exists().returning(|_, _| Ok(true));
     mock_repository
         .expect_add_repo()
@@ -177,8 +196,8 @@ async fn test_add_repos_already_tracked() {
 
     let expected_already_tracked = str_hashset(&[repo_name_with_owner]);
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
             chat_id_param == CHAT_ID
                 && s_added.is_empty()
                 && *a_tracked == expected_already_tracked
@@ -186,7 +205,7 @@ async fn test_add_repos_already_tracked() {
                 && inv_urls.is_empty()
                 && p_errors.is_empty()
         })
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -214,13 +233,15 @@ async fn test_add_repos_does_not_exist() {
     let repo_name_with_owner = "owner/nonexistent";
     let repo_url = "https://github.com/owner/nonexistent";
 
+    setup_add_repo_mocks(&mut mock_messaging);
+
     mock_repository.expect_repo_exists().returning(|_, _| Ok(false));
     // contains_repo and add_repo should not be called
 
     let expected_not_found = str_hashset(&[repo_name_with_owner]);
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
             chat_id_param == CHAT_ID
                 && s_added.is_empty()
                 && a_tracked.is_empty()
@@ -228,7 +249,7 @@ async fn test_add_repos_does_not_exist() {
                 && inv_urls.is_empty()
                 && p_errors.is_empty()
         })
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -255,10 +276,12 @@ async fn test_add_repos_parse_error() {
 
     let invalid_url = "this_is_not_a_url";
 
+    setup_add_repo_mocks(&mut mock_messaging);
+
     let expected_invalid_urls = str_hashset(&[invalid_url]);
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
             chat_id_param == CHAT_ID
                 && s_added.is_empty()
                 && a_tracked.is_empty()
@@ -266,7 +289,7 @@ async fn test_add_repos_parse_error() {
                 && *inv_urls == expected_invalid_urls
                 && p_errors.is_empty()
         })
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -295,14 +318,16 @@ async fn test_add_repos_error() {
     let repo_url = "https://github.com/owner/gh-error";
     let error_msg = "Github client error";
 
+    setup_add_repo_mocks(&mut mock_messaging);
+
     mock_repository.expect_repo_exists().returning(move |_, _| {
         Err(RepositoryServiceError::GithubClientError(GithubError::Unauthorized))
     });
 
     let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, error_msg)]);
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
             chat_id_param == CHAT_ID
                 && s_added.is_empty()
                 && a_tracked.is_empty()
@@ -310,7 +335,7 @@ async fn test_add_repos_error() {
                 && inv_urls.is_empty()
                 && *p_errors == expected_errors
         })
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -342,6 +367,8 @@ repositories.";
     let full_error_str =
         RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()).to_string();
 
+    setup_add_repo_mocks(&mut mock_messaging);
+
     mock_repository.expect_repo_exists().returning(|_, _| Ok(true));
     mock_repository.expect_add_repo().returning(move |_, _| {
         Err(RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()))
@@ -350,8 +377,8 @@ repositories.";
     let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, &full_error_str)]);
 
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&chat_id_param, s_added, a_tracked, n_found, inv_urls, p_errors| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
             println!("p_errors: {:?}", p_errors);
             chat_id_param == CHAT_ID
                 && s_added.is_empty()
@@ -360,7 +387,7 @@ repositories.";
                 && inv_urls.is_empty()
                 && *p_errors == expected_errors
         })
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -399,6 +426,8 @@ async fn test_add_repos_multiple_mixed_outcomes() {
     let name_add_error = "owner/add-error";
     let db_failure_reason = "DB Add Failed";
     let add_error_msg = format!("Storage error: Database error: {db_failure_reason}");
+
+    setup_add_repo_mocks(&mut mock_messaging);
 
     // Mocking for 'new' repo
     mock_repository.expect_repo_exists().with(eq("owner"), eq("new")).returning(|_, _| Ok(true));
@@ -452,8 +481,8 @@ async fn test_add_repos_multiple_mixed_outcomes() {
         str_tuple_hashset(&[(name_gh_error, gh_error_msg), (name_add_error, &add_error_msg)]);
 
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&ch_id, s, a, n, inv, p_err| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&ch_id, _, s, a, n, inv, p_err| {
             ch_id == CHAT_ID
                 && *s == expected_s_added
                 && *a == expected_a_tracked
@@ -462,7 +491,7 @@ async fn test_add_repos_multiple_mixed_outcomes() {
                 && *p_err == expected_p_errors
         })
         .times(1)
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -500,6 +529,8 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
     mock_messaging.expect_prompt_for_repo_input().with(eq(chat_id)).times(1).returning(|_| Ok(()));
 
     // Expectations for Interaction 2 (the reply to the prompt)
+    setup_add_repo_mocks(&mut mock_messaging);
+
     // Expect the repository to exist
     mock_repository
         .expect_repo_exists()
@@ -517,8 +548,8 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
     // Expect summary message at the end of reply processing
     let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&cid, s, a, n, i, p| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&cid, _, s, a, n, i, p| {
             cid == chat_id
                 && *s == expected_successfully_added
                 && a.is_empty()
@@ -527,7 +558,7 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
                 && p.is_empty()
         })
         .times(1)
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -589,6 +620,12 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
 
     // `handle_callback_query` always answers the query immediately.
     mock_messaging.expect_answer_callback_query().times(2).returning(|_, _| Ok(()));
+
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(chat_id), eq(ChatAction::Typing))
+        .times(2)
+        .returning(|_, _| Ok(()));
 
     // `get_repo_github_labels` is called three times in total.
     // 1. Once in `action_view_labels`.
@@ -688,6 +725,12 @@ async fn test_handle_callback_view_repo_details() {
     let repo_entity = RepoEntity::from_str(repo_id).unwrap();
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
 
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(CHAT_ID), eq(ChatAction::Typing))
+        .times(1)
+        .returning(|_, _| Ok(()));
+
     mock_repository
         .expect_get_repo_github_labels()
         .with(eq(CHAT_ID), eq(repo_entity.clone()), eq(1))
@@ -768,6 +811,8 @@ async fn test_handle_reply_awaiting_add_repo_success() {
     // Set the state to AwaitingAddRepo
     dialogue.update(CommandState::AwaitingAddRepo).await.unwrap();
 
+    setup_add_repo_mocks(&mut mock_messaging);
+
     // Mock the repository interactions for a successful add
     mock_repository
         .expect_repo_exists()
@@ -783,8 +828,8 @@ async fn test_handle_reply_awaiting_add_repo_success() {
     // Expect the summary message
     let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
     mock_messaging
-        .expect_send_add_summary_msg()
-        .withf(move |&cid, s, a, n, i, p| {
+        .expect_edit_add_summary_msg()
+        .withf(move |&cid, _, s, a, n, i, p| {
             cid == CHAT_ID
                 && *s == expected_successfully_added
                 && a.is_empty()
@@ -793,7 +838,7 @@ async fn test_handle_reply_awaiting_add_repo_success() {
                 && p.is_empty()
         })
         .times(1)
-        .returning(|_, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _, _, _, _, _| Ok(()));
 
     let handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -820,6 +865,12 @@ async fn test_handle_callback_view_repo_labels() {
     let from_page = 1;
     let repo_entity = RepoEntity::from_str(repo_id).unwrap();
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
+
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(CHAT_ID), eq(ChatAction::Typing))
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     let paginated_labels = Paginated::new(vec![], page);
     mock_repository
@@ -868,6 +919,12 @@ async fn test_handle_callback_view_repo_labels_error() {
     let repo_entity = RepoEntity::from_str(repo_id).unwrap();
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
 
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(CHAT_ID), eq(ChatAction::Typing))
+        .times(1)
+        .returning(|_, _| Ok(()));
+
     mock_repository
         .expect_get_repo_github_labels()
         .with(eq(CHAT_ID), eq(repo_entity.clone()), eq(page))
@@ -902,6 +959,12 @@ async fn test_handle_callback_remove_repo_error() {
     let repo_id = "owner/repo";
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
 
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(CHAT_ID), eq(ChatAction::Typing))
+        .times(1)
+        .returning(|_, _| Ok(()));
+
     mock_repository.expect_remove_repo().with(eq(CHAT_ID), eq(repo_id)).times(1).returning(
         |_, _| {
             Err(RepositoryServiceError::StorageError(StorageError::DbError(
@@ -933,6 +996,12 @@ async fn test_handle_callback_back_to_repo_details() {
     let repo_id = "owner/repo";
     let from_page = 1;
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
+
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(CHAT_ID), eq(ChatAction::Typing))
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     mock_repository
         .expect_get_repo_github_labels()
@@ -986,6 +1055,12 @@ async fn test_handle_callback_back_to_repo_list() {
 
     let repos = vec![RepoEntity::from_str("owner/repo1").unwrap()];
     let paginated_repos = Paginated::new(repos.clone(), page);
+
+    mock_messaging
+        .expect_send_chat_action()
+        .with(eq(chat_id), eq(ChatAction::Typing))
+        .times(1)
+        .returning(|_, _| Ok(()));
 
     mock_repository
         .expect_get_user_repos()

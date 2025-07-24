@@ -10,6 +10,7 @@ pub async fn handle(
     repo_id: &str,
     page: usize,
     from_page: usize,
+    _query_id: &str,
 ) -> BotHandlerResult<()> {
     let chat_id = ctx.message.chat.id;
 
