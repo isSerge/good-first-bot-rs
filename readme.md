@@ -51,7 +51,8 @@ docker-compose.yml        # For running with Docker Compose
 migrations
 src
   ├── bot_handler         # Telegram bot commands and handlers
-  │   └── commands        # Individual command implementations (add, remove, list, help, start)
+  │   └── commands        # Individual command implementations (add, list, help, etc.)
+  |   └── callbacks       # Handlers for callback queries (view repo, toggle label, etc.)
   ├── config.rs           # Environment-based configuration
   ├── dispatcher.rs       # Dispatcher setup for handling Telegram updates
   ├── github              # GitHub API integration using GraphQL
