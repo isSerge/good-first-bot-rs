@@ -14,13 +14,13 @@ use mockall::automock;
 use teloxide::{
     prelude::*,
     sugar::request::RequestLinkPreviewExt,
-    types::{ChatId, ForceReply, InlineKeyboardMarkup, MessageId, ParseMode},
+    types::{ChatAction, ChatId, ForceReply, InlineKeyboardMarkup, MessageId, ParseMode},
     utils::{command::BotCommands, html},
 };
 use thiserror::Error;
 
 use crate::{
-    bot_handler::{BotHandlerError, Command},
+    bot_handler::{BotHandlerError, Command, commands::add::AddSummary},
     github::issues::IssuesRepositoryIssuesNodes,
     pagination::Paginated,
     repository::LabelNormalized,
@@ -143,15 +143,7 @@ pub trait MessagingService: Send + Sync {
     /// Sends a summary message after adding repositories.
     /// This message includes the number of successfully added, already
     /// tracked, not found, invalid URLs, and errors.
-    async fn send_add_summary_msg(
-        &self,
-        chat_id: ChatId,
-        successfully_added: HashSet<String>,
-        already_tracked: HashSet<String>,
-        not_found: HashSet<String>,
-        invalid_urls: HashSet<String>,
-        errors: HashSet<(String, String)>,
-    ) -> Result<()>;
+    async fn send_add_summary_msg(&self, chat_id: ChatId, summary: &AddSummary) -> Result<()>;
 
     /// Sends an overview message with tracked repositories and their labels.
     /// The overview is a vector of tuples, where each tuple contains a
@@ -160,6 +152,20 @@ pub trait MessagingService: Send + Sync {
         &self,
         chat_id: ChatId,
         overview: Vec<(RepoEntity, Vec<String>)>,
+    ) -> Result<()>;
+
+    /// Sends a chat action to the user.
+    async fn send_chat_action(&self, chat_id: ChatId, action: ChatAction) -> Result<()>;
+
+    /// Sends a simple text message and returns the sent message.
+    async fn send_text_message(&self, chat_id: ChatId, text: &str) -> Result<Message>;
+
+    /// Edits a message with the summary of an add operation.
+    async fn edit_add_summary_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        summary: &AddSummary,
     ) -> Result<()>;
 }
 
@@ -172,6 +178,69 @@ impl TelegramMessagingService {
     /// Creates a new `TelegramMessagingService`.
     pub fn new(bot: Bot) -> Self {
         Self { bot }
+    }
+
+    // Helper to format the summary text for adding repositories.
+    fn format_add_summary_text(summary: &AddSummary) -> String {
+        let mut summary_parts = Vec::new();
+        summary_parts.push("<b>Summary of repository addition:</b>".to_string());
+
+        let format_summary_category = |title: &str, items: &HashSet<String>| {
+            if !items.is_empty() {
+                Some(format!(
+                    "<b>{}:</b>\n{}",
+                    html::escape(title),
+                    items
+                        .iter()
+                        .map(|item| format!("- {}", html::escape(item)))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ))
+            } else {
+                None
+            }
+        };
+
+        if let Some(success) =
+            format_summary_category("✅ Successfully Added", &summary.successfully_added)
+        {
+            summary_parts.push(success);
+        }
+
+        if let Some(already) =
+            format_summary_category("➡️ Already Tracked", &summary.already_tracked)
+        {
+            summary_parts.push(already);
+        }
+
+        if let Some(not_found) =
+            format_summary_category("❓ Not Found on GitHub", &summary.not_found)
+        {
+            summary_parts.push(not_found);
+        }
+
+        if let Some(invalid_urls) = format_summary_category("⚠️ Invalid URL", &summary.invalid_urls)
+        {
+            summary_parts.push(invalid_urls);
+        }
+
+        if !summary.errors.is_empty() {
+            let error_messages = summary
+                .errors
+                .iter()
+                .map(|(repo, error)| format!("- {}: {}", html::escape(repo), html::escape(error)))
+                .collect::<Vec<_>>()
+                .join("\n");
+            summary_parts.push(format!("❌ <b>Errors:</b>\n{error_messages}"));
+        }
+
+        // Only the main title
+        if summary_parts.len() == 1 {
+            summary_parts
+                .push("No valid URLs were processed, or all inputs were empty.".to_string());
+        }
+
+        summary_parts.join("\n\n")
     }
 
     // Helper to format text for paginated messages
@@ -446,66 +515,9 @@ impl MessagingService for TelegramMessagingService {
             .map_err(MessagingError::TeloxideRequest)
     }
 
-    async fn send_add_summary_msg(
-        &self,
-        chat_id: ChatId,
-        successfully_added: HashSet<String>,
-        already_tracked: HashSet<String>,
-        not_found: HashSet<String>,
-        invalid_urls: HashSet<String>,
-        errors: HashSet<(String, String)>,
-    ) -> Result<()> {
-        let mut summary = Vec::new();
-        summary.push("<b>Summary of repository addition:</b>".to_string());
-
-        let format_summary_category = |title: &str, items: &HashSet<String>| {
-            if !items.is_empty() {
-                Some(format!(
-                    "<b>{}:</b>\n{}",
-                    html::escape(title),
-                    items
-                        .iter()
-                        .map(|item| format!("- {}", html::escape(item)))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                ))
-            } else {
-                None
-            }
-        };
-
-        if let Some(success) = format_summary_category("✅ Successfully Added", &successfully_added)
-        {
-            summary.push(success);
-        }
-
-        if let Some(already) = format_summary_category("➡️ Already Tracked", &already_tracked) {
-            summary.push(already);
-        }
-
-        if let Some(not_found) = format_summary_category("❓ Not Found on GitHub", &not_found) {
-            summary.push(not_found);
-        }
-
-        if let Some(invalid_urls) = format_summary_category("⚠️ Invalid URL", &invalid_urls) {
-            summary.push(invalid_urls);
-        }
-
-        if !errors.is_empty() {
-            let error_messages = errors
-                .iter()
-                .map(|(repo, error)| format!("- {}: {}", html::escape(repo), html::escape(error)))
-                .collect::<Vec<_>>()
-                .join("\n");
-            summary.push(format!("❌ <b>Errors:</b>\n{error_messages}"));
-        }
-
-        // Only the main title
-        if summary.len() == 1 {
-            summary.push("No valid URLs were processed, or all inputs were empty.".to_string());
-        }
-
-        self.send_response_with_keyboard(chat_id, summary.join("\n\n"), None).await
+    async fn send_add_summary_msg(&self, chat_id: ChatId, summary: &AddSummary) -> Result<()> {
+        let text = Self::format_add_summary_text(summary);
+        self.send_response_with_keyboard(chat_id, text, None).await
     }
 
     async fn send_overview_msg(
@@ -545,5 +557,32 @@ impl MessagingService for TelegramMessagingService {
 
         let text = message_parts.join("\n");
         self.send_response_with_keyboard(chat_id, text, None).await
+    }
+
+    async fn send_chat_action(&self, chat_id: ChatId, action: ChatAction) -> Result<()> {
+        self.bot
+            .send_chat_action(chat_id, action)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn send_text_message(&self, chat_id: ChatId, text: &str) -> Result<Message> {
+        self.bot.send_message(chat_id, text).await.map_err(MessagingError::TeloxideRequest)
+    }
+
+    async fn edit_add_summary_msg(
+        &self,
+        chat_id: ChatId,
+        message_id: MessageId,
+        summary: &AddSummary,
+    ) -> Result<()> {
+        let text = Self::format_add_summary_text(summary);
+        self.bot
+            .edit_message_text(chat_id, message_id, text)
+            .parse_mode(ParseMode::Html)
+            .await
+            .map(|_| ())
+            .map_err(MessagingError::TeloxideRequest)
     }
 }

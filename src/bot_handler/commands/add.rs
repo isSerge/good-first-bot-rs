@@ -1,11 +1,27 @@
 use std::collections::HashSet;
 
 use futures::{StreamExt, stream};
+use teloxide::types::ChatAction;
 
 use crate::{
     bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::Context},
     storage::RepoEntity,
 };
+
+/// A struct to hold the summary of the add operation.
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct AddSummary {
+    /// Repositories that were successfully added.
+    pub successfully_added: HashSet<String>,
+    /// Repositories that were already tracked.
+    pub already_tracked: HashSet<String>,
+    /// Repositories that were not found on GitHub.
+    pub not_found: HashSet<String>,
+    /// URLs that were invalid.
+    pub invalid_urls: HashSet<String>,
+    /// Repositories that failed to be added due to an error.
+    pub errors: HashSet<(String, String)>,
+}
 
 pub async fn handle(ctx: Context<'_>) -> BotHandlerResult<()> {
     ctx.handler.messaging_service.prompt_for_repo_input(ctx.message.chat.id).await?;
@@ -23,16 +39,6 @@ enum AddRepoResult {
     NotFound(String),
     InvalidUrl(String),
     Error(String, String),
-}
-
-// A struct to hold the summary of the add operation.
-#[derive(Default)]
-struct AddSummary {
-    successfully_added: HashSet<String>,
-    already_tracked: HashSet<String>,
-    not_found: HashSet<String>,
-    invalid_urls: HashSet<String>,
-    errors: HashSet<(String, String)>,
 }
 
 /// Handle the reply message when we're waiting for repository input.
@@ -53,6 +59,14 @@ pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> 
             .await?;
         return Ok(());
     }
+
+    ctx.handler.messaging_service.send_chat_action(ctx.message.chat.id, ChatAction::Typing).await?;
+
+    let status_msg = ctx
+        .handler
+        .messaging_service
+        .send_text_message(ctx.message.chat.id, "Processing... ⏳")
+        .await?;
 
     let summary = stream::iter(urls)
         .map(|url| async move {
@@ -101,14 +115,7 @@ pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> 
 
     ctx.handler
         .messaging_service
-        .send_add_summary_msg(
-            ctx.message.chat.id,
-            summary.successfully_added,
-            summary.already_tracked,
-            summary.not_found,
-            summary.invalid_urls,
-            summary.errors,
-        )
+        .edit_add_summary_msg(ctx.message.chat.id, status_msg.id, &summary)
         .await?;
 
     Ok(())
