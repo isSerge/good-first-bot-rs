@@ -12,7 +12,7 @@ use teloxide::{
 
 use super::*;
 use crate::{
-    bot_handler::{BotHandler, Command, CommandState},
+    bot_handler::{BotHandler, Command, CommandState, commands::add::AddSummary},
     github::GithubError,
     messaging::MockMessagingService,
     pagination::Paginated,
@@ -144,20 +144,17 @@ async fn test_add_repos_success() {
         .times(1)
         .returning(|_, _| Ok(true));
 
-    // Expect send_add_summary_msg to be called
-    let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
+    let expected_summary = AddSummary {
+        successfully_added: str_hashset(&[repo_name_with_owner]),
+        ..Default::default()
+    };
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
-            chat_id_param == CHAT_ID &&
-                *s_added == expected_successfully_added && // Compare HashSets directly
-                a_tracked.is_empty() &&
-                n_found.is_empty() &&
-                inv_urls.is_empty() &&
-                p_errors.is_empty()
+        .withf(move |&chat_id_param, _, summary| {
+            chat_id_param == CHAT_ID && summary == &expected_summary
         })
         .times(1)
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -194,18 +191,14 @@ async fn test_add_repos_already_tracked() {
         .times(1)
         .returning(|_, _| Ok(false));
 
-    let expected_already_tracked = str_hashset(&[repo_name_with_owner]);
+    let expected_summary =
+        AddSummary { already_tracked: str_hashset(&[repo_name_with_owner]), ..Default::default() };
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
-            chat_id_param == CHAT_ID
-                && s_added.is_empty()
-                && *a_tracked == expected_already_tracked
-                && n_found.is_empty()
-                && inv_urls.is_empty()
-                && p_errors.is_empty()
+        .withf(move |&chat_id_param, _, summary| {
+            chat_id_param == CHAT_ID && summary == &expected_summary
         })
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -238,18 +231,14 @@ async fn test_add_repos_does_not_exist() {
     mock_repository.expect_repo_exists().returning(|_, _| Ok(false));
     // contains_repo and add_repo should not be called
 
-    let expected_not_found = str_hashset(&[repo_name_with_owner]);
+    let expected_summary =
+        AddSummary { not_found: str_hashset(&[repo_name_with_owner]), ..Default::default() };
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
-            chat_id_param == CHAT_ID
-                && s_added.is_empty()
-                && a_tracked.is_empty()
-                && *n_found == expected_not_found
-                && inv_urls.is_empty()
-                && p_errors.is_empty()
+        .withf(move |&chat_id_param, _, summary| {
+            chat_id_param == CHAT_ID && summary == &expected_summary
         })
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -278,18 +267,14 @@ async fn test_add_repos_parse_error() {
 
     setup_add_repo_mocks(&mut mock_messaging);
 
-    let expected_invalid_urls = str_hashset(&[invalid_url]);
+    let expected_summary =
+        AddSummary { invalid_urls: str_hashset(&[invalid_url]), ..Default::default() };
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
-            chat_id_param == CHAT_ID
-                && s_added.is_empty()
-                && a_tracked.is_empty()
-                && n_found.is_empty()
-                && *inv_urls == expected_invalid_urls
-                && p_errors.is_empty()
+        .withf(move |&chat_id_param, _, summary| {
+            chat_id_param == CHAT_ID && summary == &expected_summary
         })
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -324,18 +309,16 @@ async fn test_add_repos_error() {
         Err(RepositoryServiceError::GithubClientError(GithubError::Unauthorized))
     });
 
-    let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, error_msg)]);
+    let expected_summary = AddSummary {
+        errors: str_tuple_hashset(&[(repo_name_with_owner, error_msg)]),
+        ..Default::default()
+    };
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
-            chat_id_param == CHAT_ID
-                && s_added.is_empty()
-                && a_tracked.is_empty()
-                && n_found.is_empty()
-                && inv_urls.is_empty()
-                && *p_errors == expected_errors
+        .withf(move |&chat_id_param, _, summary| {
+            chat_id_param == CHAT_ID && summary == &expected_summary
         })
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -374,20 +357,17 @@ repositories.";
         Err(RepositoryServiceError::LimitExceeded(limit_error_msg.to_string()))
     });
 
-    let expected_errors = str_tuple_hashset(&[(repo_name_with_owner, &full_error_str)]);
+    let expected_summary = AddSummary {
+        errors: str_tuple_hashset(&[(repo_name_with_owner, &full_error_str)]),
+        ..Default::default()
+    };
 
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&chat_id_param, _, s_added, a_tracked, n_found, inv_urls, p_errors| {
-            println!("p_errors: {:?}", p_errors);
-            chat_id_param == CHAT_ID
-                && s_added.is_empty()
-                && a_tracked.is_empty()
-                && n_found.is_empty()
-                && inv_urls.is_empty()
-                && *p_errors == expected_errors
+        .withf(move |&chat_id_param, _, summary| {
+            chat_id_param == CHAT_ID && summary == &expected_summary
         })
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -472,26 +452,22 @@ async fn test_add_repos_multiple_mixed_outcomes() {
             )))
         });
 
-    // Expected HashSets for summary
-    let expected_s_added = str_hashset(&[name_new]);
-    let expected_a_tracked = str_hashset(&[name_tracked]);
-    let expected_n_found = str_hashset(&[name_notfound]);
-    let expected_inv_urls = str_hashset(&[url_invalid]);
-    let expected_p_errors =
-        str_tuple_hashset(&[(name_gh_error, gh_error_msg), (name_add_error, &add_error_msg)]);
+    let expected_summary = AddSummary {
+        successfully_added: str_hashset(&[name_new]),
+        already_tracked: str_hashset(&[name_tracked]),
+        not_found: str_hashset(&[name_notfound]),
+        invalid_urls: str_hashset(&[url_invalid]),
+        errors: str_tuple_hashset(&[
+            (name_gh_error, gh_error_msg),
+            (name_add_error, &add_error_msg),
+        ]),
+    };
 
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&ch_id, _, s, a, n, inv, p_err| {
-            ch_id == CHAT_ID
-                && *s == expected_s_added
-                && *a == expected_a_tracked
-                && *n == expected_n_found
-                && *inv == expected_inv_urls
-                && *p_err == expected_p_errors
-        })
+        .withf(move |&ch_id, _, summary| ch_id == CHAT_ID && summary == &expected_summary)
         .times(1)
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let bot_handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -545,20 +521,15 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
         .times(1)
         .returning(|_, _| Ok(true));
 
-    // Expect summary message at the end of reply processing
-    let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
+    let expected_summary = AddSummary {
+        successfully_added: str_hashset(&[repo_name_with_owner]),
+        ..Default::default()
+    };
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&cid, _, s, a, n, i, p| {
-            cid == chat_id
-                && *s == expected_successfully_added
-                && a.is_empty()
-                && n.is_empty()
-                && i.is_empty()
-                && p.is_empty()
-        })
+        .withf(move |&cid, _, summary| cid == CHAT_ID && summary == &expected_summary)
         .times(1)
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
@@ -825,20 +796,15 @@ async fn test_handle_reply_awaiting_add_repo_success() {
         .times(1)
         .returning(|_, _| Ok(true));
 
-    // Expect the summary message
-    let expected_successfully_added = str_hashset(&[repo_name_with_owner]);
+    let expected_summary = AddSummary {
+        successfully_added: str_hashset(&[repo_name_with_owner]),
+        ..Default::default()
+    };
     mock_messaging
         .expect_edit_add_summary_msg()
-        .withf(move |&cid, _, s, a, n, i, p| {
-            cid == CHAT_ID
-                && *s == expected_successfully_added
-                && a.is_empty()
-                && n.is_empty()
-                && i.is_empty()
-                && p.is_empty()
-        })
+        .withf(move |&cid, _, summary| cid == CHAT_ID && summary == &expected_summary)
         .times(1)
-        .returning(|_, _, _, _, _, _, _| Ok(()));
+        .returning(|_, _, _| Ok(()));
 
     let handler =
         BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);

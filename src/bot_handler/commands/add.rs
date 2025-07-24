@@ -8,6 +8,21 @@ use crate::{
     storage::RepoEntity,
 };
 
+/// A struct to hold the summary of the add operation.
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub struct AddSummary {
+    /// Repositories that were successfully added.
+    pub successfully_added: HashSet<String>,
+    /// Repositories that were already tracked.
+    pub already_tracked: HashSet<String>,
+    /// Repositories that were not found on GitHub.
+    pub not_found: HashSet<String>,
+    /// URLs that were invalid.
+    pub invalid_urls: HashSet<String>,
+    /// Repositories that failed to be added due to an error.
+    pub errors: HashSet<(String, String)>,
+}
+
 pub async fn handle(ctx: Context<'_>) -> BotHandlerResult<()> {
     ctx.handler.messaging_service.prompt_for_repo_input(ctx.message.chat.id).await?;
     ctx.dialogue
@@ -24,16 +39,6 @@ enum AddRepoResult {
     NotFound(String),
     InvalidUrl(String),
     Error(String, String),
-}
-
-// A struct to hold the summary of the add operation.
-#[derive(Default)]
-struct AddSummary {
-    successfully_added: HashSet<String>,
-    already_tracked: HashSet<String>,
-    not_found: HashSet<String>,
-    invalid_urls: HashSet<String>,
-    errors: HashSet<(String, String)>,
 }
 
 /// Handle the reply message when we're waiting for repository input.
@@ -110,15 +115,7 @@ pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> 
 
     ctx.handler
         .messaging_service
-        .edit_add_summary_msg(
-            ctx.message.chat.id,
-            status_msg.id,
-            summary.successfully_added,
-            summary.already_tracked,
-            summary.not_found,
-            summary.invalid_urls,
-            summary.errors,
-        )
+        .edit_add_summary_msg(ctx.message.chat.id, status_msg.id, &summary)
         .await?;
 
     Ok(())
