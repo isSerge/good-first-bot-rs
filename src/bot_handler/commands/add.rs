@@ -55,10 +55,7 @@ pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> 
         return Ok(());
     }
 
-    ctx.handler
-        .messaging_service
-        .send_chat_action(ctx.message.chat.id, ChatAction::Typing)
-        .await?;
+    ctx.handler.messaging_service.send_chat_action(ctx.message.chat.id, ChatAction::Typing).await?;
 
     let status_msg = ctx
         .handler
