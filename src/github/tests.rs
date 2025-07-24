@@ -60,8 +60,9 @@ async fn test_update_rate_limit_from_headers() {
 async fn rate_limit_guard_sleeps_when_below_threshold_and_before_reset() {
     // -------- Arrange --------
     let threshold = 5;
-    let client = DefaultGithubClient::new("fake_token", "https://example.com/graphql", threshold as u64)
-        .expect("client");
+    let client =
+        DefaultGithubClient::new("fake_token", "https://example.com/graphql", threshold as u64)
+            .expect("client");
 
     const WAIT_MS: u64 = 40;
     {
@@ -80,13 +81,12 @@ async fn rate_limit_guard_sleeps_when_below_threshold_and_before_reset() {
     let elapsed = start.elapsed();
 
     // -------- Assert --------
-    assert!(
-        elapsed >= expected_min,
-        "Guard returned too fast: {:?} < {:?}", elapsed, expected_min
-    );
+    assert!(elapsed >= expected_min, "Guard returned too fast: {:?} < {:?}", elapsed, expected_min);
     assert!(
         elapsed <= expected_max + fudge,
-        "Guard slept too long: {:?} > {:?}", elapsed, expected_max + fudge
+        "Guard slept too long: {:?} > {:?}",
+        elapsed,
+        expected_max + fudge
     );
 }
 
@@ -111,8 +111,8 @@ async fn jitter_is_within_bounds() {
     const WAIT_MS: u64 = 50;
     const FUDGE_MS: u64 = 8;
 
-    let client = DefaultGithubClient::new("fake", "https://example/graphql", THRESHOLD)
-        .expect("client");
+    let client =
+        DefaultGithubClient::new("fake", "https://example/graphql", THRESHOLD).expect("client");
 
     // Force a sleep path
     prime_state(&client, THRESHOLD as u32, WAIT_MS).await;
@@ -123,12 +123,7 @@ async fn jitter_is_within_bounds() {
 
     let elapsed = measure_sleep(&client).await;
 
-    assert!(
-        elapsed >= expected_min,
-        "Returned too fast: {:?} < {:?}",
-        elapsed,
-        expected_min
-    );
+    assert!(elapsed >= expected_min, "Returned too fast: {:?} < {:?}", elapsed, expected_min);
     assert!(
         elapsed <= expected_max + fudge,
         "Slept too long: {:?} > {:?}",
@@ -146,8 +141,8 @@ async fn jitter_varies_across_runs() {
     const RUNS: usize = 20;
     const FUDGE_MS: u64 = 8;
 
-    let client = DefaultGithubClient::new("fake", "https://example/graphql", THRESHOLD)
-        .expect("client");
+    let client =
+        DefaultGithubClient::new("fake", "https://example/graphql", THRESHOLD).expect("client");
 
     let mut samples = Vec::with_capacity(RUNS);
 
@@ -164,12 +159,7 @@ async fn jitter_varies_across_runs() {
 
     // Same bounds check as safety
     for (i, dur) in samples.iter().enumerate() {
-        assert!(
-            *dur >= base,
-            "Run {i}: {:?} < base {:?}",
-            dur,
-            base
-        );
+        assert!(*dur >= base, "Run {i}: {:?} < base {:?}", dur, base);
         assert!(
             *dur <= base + jitter_span + Duration::from_millis(FUDGE_MS),
             "Run {i}: {:?} > upper bound {:?}",
@@ -191,8 +181,8 @@ async fn jitter_varies_across_runs() {
 #[tokio::test(flavor = "multi_thread")]
 async fn no_jitter_when_wait_is_zero() {
     const THRESHOLD: u64 = 1;
-    let client = DefaultGithubClient::new("fake", "https://example/graphql", THRESHOLD)
-        .expect("client");
+    let client =
+        DefaultGithubClient::new("fake", "https://example/graphql", THRESHOLD).expect("client");
 
     // Force path where remaining <= threshold but reset_at == now
     let mut s = client.rate_limit.lock().await;
@@ -202,9 +192,5 @@ async fn no_jitter_when_wait_is_zero() {
 
     // Should return basically immediately
     let elapsed = measure_sleep(&client).await;
-    assert!(
-        elapsed < Duration::from_millis(2),
-        "Guard unexpectedly slept: {:?}",
-        elapsed
-    );
+    assert!(elapsed < Duration::from_millis(2), "Guard unexpectedly slept: {:?}", elapsed);
 }
