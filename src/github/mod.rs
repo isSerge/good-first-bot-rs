@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #[cfg(test)]
 mod tests;
 
@@ -22,24 +23,33 @@ struct RateLimitState {
     reset_at: Instant,
 }
 
+/// Represents errors that can occur when interacting with the GitHub API.
 #[derive(Debug, Error)]
 pub enum GithubError {
+    /// A network or HTTP request error from the underlying `reqwest` client.
     #[error("Network or HTTP request error: {source}")]
     RequestError {
+        /// The source `reqwest` error.
         #[from]
         source: reqwest::Error,
     },
+    /// An error representing an invalid HTTP header value.
     #[error("Invalid HTTP header value: {0}")]
     InvalidHeader(#[from] reqwest::header::InvalidHeaderValue),
+    /// An error from the GraphQL API.
     #[error("GraphQL API error: {0}")]
     GraphQLApiError(String),
+    /// An error during JSON serialization or deserialization.
     #[error("Failed to (de)serialize JSON: {source}")]
     SerializationError {
+        /// The source `serde_json` error.
         #[from]
         source: serde_json::Error,
     },
+    /// An error indicating that the GitHub API rate limit has been exceeded.
     #[error("GitHub API rate limited")]
     RateLimited,
+    /// An error indicating that the request was not authorized.
     #[error("GitHub authentication failed")]
     Unauthorized,
     #[error("Failed to parse header: {0}")]
@@ -57,6 +67,7 @@ fn is_retryable_graphql_error(error: &graphql_client::Error) -> bool {
         .unwrap_or(false)
 }
 
+/// A trait for interacting with the GitHub API.
 #[automock]
 #[async_trait]
 pub trait GithubClient: Send + Sync {
@@ -82,6 +93,7 @@ pub trait GithubClient: Send + Sync {
 // GraphQL DateTime scalar type.
 type DateTime = String;
 
+/// GraphQL query for checking if a repository exists.
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "src/github/schema.graphql",
@@ -91,6 +103,7 @@ type DateTime = String;
 )]
 pub struct Repository;
 
+/// GraphQL query for fetching issues.
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "src/github/schema.graphql",
@@ -100,6 +113,7 @@ pub struct Repository;
 )]
 pub struct Issues;
 
+/// GraphQL query for fetching labels.
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "src/github/schema.graphql",
@@ -109,6 +123,7 @@ pub struct Issues;
 )]
 pub struct Labels;
 
+/// The default implementation of the `GithubClient` trait.
 #[derive(Clone)]
 pub struct DefaultGithubClient {
     client: Client,
@@ -118,6 +133,7 @@ pub struct DefaultGithubClient {
 }
 
 impl DefaultGithubClient {
+    /// Creates a new `DefaultGithubClient`.
     pub fn new(
         github_token: &str,
         graphql_url: &str,

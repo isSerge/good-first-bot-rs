@@ -1,16 +1,22 @@
-/// Pagination structure to handle paginated data (labels, repositories, etc.)
+/// A structure to handle paginated data.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Paginated<T> {
+    /// The items on the current page.
     pub items: Vec<T>,
-    pub page: usize, // Current page number (1-indexed)
+    /// The current page number (1-indexed).
+    pub page: usize,
+    /// The number of items per page.
     pub page_size: usize,
+    /// The total number of items across all pages.
     pub total_items: usize,
+    /// The total number of pages.
     pub total_pages: usize,
 }
 
 const DEFAULT_PAGE_SIZE: usize = 10;
 
 impl<T> Paginated<T> {
+    /// Creates a new `Paginated` instance.
     pub fn new(items: Vec<T>, page: usize) -> Self {
         let total_items = items.len();
 
@@ -33,14 +39,17 @@ impl<T> Paginated<T> {
         }
     }
 
+    /// Returns `true` if there is a next page.
     pub fn has_next(&self) -> bool {
         self.page < self.total_pages
     }
 
+    /// Returns `true` if there is a previous page.
     pub fn has_prev(&self) -> bool {
         self.page > 1
     }
 
+    /// Returns a slice of the items on the current page.
     pub fn get_page_items(&self) -> &[T] {
         if self.items.is_empty() || self.page_size == 0 {
             return &[];

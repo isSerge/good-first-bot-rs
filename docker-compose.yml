@@ -8,7 +8,7 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN:?err_github_token_not_set}
       - POLL_INTERVAL=${POLL_INTERVAL:-3600}
       - DATABASE_URL=sqlite:///data/data.db
-      - RUST_LOG=${RUST_LOG:-info,good_first_bot_rs=trace}
+      - RUST_LOG=${RUST_LOG:-info,good_first_bot=trace}
     volumes:
       - ./data:/data
 

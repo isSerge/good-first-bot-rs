@@ -37,7 +37,7 @@ RUN cargo build --release --locked
 FROM gcr.io/distroless/cc-debian12 AS runtime
 
 WORKDIR /app
-COPY --from=builder /app/target/release/good-first-bot-rs /app/
+COPY --from=builder /app/target/release/good-first-bot /app/
 COPY --from=builder /app/migrations ./migrations
 
-ENTRYPOINT ["/app/good-first-bot-rs"]
+ENTRYPOINT ["/app/good-first-bot"]
