@@ -1,6 +1,22 @@
 use std::collections::HashMap;
 
 use super::*;
+
+/// Helper: set the shared rate-limit state so the guard will sleep `wait_ms`
+/// plus jitter.
+async fn prime_state(client: &DefaultGithubClient, remaining: u32, wait_ms: u64) {
+    let mut s = client.rate_limit.lock().await;
+    s.remaining = remaining;
+    s.reset_at = Instant::now() + Duration::from_millis(wait_ms);
+}
+
+/// Helper: run the guard once and return how long it actually waited.
+async fn measure_sleep(client: &DefaultGithubClient) -> Duration {
+    let start = Instant::now();
+    client.rate_limit_guard().await;
+    start.elapsed()
+}
+
 #[test]
 fn test_new_github_client() {
     let client = DefaultGithubClient::new("test_token", "https://api.github.com/graphql", 10);
@@ -48,7 +64,9 @@ async fn test_update_rate_limit_from_headers() {
     let reset_ts = (chrono::Utc::now().timestamp() as u64) + 60;
     headers.insert("X-RateLimit-Reset", HeaderValue::from_str(&reset_ts.to_string()).unwrap());
 
-    client.update_rate_limit_from_headers(&headers).await;
+    let result = client.update_rate_limit_from_headers(&headers).await;
+
+    assert!(result.is_ok());
 
     let state = client.rate_limit.lock().await;
     assert_eq!(state.remaining, 3);
@@ -89,21 +107,6 @@ async fn rate_limit_guard_sleeps_when_below_threshold_and_before_reset() {
         elapsed,
         expected_max + fudge
     );
-}
-
-/// Helper: set the shared rate-limit state so the guard will sleep `wait_ms`
-/// plus jitter.
-async fn prime_state(client: &DefaultGithubClient, remaining: u32, wait_ms: u64) {
-    let mut s = client.rate_limit.lock().await;
-    s.remaining = remaining;
-    s.reset_at = Instant::now() + Duration::from_millis(wait_ms);
-}
-
-/// Helper: run the guard once and return how long it actually waited.
-async fn measure_sleep(client: &DefaultGithubClient) -> Duration {
-    let start = Instant::now();
-    client.rate_limit_guard().await;
-    start.elapsed()
 }
 
 /// 1) Always inside [wait, wait + 10%] (with a little fudge for scheduler
@@ -172,7 +175,7 @@ async fn jitter_varies_across_runs() {
     }
 
     // And now confirm we saw at least ~some spread (non‑deterministic, so we only
-    ///require >1ms spread).
+    // require >1ms spread).
     assert!(
         max > min + Duration::from_millis(1),
         "Jitter didn't vary enough: min={:?}, max={:?}",

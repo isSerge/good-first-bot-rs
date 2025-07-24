@@ -1,6 +1,6 @@
 use std::env::{self, VarError};
 
-const DEFAULT_DATABASE_URL: &str = "sqlite://data/data.db";
+const DEFAULT_DATABASE_URL: &str = "sqlite:data/data.db";
 const DEFAULT_GITHUB_GRAPHQL_URL: &str = "https://api.github.com/graphql";
 const DEFAULT_POLL_INTERVAL: u64 = 10;
 const DEFAULT_REPOS_PER_USER: usize = 20;
@@ -79,7 +79,7 @@ mod tests {
                 ("GITHUB_GRAPHQL_URL", Some("https://api.github.com/graphql")),
                 ("TELOXIDE_TOKEN", Some("test telegram bot token")),
                 ("POLL_INTERVAL", Some("100")),
-                ("DATABASE_URL", Some("sqlite://test/test.db")),
+                ("DATABASE_URL", Some("sqlite:test/test.db")),
                 ("MAX_REPOS_PER_USER", Some("50")),
                 ("MAX_LABELS_PER_REPO", Some("20")),
             ],
@@ -89,7 +89,7 @@ mod tests {
                 assert_eq!(config.github_graphql_url, "https://api.github.com/graphql");
                 assert_eq!(config.telegram_bot_token, "test telegram bot token");
                 assert_eq!(config.poll_interval, 100);
-                assert_eq!(config.database_url, "sqlite://test/test.db");
+                assert_eq!(config.database_url, "sqlite:test/test.db");
                 assert_eq!(config.max_repos_per_user, 50);
                 assert_eq!(config.max_labels_per_repo, 20);
             },
@@ -103,7 +103,7 @@ mod tests {
                 ("GITHUB_GRAPHQL_URL", Some("https://api.github.com/graphql")),
                 ("TELOXIDE_TOKEN", Some("test telegram bot token")),
                 ("POLL_INTERVAL", Some("100")),
-                ("DATABASE_URL", Some("sqlite://test/test.db")),
+                ("DATABASE_URL", Some("sqlite:test/test.db")),
             ],
             || {
                 unsafe {
@@ -122,7 +122,7 @@ mod tests {
                 ("GITHUB_GRAPHQL_URL", Some("https://api.github.com/graphql")),
                 ("GITHUB_TOKEN", Some("test github token")),
                 ("POLL_INTERVAL", Some("100")),
-                ("DATABASE_URL", Some("sqlite://test/test.db")),
+                ("DATABASE_URL", Some("sqlite:test/test.db")),
             ],
             || {
                 let config = Config::from_env();

@@ -94,7 +94,7 @@ TELOXIDE_TOKEN=your_telegram_bot_token_here
 # Optional
 GITHUB_GRAPHQL_URL=https://api.github.com/graphql
 POLL_INTERVAL=10
-DATABASE_URL=sqlite://data/data.db
+DATABASE_URL=sqlite:data/data.db
 MAX_REPOS_PER_USER=10
 MAX_LABELS_PER_REPO=5
 ```
@@ -105,7 +105,7 @@ MAX_LABELS_PER_REPO=5
 - GITHUB_GRAPHQL_URL: (Optional) Defaults to https://api.github.com/graphql.
 - POLL_INTERVAL: (Optional) Poll interval in seconds. Default is 10.
 - DATABASE_URL: (Optional) Database URL for SQLite. Default is
-  sqlite://data/data.db.
+  `sqlite:data/data.db`.
 - MAX_REPOS_PER_USER: (Optional) Maximum number of repositories a user can
   track. Default is 20.
 - MAX_LABELS_PER_REPO: (Optional) Maximum number of labels per repository a user
@@ -174,14 +174,14 @@ mkdir data
    `docker-compose.yml` is):
 
 ```bash
-docker-compose up --build
-# or docker-compose up --build -d (in detached background mode)
+docker compose up --build
+# or docker compose up --build -d (in detached background mode)
 ```
 
 3. View logs: If running in detached mode or from another terminal:
 
 ```bash
-docker-compose logs -f bot
+docker compose logs -f bot
 ```
 
 (Assuming your service in `docker-compose.yml` is using default name `bot`).
@@ -189,7 +189,7 @@ docker-compose logs -f bot
 4. Stop the container:
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ## License
