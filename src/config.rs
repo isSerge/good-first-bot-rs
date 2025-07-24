@@ -104,6 +104,7 @@ mod tests {
                 ("TELOXIDE_TOKEN", Some("test telegram bot token")),
                 ("POLL_INTERVAL", Some("100")),
                 ("DATABASE_URL", Some("sqlite:test/test.db")),
+                ("GITHUB_TOKEN", None),
             ],
             || {
                 unsafe {
@@ -123,6 +124,7 @@ mod tests {
                 ("GITHUB_TOKEN", Some("test github token")),
                 ("POLL_INTERVAL", Some("100")),
                 ("DATABASE_URL", Some("sqlite:test/test.db")),
+                ("TELOXIDE_TOKEN", None),
             ],
             || {
                 let config = Config::from_env();
@@ -139,6 +141,7 @@ mod tests {
                 ("GITHUB_TOKEN", Some("test github token")),
                 ("TELOXIDE_TOKEN", Some("test telegram bot token")),
                 ("POLL_INTERVAL", Some("100")),
+                ("DATABASE_URL", None),
             ],
             || {
                 let config = Config::from_env().unwrap();
@@ -155,6 +158,7 @@ mod tests {
                 ("GITHUB_TOKEN", Some("test github token")),
                 ("TELOXIDE_TOKEN", Some("test telegram bot token")),
                 ("POLL_INTERVAL", Some("100")),
+                ("GITHUB_GRAPHQL_URL", None),
             ],
             || {
                 let config = Config::from_env().unwrap();
@@ -170,6 +174,7 @@ mod tests {
                 ("GITHUB_TOKEN", Some("test github token")),
                 ("GITHUB_GRAPHQL_URL", Some("https://api.github.com/graphql")),
                 ("TELOXIDE_TOKEN", Some("test telegram bot token")),
+                ("POLL_INTERVAL", None),
             ],
             || {
                 let config = Config::from_env().unwrap();
@@ -186,11 +191,15 @@ mod tests {
                 ("GITHUB_GRAPHQL_URL", Some("https://api.github.com/graphql")),
                 ("TELOXIDE_TOKEN", Some("test telegram bot token")),
                 ("POLL_INTERVAL", Some("100")),
+                ("MAX_REPOS_PER_USER", None),
+                ("MAX_LABELS_PER_REPO", None),
+                ("MAX_CONCURRENCY", None),
             ],
             || {
                 let config = Config::from_env().unwrap();
                 assert_eq!(config.max_repos_per_user, DEFAULT_REPOS_PER_USER);
                 assert_eq!(config.max_labels_per_repo, DEFAULT_LABELS_PER_REPO);
+                assert_eq!(config.max_concurrency, DEFAULT_MAX_CONCURRENCY);
             },
         );
     }
