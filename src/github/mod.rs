@@ -113,10 +113,15 @@ pub struct Issues;
 pub struct Labels;
 
 /// The default implementation of the `GithubClient` trait.
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 #[derive(Clone)]
 pub struct DefaultGithubClient {
     client: Client,
     graphql_url: String,
+    rate_limit_remaining: Mutex<u32>,
+    rate_limit_reset: Mutex<u64>,
 }
 
 impl DefaultGithubClient {
@@ -156,6 +161,19 @@ impl DefaultGithubClient {
         Q::Variables: Clone,
         Q::ResponseData: serde::de::DeserializeOwned,
     {
+        // Before sending request, check rate limit
+        {
+            let remaining = *self.rate_limit_remaining.lock().unwrap();
+            let reset = *self.rate_limit_reset.lock().unwrap();
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+
+            if remaining < 10 && now < reset {
+                let wait_secs = reset - now;
+                tracing::warn!("Rate limit low ({} remaining). Sleeping for {} seconds before retrying.", remaining, wait_secs);
+                tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
+            }
+        }
+
         // closure that Backoff expects
         let operation = || async {
             // 1. Build the request
@@ -169,6 +187,24 @@ impl DefaultGithubClient {
                         BackoffError::transient(GithubError::RequestError { source: e })
                     },
                 )?;
+
+            // Extract rate limit headers and update stored values
+            if let Some(remaining_header) = resp.headers().get("X-RateLimit-Remaining") {
+                if let Ok(remaining_str) = remaining_header.to_str() {
+                    if let Ok(remaining_val) = remaining_str.parse::<u32>() {
+                        let mut remaining_lock = self.rate_limit_remaining.lock().unwrap();
+                        *remaining_lock = remaining_val;
+                    }
+                }
+            }
+            if let Some(reset_header) = resp.headers().get("X-RateLimit-Reset") {
+                if let Ok(reset_str) = reset_header.to_str() {
+                    if let Ok(reset_val) = reset_str.parse::<u64>() {
+                        let mut reset_lock = self.rate_limit_reset.lock().unwrap();
+                        *reset_lock = reset_val;
+                    }
+                }
+            }
 
             // 3. HTTP-status check
             if !resp.status().is_success() {
