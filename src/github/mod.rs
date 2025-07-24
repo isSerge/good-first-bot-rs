@@ -2,18 +2,21 @@
 #[cfg(test)]
 mod tests;
 
-use rand::{Rng, rng};
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
 use backoff::{Error as BackoffError, ExponentialBackoff, future::retry};
 use graphql_client::{GraphQLQuery, Response};
 use mockall::automock;
+use rand::{Rng, rng};
 use reqwest::{
     Client,
     header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
 };
-use std::{sync::Arc, time::Instant};
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -182,7 +185,7 @@ impl DefaultGithubClient {
     {
         // closure that Backoff expects
         let operation = || async {
-            //0. Rate limit guard
+            // 0. Rate limit guard
             self.rate_limit_guard().await;
 
             // 1. Build the request
@@ -232,9 +235,8 @@ impl DefaultGithubClient {
                             ))
                         }
                     }
-                    reqwest::StatusCode::NOT_FOUND => {
-                        GithubError::GraphQLApiError(format!("HTTP Not Found ({status}): {text}"))
-                    }
+                    reqwest::StatusCode::NOT_FOUND =>
+                        GithubError::GraphQLApiError(format!("HTTP Not Found ({status}): {text}")),
                     _ => GithubError::GraphQLApiError(format!("HTTP Error ({status}): {text}")),
                 };
 
@@ -242,9 +244,7 @@ impl DefaultGithubClient {
                     GithubError::RateLimited => BackoffError::transient(github_err),
                     _ if status.is_server_error()
                         || status == reqwest::StatusCode::TOO_MANY_REQUESTS =>
-                    {
-                        BackoffError::transient(github_err)
-                    }
+                        BackoffError::transient(github_err),
                     _ => BackoffError::permanent(github_err),
                 };
                 return Err(be);
@@ -288,7 +288,8 @@ impl DefaultGithubClient {
         retry(Self::backoff_config(), operation).await
     }
 
-    /// Rate limit guard that sleeps until the rate limit resets if we're close to the threshold.
+    /// Rate limit guard that sleeps until the rate limit resets if we're close
+    /// to the threshold.
     async fn rate_limit_guard(&self) {
         let (remaining, reset_at) = {
             let state = self.rate_limit.lock().await;

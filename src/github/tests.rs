@@ -1,5 +1,6 @@
-use super::*;
 use std::collections::HashMap;
+
+use super::*;
 #[test]
 fn test_new_github_client() {
     let client = DefaultGithubClient::new("test_token", "https://api.github.com/graphql", 10);
@@ -90,7 +91,8 @@ async fn rate_limit_guard_sleeps_when_below_threshold_and_before_reset() {
     );
 }
 
-/// Helper: set the shared rate-limit state so the guard will sleep `wait_ms` plus jitter.
+/// Helper: set the shared rate-limit state so the guard will sleep `wait_ms`
+/// plus jitter.
 async fn prime_state(client: &DefaultGithubClient, remaining: u32, wait_ms: u64) {
     let mut s = client.rate_limit.lock().await;
     s.remaining = remaining;
@@ -104,7 +106,8 @@ async fn measure_sleep(client: &DefaultGithubClient) -> Duration {
     start.elapsed()
 }
 
-/// 1) Always inside [wait, wait + 10%] (with a little fudge for scheduler noise)
+/// 1) Always inside [wait, wait + 10%] (with a little fudge for scheduler
+/// noise)
 #[tokio::test(flavor = "multi_thread")]
 async fn jitter_is_within_bounds() {
     const THRESHOLD: u64 = 5;
@@ -168,7 +171,8 @@ async fn jitter_varies_across_runs() {
         );
     }
 
-    // And now confirm we saw at least ~some spread (non‑deterministic, so we only require >1ms spread).
+    // And now confirm we saw at least ~some spread (non‑deterministic, so we only
+    ///require >1ms spread).
     assert!(
         max > min + Duration::from_millis(1),
         "Jitter didn't vary enough: min={:?}, max={:?}",
