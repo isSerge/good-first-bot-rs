@@ -186,11 +186,6 @@ impl BotHandler {
 
             // Answer the callback query to clear the spinner.
             self.messaging_service.answer_callback_query(&query_id, &None).await?;
-            if let Some(message) = query.message.as_ref() {
-                self.messaging_service
-                    .send_chat_action(message.chat().id, teloxide::types::ChatAction::Typing)
-                    .await?;
-            }
 
             let ctx = Context {
                 handler: self,

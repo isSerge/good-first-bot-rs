@@ -14,7 +14,7 @@ use mockall::automock;
 use teloxide::{
     prelude::*,
     sugar::request::RequestLinkPreviewExt,
-    types::{ChatAction, ChatId, ForceReply, InlineKeyboardMarkup, MessageId, ParseMode},
+    types::{ChatId, ForceReply, InlineKeyboardMarkup, MessageId, ParseMode},
     utils::{command::BotCommands, html},
 };
 use thiserror::Error;
@@ -153,9 +153,6 @@ pub trait MessagingService: Send + Sync {
         chat_id: ChatId,
         overview: Vec<(RepoEntity, Vec<String>)>,
     ) -> Result<()>;
-
-    /// Sends a chat action to the user.
-    async fn send_chat_action(&self, chat_id: ChatId, action: ChatAction) -> Result<()>;
 
     /// Sends a simple text message and returns the sent message.
     async fn send_text_message(&self, chat_id: ChatId, text: &str) -> Result<Message>;
@@ -557,14 +554,6 @@ impl MessagingService for TelegramMessagingService {
 
         let text = message_parts.join("\n");
         self.send_response_with_keyboard(chat_id, text, None).await
-    }
-
-    async fn send_chat_action(&self, chat_id: ChatId, action: ChatAction) -> Result<()> {
-        self.bot
-            .send_chat_action(chat_id, action)
-            .await
-            .map(|_| ())
-            .map_err(MessagingError::TeloxideRequest)
     }
 
     async fn send_text_message(&self, chat_id: ChatId, text: &str) -> Result<Message> {

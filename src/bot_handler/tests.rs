@@ -5,8 +5,8 @@ use mockall::predicate::*;
 use teloxide::{
     dispatching::dialogue::{Dialogue, SqliteStorage, serializer},
     types::{
-        Chat, ChatAction, ChatId, ChatKind, ChatPrivate, MaybeInaccessibleMessage, MediaKind,
-        MediaText, Message, MessageCommon, MessageId, MessageKind, User,
+        Chat, ChatId, ChatKind, ChatPrivate, MaybeInaccessibleMessage, MediaKind, MediaText,
+        Message, MessageCommon, MessageId, MessageKind, User,
     },
 };
 
@@ -104,12 +104,6 @@ fn mock_callback_query<'a>(
 }
 
 fn setup_add_repo_mocks(mock_messaging: &mut MockMessagingService) {
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(CHAT_ID), eq(ChatAction::Typing))
-        .times(1)
-        .returning(|_, _| Ok(()));
-
     let status_msg = mock_message(CHAT_ID, "Processing... ⏳");
     mock_messaging
         .expect_send_text_message()
@@ -592,12 +586,6 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
     // `handle_callback_query` always answers the query immediately.
     mock_messaging.expect_answer_callback_query().times(2).returning(|_, _| Ok(()));
 
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(chat_id), eq(ChatAction::Typing))
-        .times(2)
-        .returning(|_, _| Ok(()));
-
     // `get_repo_github_labels` is called three times in total.
     // 1. Once in `action_view_labels`.
     // 2. Twice in `action_toggle_label` (the bug we are testing around).
@@ -695,12 +683,6 @@ async fn test_handle_callback_view_repo_details() {
     let from_page = 1;
     let repo_entity = RepoEntity::from_str(repo_id).unwrap();
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
-
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(CHAT_ID), eq(ChatAction::Typing))
-        .times(1)
-        .returning(|_, _| Ok(()));
 
     mock_repository
         .expect_get_repo_github_labels()
@@ -832,12 +814,6 @@ async fn test_handle_callback_view_repo_labels() {
     let repo_entity = RepoEntity::from_str(repo_id).unwrap();
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
 
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(CHAT_ID), eq(ChatAction::Typing))
-        .times(1)
-        .returning(|_, _| Ok(()));
-
     let paginated_labels = Paginated::new(vec![], page);
     mock_repository
         .expect_get_repo_github_labels()
@@ -885,12 +861,6 @@ async fn test_handle_callback_view_repo_labels_error() {
     let repo_entity = RepoEntity::from_str(repo_id).unwrap();
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
 
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(CHAT_ID), eq(ChatAction::Typing))
-        .times(1)
-        .returning(|_, _| Ok(()));
-
     mock_repository
         .expect_get_repo_github_labels()
         .with(eq(CHAT_ID), eq(repo_entity.clone()), eq(page))
@@ -925,12 +895,6 @@ async fn test_handle_callback_remove_repo_error() {
     let repo_id = "owner/repo";
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
 
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(CHAT_ID), eq(ChatAction::Typing))
-        .times(1)
-        .returning(|_, _| Ok(()));
-
     mock_repository.expect_remove_repo().with(eq(CHAT_ID), eq(repo_id)).times(1).returning(
         |_, _| {
             Err(RepositoryServiceError::StorageError(StorageError::DbError(
@@ -962,12 +926,6 @@ async fn test_handle_callback_back_to_repo_details() {
     let repo_id = "owner/repo";
     let from_page = 1;
     let dialogue: Dialogue<CommandState, DialogueStorage> = Dialogue::new(storage.clone(), CHAT_ID);
-
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(CHAT_ID), eq(ChatAction::Typing))
-        .times(1)
-        .returning(|_, _| Ok(()));
 
     mock_repository
         .expect_get_repo_github_labels()
@@ -1021,12 +979,6 @@ async fn test_handle_callback_back_to_repo_list() {
 
     let repos = vec![RepoEntity::from_str("owner/repo1").unwrap()];
     let paginated_repos = Paginated::new(repos.clone(), page);
-
-    mock_messaging
-        .expect_send_chat_action()
-        .with(eq(chat_id), eq(ChatAction::Typing))
-        .times(1)
-        .returning(|_, _| Ok(()));
 
     mock_repository
         .expect_get_user_repos()

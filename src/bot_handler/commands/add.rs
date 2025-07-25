@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 
 use futures::{StreamExt, stream};
-use teloxide::types::ChatAction;
 
 use crate::{
     bot_handler::{BotHandlerError, BotHandlerResult, CommandState, commands::Context},
@@ -59,8 +58,6 @@ pub async fn handle_reply(ctx: Context<'_>, text: &str) -> BotHandlerResult<()> 
             .await?;
         return Ok(());
     }
-
-    ctx.handler.messaging_service.send_chat_action(ctx.message.chat.id, ChatAction::Typing).await?;
 
     let status_msg = ctx
         .handler
