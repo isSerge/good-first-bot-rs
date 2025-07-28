@@ -97,10 +97,9 @@ mod tests {
             .times(2)
             .returning(move |_, _, _| {
                 *call_count.borrow_mut() += 1;
-                if *call_count.borrow() == 1 {
-                    Ok(initial_labels.clone())
-                } else {
-                    Ok(updated_labels.clone())
+                match *call_count.borrow() {
+                    1 => Ok(initial_labels.clone()),
+                    _ => Ok(updated_labels.clone()),
                 }
             });
 
