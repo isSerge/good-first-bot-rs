@@ -101,11 +101,11 @@ pub enum Command {
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Command::Start => write!(f, "/start"),
-            Command::Help => write!(f, "/help"),
-            Command::Add => write!(f, "/add"),
-            Command::List => write!(f, "/list"),
-            Command::Overview => write!(f, "/overview"),
+            Command::Start => write!(f, "start"),
+            Command::Help => write!(f, "help"),
+            Command::Add => write!(f, "add"),
+            Command::List => write!(f, "list"),
+            Command::Overview => write!(f, "overview"),
         }
     }
 }
