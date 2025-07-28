@@ -26,3 +26,46 @@ pub async fn handle(ctx: Context<'_>, repo_id: &str, from_page: usize) -> BotHan
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use mockall::predicate::eq;
+
+    use super::*;
+    use crate::{
+        bot_handler::{
+            CallbackAction,
+            test_helpers::{CHAT_ID, TestHarness},
+        },
+        messaging::MockMessagingService,
+        repository::{MockRepositoryService, RepositoryServiceError},
+        storage::StorageError,
+    };
+
+    #[tokio::test]
+    async fn test_handle_callback_remove_repo_error() {
+        // Arrange
+        let mut mock_messaging = MockMessagingService::new();
+        let mut mock_repository = MockRepositoryService::new();
+        let repo_id = "owner/repo";
+
+        mock_repository.expect_remove_repo().with(eq(CHAT_ID), eq(repo_id)).times(1).returning(
+            |_, _| {
+                Err(RepositoryServiceError::StorageError(StorageError::DbError(
+                    "DB is down".to_string(),
+                )))
+            },
+        );
+
+        mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
+
+        let harness = TestHarness::new(mock_messaging, mock_repository).await;
+        let action = CallbackAction::RemoveRepoPrompt(repo_id);
+
+        // Act
+        let result = harness.handle_callback(&action).await;
+
+        // Assert
+        assert!(matches!(result, Err(BotHandlerError::InternalError(_))));
+    }
+}

@@ -7,7 +7,7 @@ pub mod callbacks;
 #[allow(missing_docs)]
 pub mod commands;
 #[cfg(test)]
-mod tests;
+mod test_helpers;
 
 use std::{fmt, sync::Arc};
 
