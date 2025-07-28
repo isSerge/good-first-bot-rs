@@ -23,6 +23,94 @@ use crate::{
 const CHAT_ID: ChatId = ChatId(123);
 type DialogueStorage = SqliteStorage<serializer::Json>;
 
+// Test harness to encapsulate common test setup and actions.
+struct TestHarness {
+    bot_handler: BotHandler,
+    dialogue: Dialogue<CommandState, DialogueStorage>,
+    storage: Arc<DialogueStorage>,
+}
+
+impl TestHarness {
+    // Creates a new TestHarness with mock services.
+    async fn new(
+        mock_messaging: MockMessagingService,
+        mock_repository: MockRepositoryService,
+    ) -> Self {
+        let max_concurrency = 10;
+        let bot_handler =
+            BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
+        let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
+        let dialogue = Dialogue::<CommandState, DialogueStorage>::new(storage.clone(), CHAT_ID);
+
+        Self { bot_handler, dialogue, storage }
+    }
+
+    // Creates a new dialogue for the same chat ID to test state persistence.
+    fn new_dialogue(&self) -> Dialogue<CommandState, DialogueStorage> {
+        Dialogue::new(self.storage.clone(), CHAT_ID)
+    }
+
+    // Simulates handling a command message.
+    async fn handle_command_with_dialogue(
+        &self,
+        command: Command,
+        dialogue: Dialogue<CommandState, DialogueStorage>,
+    ) -> Result<(), BotHandlerError> {
+        let msg = mock_message(CHAT_ID, &format!("/{}", command.to_string()));
+        self.bot_handler.handle_commands(&msg, command, dialogue).await
+    }
+
+    // Simulates handling a reply message.
+    async fn handle_reply_with_dialogue(
+        &self,
+        text: &str,
+        dialogue: &Dialogue<CommandState, DialogueStorage>,
+    ) -> Result<(), BotHandlerError> {
+        let mut msg = mock_message(CHAT_ID, text);
+        if let MessageKind::Common(common) = &mut msg.kind {
+            common.reply_to_message = Some(Box::new(mock_message(CHAT_ID, "prompt")));
+        }
+        self.bot_handler.handle_reply(&msg, dialogue).await
+    }
+
+    // Simulates handling a callback query.
+    // This is the core method for handling callbacks, allowing explicit dialogue
+    // control. Use this method directly when testing state persistence across
+    // multiple interactions, where you need to create and pass a new dialogue
+    // instance for the second interaction.
+    async fn handle_callback_with_dialogue<'a>(
+        &self,
+        action: &CallbackAction<'a>,
+        dialogue: Dialogue<CommandState, DialogueStorage>,
+    ) -> Result<(), BotHandlerError> {
+        let (_, query) = mock_callback_query(CHAT_ID, action);
+        self.bot_handler.handle_callback_query(&query, dialogue).await
+    }
+
+    // Simulates handling a callback query with the main dialogue.
+    // This is a convenience wrapper around `handle_callback_with_dialogue`.
+    // Use this for most callback tests where you are only testing a single
+    // interaction and don't need to manually manage the dialogue instance.
+    async fn handle_callback<'a>(
+        &self,
+        action: &CallbackAction<'a>,
+    ) -> Result<(), BotHandlerError> {
+        self.handle_callback_with_dialogue(action, self.dialogue.clone()).await
+    }
+
+    // Simulates handling a reply for the 'add' command specifically.
+    async fn handle_add_reply(&self, text: &str) -> Result<(), BotHandlerError> {
+        let message = mock_message(CHAT_ID, text);
+        let ctx = Context {
+            handler: &self.bot_handler,
+            message: &message,
+            dialogue: &self.dialogue,
+            query: None,
+        };
+        commands::add::handle_reply(ctx, message.text().unwrap()).await
+    }
+}
+
 // Helper function to create a HashSet from a slice of strings
 fn str_hashset(items: &[&str]) -> HashSet<String> {
     items.iter().map(|s| s.to_string()).collect()
@@ -112,29 +200,6 @@ fn setup_add_repo_mocks(mock_messaging: &mut MockMessagingService) {
         .returning(move |_, _| Ok(status_msg.clone()));
 }
 
-// A struct to hold the common setup for tests.
-struct TestHarness {
-    bot_handler: BotHandler,
-    dialogue: Dialogue<CommandState, DialogueStorage>,
-    storage: Arc<DialogueStorage>,
-}
-
-impl TestHarness {
-    // Creates a new TestHarness with mock services.
-    async fn new(
-        mock_messaging: MockMessagingService,
-        mock_repository: MockRepositoryService,
-    ) -> Self {
-        let max_concurrency = 10;
-        let bot_handler =
-            BotHandler::new(Arc::new(mock_messaging), Arc::new(mock_repository), max_concurrency);
-        let storage = DialogueStorage::open("sqlite::memory:", serializer::Json).await.unwrap();
-        let dialogue = Dialogue::new(storage.clone(), CHAT_ID);
-
-        Self { bot_handler, dialogue, storage }
-    }
-}
-
 #[tokio::test]
 async fn test_add_repos_success() {
     // Arrange
@@ -148,11 +213,10 @@ async fn test_add_repos_success() {
 
     setup_add_repo_mocks(&mut mock_messaging);
 
-    // Mock repository interactions
     mock_repository
         .expect_repo_exists()
         .with(eq(repo_owner), eq(repo_name))
-        .times(1) // Expect it to be called once for this repo
+        .times(1)
         .returning(|_, _| Ok(true));
     mock_repository
         .expect_add_repo()
@@ -173,17 +237,9 @@ async fn test_add_repos_success() {
         .returning(|_, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let message = mock_message(CHAT_ID, repo_url);
-
-    let ctx = Context {
-        handler: &harness.bot_handler,
-        message: &message,
-        dialogue: &harness.dialogue,
-        query: None,
-    };
 
     // Act
-    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
+    let result = harness.handle_add_reply(repo_url).await;
 
     // Assert
     assert!(result.is_ok());
@@ -194,7 +250,6 @@ async fn test_add_repos_already_tracked() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-
     let repo_name_with_owner = "owner/repo";
     let repo_url = "https://github.com/owner/repo";
 
@@ -217,17 +272,9 @@ async fn test_add_repos_already_tracked() {
         .returning(|_, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let message = mock_message(CHAT_ID, repo_url);
-
-    let ctx = Context {
-        handler: &harness.bot_handler,
-        message: &message,
-        dialogue: &harness.dialogue,
-        query: None,
-    };
 
     // Act
-    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
+    let result = harness.handle_add_reply(repo_url).await;
 
     // Assert
     assert!(result.is_ok());
@@ -238,14 +285,12 @@ async fn test_add_repos_does_not_exist() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-
     let repo_name_with_owner = "owner/nonexistent";
     let repo_url = "https://github.com/owner/nonexistent";
 
     setup_add_repo_mocks(&mut mock_messaging);
 
     mock_repository.expect_repo_exists().returning(|_, _| Ok(false));
-    // contains_repo and add_repo should not be called
 
     let expected_summary =
         AddSummary { not_found: str_hashset(&[repo_name_with_owner]), ..Default::default() };
@@ -257,17 +302,9 @@ async fn test_add_repos_does_not_exist() {
         .returning(|_, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let message = mock_message(CHAT_ID, repo_url);
-
-    let ctx = Context {
-        handler: &harness.bot_handler,
-        message: &message,
-        dialogue: &harness.dialogue,
-        query: None,
-    };
 
     // Act
-    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
+    let result = harness.handle_add_reply(repo_url).await;
 
     // Assert
     assert!(result.is_ok());
@@ -277,8 +314,7 @@ async fn test_add_repos_does_not_exist() {
 async fn test_add_repos_parse_error() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
-    let mock_repository = MockRepositoryService::new(); // No repo interactions expected
-
+    let mock_repository = MockRepositoryService::new();
     let invalid_url = "this_is_not_a_url";
 
     setup_add_repo_mocks(&mut mock_messaging);
@@ -293,17 +329,9 @@ async fn test_add_repos_parse_error() {
         .returning(|_, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let message = mock_message(CHAT_ID, invalid_url);
-
-    let ctx = Context {
-        handler: &harness.bot_handler,
-        message: &message,
-        dialogue: &harness.dialogue,
-        query: None,
-    };
 
     // Act
-    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
+    let result = harness.handle_add_reply(invalid_url).await;
 
     // Assert
     assert!(result.is_ok());
@@ -314,7 +342,6 @@ async fn test_add_repos_error() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-
     let repo_name_with_owner = "owner/gh-error";
     let repo_url = "https://github.com/owner/gh-error";
     let error_msg = "Github client error";
@@ -337,17 +364,9 @@ async fn test_add_repos_error() {
         .returning(|_, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let message = mock_message(CHAT_ID, repo_url);
-
-    let ctx = Context {
-        handler: &harness.bot_handler,
-        message: &message,
-        dialogue: &harness.dialogue,
-        query: None,
-    };
 
     // Act
-    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
+    let result = harness.handle_add_reply(repo_url).await;
 
     // Assert
     assert!(result.is_ok());
@@ -358,7 +377,6 @@ async fn test_add_repos_limit_reached() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-
     let repo_name_with_owner = "owner/repo";
     let repo_url = "https://github.com/owner/repo";
     let limit_error_msg = "You have reached the maximum limit of 10
@@ -386,17 +404,9 @@ repositories.";
         .returning(|_, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let message = mock_message(CHAT_ID, repo_url);
-
-    let ctx = Context {
-        handler: &harness.bot_handler,
-        message: &message,
-        dialogue: &harness.dialogue,
-        query: None,
-    };
 
     // Act
-    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
+    let result = harness.handle_add_reply(repo_url).await;
 
     // Assert
     assert!(result.is_ok());
@@ -407,7 +417,6 @@ async fn test_add_repos_multiple_mixed_outcomes() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-
     let url_new = "https://github.com/owner/new";
     let name_new = "owner/new";
     let url_tracked = "https://github.com/owner/tracked";
@@ -425,14 +434,11 @@ async fn test_add_repos_multiple_mixed_outcomes() {
 
     setup_add_repo_mocks(&mut mock_messaging);
 
-    // Mocking for 'new' repo
     mock_repository.expect_repo_exists().with(eq("owner"), eq("new")).returning(|_, _| Ok(true));
     mock_repository
         .expect_add_repo()
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_new)
         .returning(|_, _| Ok(true));
-
-    // Mocking for 'tracked' repo
     mock_repository
         .expect_repo_exists()
         .with(eq("owner"), eq("tracked"))
@@ -441,24 +447,17 @@ async fn test_add_repos_multiple_mixed_outcomes() {
         .expect_add_repo()
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_tracked)
         .returning(|_, _| Ok(false));
-
-    // Mocking for 'notfound' repo
     mock_repository
         .expect_repo_exists()
         .with(eq("owner"), eq("notfound"))
         .returning(|_, _| Ok(false));
-
-    // Mocking for 'gh-error' repo
     mock_repository.expect_repo_exists().with(eq("owner"), eq("gh-error")).returning(
         move |_, _| Err(RepositoryServiceError::GithubClientError(GithubError::Unauthorized)),
     );
-
-    // Mocking for 'add-error' repo
     mock_repository
         .expect_repo_exists()
         .with(eq("owner"), eq("add-error"))
         .returning(|_, _| Ok(true));
-
     mock_repository
         .expect_add_repo()
         .withf(move |_, e: &RepoEntity| e.name_with_owner == name_add_error)
@@ -490,17 +489,9 @@ async fn test_add_repos_multiple_mixed_outcomes() {
         "{url_new} {url_tracked} {url_notfound} {url_invalid} {url_gh_error}
 {url_add_error}"
     );
-    let message = mock_message(CHAT_ID, mock_msg_text.as_str());
-
-    let ctx = Context {
-        handler: &harness.bot_handler,
-        message: &message,
-        dialogue: &harness.dialogue,
-        query: None,
-    };
 
     // Act
-    let result = commands::add::handle_reply(ctx, message.text().unwrap()).await;
+    let result = harness.handle_add_reply(&mock_msg_text).await;
 
     // Assert
     assert!(result.is_ok());
@@ -511,13 +502,12 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
     // Arrage
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-    let chat_id = CHAT_ID;
     let repo_url = "https://github.com/owner/repo";
     let repo_name_with_owner = "owner/repo";
 
     // Set ALL expectations for the entire test flow
     // Expectation for Interaction 1 (/add command)
-    mock_messaging.expect_prompt_for_repo_input().with(eq(chat_id)).times(1).returning(|_| Ok(()));
+    mock_messaging.expect_prompt_for_repo_input().with(eq(CHAT_ID)).times(1).returning(|_| Ok(()));
 
     // Expectations for Interaction 2 (the reply to the prompt)
     setup_add_repo_mocks(&mut mock_messaging);
@@ -532,7 +522,7 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
     // Expect the repository to be added
     mock_repository
         .expect_add_repo()
-        .withf(move |&id, e| id == chat_id && e.name_with_owner == repo_name_with_owner)
+        .withf(move |&id, e| id == CHAT_ID && e.name_with_owner == repo_name_with_owner)
         .times(1)
         .returning(|_, _| Ok(true));
 
@@ -548,43 +538,22 @@ async fn test_dialogue_persists_awaiting_add_repo_state() {
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
 
-    // Act & Assert 1: Initial Command Handling
-    let dialogue1: Dialogue<CommandState, DialogueStorage> =
-        Dialogue::new(harness.storage.clone(), chat_id);
-    let add_msg = mock_message(chat_id, "/add");
-
-    harness.bot_handler.handle_commands(&add_msg, Command::Add, dialogue1.clone()).await.unwrap();
-
-    let state1 = dialogue1.get().await.unwrap();
+    // Act & Assert: Initial command
+    let dialogue1 = harness.new_dialogue();
+    harness.handle_command_with_dialogue(Command::Add, dialogue1.clone()).await.unwrap();
     assert!(
-        matches!(state1, Some(CommandState::AwaitingAddRepo)),
-        "State should be AwaitingAddRepo after /add"
+        matches!(dialogue1.get().await.unwrap(), Some(CommandState::AwaitingAddRepo)),
+        "State should be AwaitingAddRepo"
     );
 
-    // Act & Assert 2: Reply Handling
-    // This simulates a new update arriving. We create a new dialogue instance,
-    // which should load its state from the storage.
-    let dialogue2 = Dialogue::new(harness.storage.clone(), chat_id);
-
-    // This is the core check for persistence.
-    let persisted_state = dialogue2.get().await.unwrap();
+    // Act & Assert: Reply with repo URL
+    let dialogue2 = harness.new_dialogue();
     assert!(
-        matches!(persisted_state, Some(CommandState::AwaitingAddRepo)),
-        "State should be loaded from storage for new dialogue instance"
+        matches!(dialogue2.get().await.unwrap(), Some(CommandState::AwaitingAddRepo)),
+        "State should persist"
     );
-
-    // `handle_reply` expects a message that is a reply, so we need to mock that.
-    let mut reply_msg = mock_message(chat_id, repo_url);
-    if let MessageKind::Common(common) = &mut reply_msg.kind {
-        // Just mock a default message as the one being replied to.
-        common.reply_to_message = Some(Box::new(mock_message(chat_id, "random message")));
-    }
-
-    harness.bot_handler.handle_reply(&reply_msg, &dialogue2).await.unwrap();
-
-    // Act & Assert 3: Final State Check
-    let final_state = dialogue2.get().await.unwrap();
-    assert!(final_state.is_none(), "State should be cleared after successful reply");
+    harness.handle_reply_with_dialogue(repo_url, &dialogue2).await.unwrap();
+    assert!(dialogue2.get().await.unwrap().is_none(), "State should be cleared");
 }
 
 #[tokio::test]
@@ -592,7 +561,6 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-    let chat_id = CHAT_ID;
     let repo_id = "owner/repo";
     let from_page = 1;
     let labels_page = 1;
@@ -620,32 +588,33 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
     let call_count = RefCell::new(0);
     mock_repository
         .expect_get_repo_github_labels()
-        .with(eq(chat_id), eq(repo_entity.clone()), eq(labels_page))
+        .with(eq(CHAT_ID), eq(repo_entity.clone()), eq(labels_page))
         .times(2)
         .returning(move |_, _, _| {
             *call_count.borrow_mut() += 1;
-            match *call_count.borrow() {
-                1 => Ok(initial_labels.clone()),
-                _ => Ok(updated_labels.clone()),
+            if *call_count.borrow() == 1 {
+                Ok(initial_labels.clone())
+            } else {
+                Ok(updated_labels.clone())
             }
         });
 
     mock_messaging
         .expect_edit_labels_msg()
-        .withf(move |&cid, _, _, rid, fp| cid == chat_id && rid == repo_id && *fp == from_page)
+        .withf(move |&cid, _, _, rid, fp| cid == CHAT_ID && rid == repo_id && *fp == from_page)
         .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
     // Other calls are only expected once.
     mock_messaging
         .expect_answer_labels_callback_query()
-        .withf(move |&cid, _, _, rid, fp| cid == chat_id && rid == repo_id && *fp == from_page)
+        .withf(move |&cid, _, _, rid, fp| cid == CHAT_ID && rid == repo_id && *fp == from_page)
         .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
     mock_repository
         .expect_toggle_label()
-        .with(eq(chat_id), eq(repo_entity.clone()), eq(label_to_toggle))
+        .with(eq(CHAT_ID), eq(repo_entity.clone()), eq(label_to_toggle))
         .times(1)
         .returning(|_, _, _| Ok(true));
 
@@ -657,39 +626,24 @@ async fn test_dialogue_persists_viewing_repo_labels_state() {
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
 
-    // --- Act & Assert ---
-
-    // 1. Simulate the first callback: viewing labels.
-    let dialogue1: Dialogue<CommandState, DialogueStorage> =
-        Dialogue::new(harness.storage.clone(), chat_id);
-    let (_, view_labels_query) = mock_callback_query(
-        chat_id,
-        &CallbackAction::ViewRepoLabels(repo_id, labels_page, from_page),
-    );
-    harness.bot_handler.handle_callback_query(&view_labels_query, dialogue1.clone()).await.unwrap();
-
+    // Act & Assert: View labels
+    let dialogue1 = harness.new_dialogue();
+    let view_action = CallbackAction::ViewRepoLabels(repo_id, labels_page, from_page);
+    harness.handle_callback_with_dialogue(&view_action, dialogue1.clone()).await.unwrap();
     let state1 = dialogue1.get().await.unwrap();
     assert!(
         matches!(&state1, Some(CommandState::ViewingRepoLabels { repo_id: r, from_page: f }) if r == repo_id && *f == from_page),
-        "State should be ViewingRepoLabels after action"
+        "State should be ViewingRepoLabels"
     );
 
-    // 2. Simulate the second callback: toggling a label.
-    let dialogue2 = Dialogue::new(harness.storage.clone(), chat_id);
-    let (_, toggle_label_query) = mock_callback_query(
-        chat_id,
-        &CallbackAction::ToggleLabel(label_to_toggle, labels_page, from_page),
-    );
-    harness
-        .bot_handler
-        .handle_callback_query(&toggle_label_query, dialogue2.clone())
-        .await
-        .unwrap();
-
+    // Act & Assert: Toggle label
+    let dialogue2 = harness.new_dialogue();
+    let toggle_action = CallbackAction::ToggleLabel(label_to_toggle, labels_page, from_page);
+    harness.handle_callback_with_dialogue(&toggle_action, dialogue2.clone()).await.unwrap();
     let final_state = dialogue2.get().await.unwrap();
     assert!(
         matches!(&final_state, Some(CommandState::ViewingRepoLabels { repo_id: r, from_page: f }) if r == repo_id && *f == from_page),
-        "State should remain ViewingRepoLabels after toggling"
+        "State should remain ViewingRepoLabels"
     );
 }
 
@@ -722,11 +676,10 @@ async fn test_handle_callback_view_repo_details() {
         .returning(|_, _, _, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let (_, query) =
-        mock_callback_query(CHAT_ID, &CallbackAction::ViewRepoDetails(repo_id, from_page));
+    let action = CallbackAction::ViewRepoDetails(repo_id, from_page);
 
     // Act
-    let result = harness.bot_handler.handle_callback_query(&query, harness.dialogue.clone()).await;
+    let result = harness.handle_callback(&action).await;
 
     // Assert
     assert!(result.is_ok());
@@ -751,10 +704,9 @@ async fn test_handle_reply_invalid_state() {
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
     harness.dialogue.update(CommandState::None).await.unwrap();
-    let msg = mock_message(CHAT_ID, "some random text");
 
     // Act
-    let result = harness.bot_handler.handle_reply(&msg, &harness.dialogue).await;
+    let result = harness.handle_reply_with_dialogue("some random text", &harness.dialogue).await;
 
     // Assert
     assert!(result.is_ok());
@@ -797,10 +749,9 @@ async fn test_handle_reply_awaiting_add_repo_success() {
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
     // Set the state to AwaitingAddRepo
     harness.dialogue.update(CommandState::AwaitingAddRepo).await.unwrap();
-    let msg = mock_message(CHAT_ID, repo_url);
 
     // Act
-    let result = harness.bot_handler.handle_reply(&msg, &harness.dialogue).await;
+    let result = harness.handle_reply_with_dialogue(repo_url, &harness.dialogue).await;
 
     // Assert
     assert!(result.is_ok());
@@ -836,11 +787,10 @@ async fn test_handle_callback_view_repo_labels() {
         .returning(|_, _, _, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let (_, query) =
-        mock_callback_query(CHAT_ID, &CallbackAction::ViewRepoLabels(repo_id, page, from_page));
+    let action = CallbackAction::ViewRepoLabels(repo_id, page, from_page);
 
     // Act
-    let result = harness.bot_handler.handle_callback_query(&query, harness.dialogue.clone()).await;
+    let result = harness.handle_callback(&action).await;
 
     // Assert
     assert!(result.is_ok());
@@ -874,11 +824,10 @@ async fn test_handle_callback_view_repo_labels_error() {
     mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let (_, query) =
-        mock_callback_query(CHAT_ID, &CallbackAction::ViewRepoLabels(repo_id, page, from_page));
+    let action = CallbackAction::ViewRepoLabels(repo_id, page, from_page);
 
     // Act
-    let result = harness.bot_handler.handle_callback_query(&query, harness.dialogue.clone()).await;
+    let result = harness.handle_callback(&action).await;
 
     // Assert
     assert!(matches!(result, Err(BotHandlerError::InternalError(_))));
@@ -902,10 +851,10 @@ async fn test_handle_callback_remove_repo_error() {
     mock_messaging.expect_answer_callback_query().times(1).returning(|_, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let (_, query) = mock_callback_query(CHAT_ID, &CallbackAction::RemoveRepoPrompt(repo_id));
+    let action = CallbackAction::RemoveRepoPrompt(repo_id);
 
     // Act
-    let result = harness.bot_handler.handle_callback_query(&query, harness.dialogue).await;
+    let result = harness.handle_callback(&action).await;
 
     // Assert
     assert!(matches!(result, Err(BotHandlerError::InternalError(_))));
@@ -939,11 +888,10 @@ async fn test_handle_callback_back_to_repo_details() {
         .returning(|_, _, _, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let (_, query) =
-        mock_callback_query(CHAT_ID, &CallbackAction::BackToRepoDetails(repo_id, from_page));
+    let action = CallbackAction::BackToRepoDetails(repo_id, from_page);
 
     // Act
-    let result = harness.bot_handler.handle_callback_query(&query, harness.dialogue.clone()).await;
+    let result = harness.handle_callback(&action).await;
 
     // Assert
     assert!(result.is_ok());
@@ -956,15 +904,14 @@ async fn test_handle_callback_back_to_repo_list() {
     // Arrange
     let mut mock_messaging = MockMessagingService::new();
     let mut mock_repository = MockRepositoryService::new();
-    let chat_id = CHAT_ID;
-    let page = 2; // Test going back to a specific page
+    let page = 2;
 
     let repos = vec![RepoEntity::from_str("owner/repo1").unwrap()];
     let paginated_repos = Paginated::new(repos.clone(), page);
 
     mock_repository
         .expect_get_user_repos()
-        .with(eq(chat_id), eq(page))
+        .with(eq(CHAT_ID), eq(page))
         .times(1)
         .returning(move |_, _| Ok(paginated_repos.clone()));
 
@@ -972,25 +919,23 @@ async fn test_handle_callback_back_to_repo_list() {
 
     mock_messaging
         .expect_edit_list_msg()
-        .withf(move |&cid, _, p_repos| cid == chat_id && p_repos.items == repos)
+        .withf(move |&cid, _, p_repos| cid == CHAT_ID && p_repos.items == repos)
         .times(1)
         .returning(|_, _, _| Ok(()));
 
     let harness = TestHarness::new(mock_messaging, mock_repository).await;
-    let dialogue: Dialogue<CommandState, DialogueStorage> =
-        Dialogue::new(harness.storage.clone(), chat_id);
-    // Set an initial state to ensure it gets cleared.
-    dialogue
+    harness
+        .dialogue
         .update(CommandState::ViewingRepoLabels { repo_id: "owner/repo".to_string(), from_page: 1 })
         .await
         .unwrap();
-    let (_, query) = mock_callback_query(chat_id, &CallbackAction::BackToRepoList(page));
+    let action = CallbackAction::BackToRepoList(page);
 
     // Act
-    let result = harness.bot_handler.handle_callback_query(&query, dialogue.clone()).await;
+    let result = harness.handle_callback(&action).await;
 
     // Assert
     assert!(result.is_ok());
-    let state = dialogue.get().await.unwrap();
+    let state = harness.dialogue.get().await.unwrap();
     assert!(matches!(state, Some(CommandState::None)), "Dialogue state should be reset to None");
 }
