@@ -9,7 +9,7 @@ pub mod commands;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 pub use callback_actions::CallbackAction;
 use serde::{Deserialize, Serialize};
@@ -96,6 +96,18 @@ pub enum Command {
     /// Show an overview of all tracked repositories and their labels.
     #[command(description = "Show an overview of tracked repositories.")]
     Overview,
+}
+
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Command::Start => write!(f, "/start"),
+            Command::Help => write!(f, "/help"),
+            Command::Add => write!(f, "/add"),
+            Command::List => write!(f, "/list"),
+            Command::Overview => write!(f, "/overview"),
+        }
+    }
 }
 
 /// Encapsulates the bot, storage and GitHub client.
